@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 const C = require('./shared/calc.js');
+const QCReports = require('./shared/reports.js');
 
 const ROOT = __dirname;
 const REPO_ROOT = path.resolve(ROOT, '..');
@@ -193,102 +194,8 @@ function normalizeSocial(b, existing) {
 }
 
 /* -------------------------------------------------------------- گزارش‌ها */
-function inRange(dateStr, from, to) {
-  const j = C.parseJalali(dateStr);
-  if (!j) return false;
-  return C.jalaliInRange(j, from ? C.parseJalali(from) : null, to ? C.parseJalali(to) : null);
-}
-
-function filterRows(rows, q) {
-  return rows.filter((r) => {
-    if (q.from || q.to) { if (!inRange(r.reviewDate, q.from, q.to)) return false; }
-    if (q.team && r.team !== q.team) return false;
-    if (q.agent && r.agentName !== q.agent) return false;
-    if (q.qc && r.qcAgent !== q.qc) return false;
-    return true;
-  });
-}
-
-function scoredRows(rows) { return rows.filter((r) => r.score != null && r.score >= 0 && r.score <= 100); }
-
-/** میانگین نمره‌های نمره‌دار */
-function avgScore(rows) { return C.avg(scoredRows(rows).map((r) => r.score)); }
-function rateAll(rows, key) { return C.elementRate(rows.map((r) => r[key])); }
-
-function ticketReport(level, q) {
-  const rows = filterRows(db.tickets, q);
-  const keys = ['q1', 'q2', 'q3', 'q4'];
-  const group = level === 'team' ? (r) => r.team : (r) => r.agentName;
-  const names = [...new Set(rows.map(group).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fa'));
-  return names.map((name) => {
-    const rs = rows.filter((r) => group(r) === name);
-    const agents = new Set(rs.map((r) => r.agentName)).size;
-    return {
-      name,
-      team: level === 'team' ? name : teamOf(name),
-      count: scoredRows(rs).length,          // تعداد ارزیابی نمره‌دار
-      agentsEvaluated: level === 'team' ? agents : undefined,
-      avgScore: avgScore(rs),                // میانگین نمره نهایی
-      q1Rate: rateAll(rs, 'q1'), q2Rate: rateAll(rs, 'q2'),
-      q3Rate: rateAll(rs, 'q3'), q4Rate: rateAll(rs, 'q4'),
-      redlineZero: rs.filter((r) => r.score === 0 && String(r.redline) === '0').length, // ردلاین صفر
-      total: rs.length
-    };
-  });
-}
-
-function socialReport(level, q) {
-  const rows = filterRows(db.socials, q);
-  const group = level === 'team' ? (r) => r.team : (r) => r.agentName;
-  const names = [...new Set(rows.map(group).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fa'));
-  const sla = (rs, v) => rs.filter((r) => r.slaStatus === v).length;
-  const answered = (rs) => rs.filter((r) => r.responseStatus === 'پاسخ داده شده').length;
-  return names.map((name) => {
-    const rs = rows.filter((r) => group(r) === name);
-    const okS = sla(rs, 'رعایت شده'), badS = sla(rs, 'رعایت نشده');
-    const agents = new Set(rs.map((r) => r.agentName)).size;
-    return {
-      name,
-      team: level === 'team' ? name : teamOf(name),
-      count: scoredRows(rs).length,                             // تعداد ارزیابی نمره‌دار
-      agentsEvaluated: level === 'team' ? agents : undefined,   // تعداد کارشناسان ارزیابی‌شده
-      avgScore: avgScore(rs),                                   // میانگین نمره /۱۰۰
-      answered: answered(rs),                                   // پیام پاسخ‌داده‌شده
-      slaReal: okS + badS === 0 ? '' : C.round2(100 * okS / (okS + badS)), // درصد رعایت SLA واقعی
-      qSlaRate: rateAll(rs, 'qSla'),                            // میانگین المان SLA
-      qFollowRate: rateAll(rs, 'qFollow'),                      // پیگیری
-      qClosingRate: rateAll(rs, 'qClosing'),                    // پایان‌بندی
-      qToneRate: rateAll(rs, 'qTone'),                          // لحن
-      unanswered: rs.filter((r) => r.responseStatus === 'عدم پاسخ').length, // عدم پاسخ
-      slaMissed: badS,                                          // SLA رعایت‌نشده
-      avgDurationMin: C.avg(rs.filter((r) => r.durationMin != null).map((r) => r.durationMin)),
-      total: rs.length
-    };
-  });
-}
-
-function dashboard(q) {
-  const T = filterRows(db.tickets, q);
-  const S = filterRows(db.socials, q);
-  const Tsc = scoredRows(T), Ssc = scoredRows(S);
-  const all = Tsc.map((r) => r.score).concat(Ssc.map((r) => r.score));
-  const okS = S.filter((r) => r.slaStatus === 'رعایت شده').length;
-  const badS = S.filter((r) => r.slaStatus === 'رعایت نشده').length;
-  const bucket = (arr, lo, hi) => arr.filter((x) => x >= lo && (hi == null || x < hi)).length;
-  return {
-    ticketCount: T.length, ticketScored: Tsc.length,
-    socialCount: S.length, socialScored: Ssc.length,
-    avgTicket: C.avg(Tsc.map((r) => r.score)),
-    avgSocial: C.avg(Ssc.map((r) => r.score)),
-    avgAll: C.avg(all),
-    slaOk: okS, slaMissed: badS,
-    slaReal: okS + badS === 0 ? '' : C.round2(100 * okS / (okS + badS)),
-    unanswered: S.filter((r) => r.responseStatus === 'عدم پاسخ').length,
-    redlineZero: T.filter((r) => r.score === 0 && String(r.redline) === '0').length,
-    dist: [bucket(all, 0, 50), bucket(all, 50, 75), bucket(all, 75, 90), bucket(all, 90, null)],
-    latestTickets: T.slice(-6).reverse(), latestSocials: S.slice(-6).reverse()
-  };
-}
+/* منطق گزارش‌سازی در shared/reports.js مشترک است (سرور و نسخه standalone) */
+const filterRows = QCReports.filterRows;
 
 /* ------------------------------------------------------------- فایل HTML اصلی */
 function findFeedbackHtml() {
@@ -339,7 +246,7 @@ async function handleApi(req, res, pathname, query) {
 
   /* داشبورد */
   if (pathname === '/api/dashboard' && method === 'GET') {
-    return ok(res, dashboard({ from: query.from, to: query.to }));
+    return ok(res, QCReports.dashboard(db, { from: query.from, to: query.to }));
   }
 
   /* ارزیابی تیکت */
@@ -452,7 +359,7 @@ async function handleApi(req, res, pathname, query) {
     const type = query.type === 'social' ? 'social' : 'ticket';
     const level = query.level === 'team' ? 'team' : 'agent';
     const q = { from: query.from, to: query.to, team: query.team, agent: query.agent, qc: query.qc };
-    const rows = type === 'ticket' ? ticketReport(level, q) : socialReport(level, q);
+    const rows = type === 'ticket' ? QCReports.ticketReport(db, level, q) : QCReports.socialReport(db, level, q);
     return ok(res, { type, level, rows });
   }
 
