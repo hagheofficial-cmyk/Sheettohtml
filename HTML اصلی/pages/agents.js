@@ -35,6 +35,7 @@ async function render(root) {
         <p>نام، تیم‌بندی و شماره داخلی — نما گروهی بر اساس تیم + ویرایش آن‌لاین</p>
       </div>
       <div class="spacer"></div>
+      <button class="btn soft" id="btnImport"><i class="fa-solid fa-file-import"></i> ایمپورت اکسل کارشناسان</button>
       <button class="btn success-soft" id="teamAdd"><i class="fa-solid fa-plus"></i> تیم جدید</button>
       <button class="btn brand" id="agentAdd"><i class="fa-solid fa-user-plus"></i> کارشناس جدید</button>
     </div>
@@ -92,9 +93,10 @@ async function render(root) {
 
     function rowHtml(a) {
       const isSel = sel.has(a.id);
+      const sub = a.subgroup && a.subgroup !== '—' ? `<div style="font-size:10.5px;color:var(--muted)"><i class="fa-solid fa-sitemap" style="opacity:.6"></i> ${esc(a.subgroup)}</div>` : '';
       return `<tr data-id="${a.id}" data-name="${esc(a.name)}" style="${a.active === false ? 'opacity:.45' : ''}">
         <td style="width:30px"><input type="checkbox" class="row-check" ${isSel ? 'checked' : ''}></td>
-        <td class="cell-main">${esc(a.name)}${a.active === false ? ' <span class="badge gray">بایگانی</span>' : ''}</td>
+        <td class="cell-main">${esc(a.name)}${a.active === false ? ' <span class="badge gray">بایگانی</span>' : ''}${sub}</td>
         <td><input type="text" class="row-ext" dir="ltr" inputmode="numeric" data-ed="1" value="${a.ext == null ? '' : esc(String(a.ext))}" style="width:74px;text-align:center;font-size:12px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px"></td>
         <td><input type="text" class="row-team" data-ed="1" value="${esc(a.team)}" list="teamsDlAll" style="flex:1;min-width:140px;font-size:12px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 8px"></td>
         <td style="font-size:11px">${a.active !== false ? '<button class="btn soft sm" data-act="archive">بایگانی</button>' : '<button class="btn success-soft sm" data-act="restore">بازیابی</button>'}</td>
@@ -283,10 +285,12 @@ async function render(root) {
           <datalist id="teamsAll">${App.state.teams.map((t) => `<option value="${esc(t)}">`).join('')}</datalist></div>
         <div class="field"><label>شماره داخلی</label>
           <input class="input" id="aE" dir="ltr" style="text-align:right" inputmode="numeric" value="${agent && agent.ext != null ? agent.ext : ''}" placeholder="مثلاً ۳۰۲۲"></div>
+        <div class="field"><label>زیرمجموعه (واحد)</label>
+          <input class="input" id="aS" value="${esc(agent && agent.subgroup ? agent.subgroup : '')}" placeholder="مثلاً Shams Team"></div>
       </div></div>
       <div class="modal-foot"><button class="btn ghost" data-close>انصراف</button><button class="btn primary" id="aSave"><i class="fa-solid fa-floppy-disk"></i> ذخیره</button></div>`);
     $('#aSave', m).addEventListener('click', async () => {
-      const payload = { name: $('#aN', m).value.trim(), team: $('#aT', m).value.trim(), ext: $('#aE', m).value.trim() || null };
+      const payload = { name: $('#aN', m).value.trim(), team: $('#aT', m).value.trim(), ext: $('#aE', m).value.trim() || null, subgroup: $('#aS', m).value.trim() };
       try {
         if (isNew) await api.post('/api/agents', payload);
         else await api.put('/api/agents/' + agent.id, payload);
@@ -316,8 +320,85 @@ async function render(root) {
     });
   }
 
+  /* ایمپورت اکسل زیرمجموعه/کارشناس/تیم/CallerID */
+  function importForm() {
+    const m = UI.modal(`${UI.modalHead('ایمپورت اکسل کارشناسان', 'fa-file-import')}
+      <div class="modal-body" style="min-width:min(760px,94vw)">
+        <div class="note"><i class="fa-solid fa-circle-info"></i>
+          ستون‌های مورد انتظار در اکسل: <b>زیرمجموعه اصلی</b> (اختیاری)، <b>کارشناس</b> (نام)، <b>تیم</b>، <b>CallerID</b> (شماره داخلی).
+          کارشناس موجود به‌روز می‌شود و کارشناس جدید اضافه می‌گردد؛ پس از آن همه فیلترها همین لیست را می‌خوانند.
+        </div>
+        <div class="field" style="margin-top:10px"><label>انتخاب فایل اکسل</label>
+          <input type="file" class="input" id="impFile" accept=".xlsx,.xls,.csv" dir="ltr"></div>
+        <div id="impPreview"></div>
+      </div>
+      <div class="modal-foot"><button class="btn ghost" data-close>انصراف</button>
+        <button class="btn primary" id="impGo" disabled><i class="fa-solid fa-cloud-arrow-up"></i> پردازش و به‌روزرسانی لیست</button></div>`);
+    let pending = [];
+    $('#impFile', m).addEventListener('change', async (e) => {
+      const f = e.target.files[0];
+      pending = [];
+      $('#impGo', m).disabled = true;
+      if (!f) { $('#impPreview', m).innerHTML = ''; return; }
+      let rows;
+      try {
+        const buf = await f.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      } catch (err) { $('#impPreview', m).innerHTML = '<div class="note bad">خواندن فایل ممکن نشد: ' + esc(err.message) + '</div>'; return; }
+      if (!rows.length) { $('#impPreview', m).innerHTML = '<div class="note bad">فایل خالی است.</div>'; return; }
+      /* سطر سرستون: سطری که «کارشناس» و یکی از CallerID/داخلی را دارد */
+      let hi = rows.findIndex((r) => r.some((c) => /کارشناس/.test(String(c))) && r.some((c) => /caller|داخلی/i.test(String(c))));
+      if (hi < 0) hi = 0;
+      const hdr = rows[hi].map((c) => String(c).trim());
+      const ci = {
+        sub: hdr.findIndex((c) => /زیرمجموعه|زیر\s*مجموعه|واحد|sub/i.test(c)),
+        name: hdr.findIndex((c) => /کارشناس/.test(c)),
+        team: hdr.findIndex((c) => /تیم/.test(c)),
+        ext: hdr.findIndex((c) => /caller|callerid|داخلی|دفتر/i.test(c))
+      };
+      if (ci.name < 0) { $('#impPreview', m).innerHTML = '<div class="note bad">ستون «کارشناس» در فایل پیدا نشد — سرستون‌ها: ' + esc(hdr.filter(Boolean).join('، ')) + '</div>'; return; }
+      for (let i = hi + 1; i < rows.length; i++) {
+        const r = rows[i];
+        const name = String(ci.name >= 0 && r[ci.name] != null ? r[ci.name] : '').trim();
+        if (!name) continue;
+        const sub = String(ci.sub >= 0 && r[ci.sub] != null ? r[ci.sub] : '').trim();
+        pending.push({
+          name,
+          team: String(ci.team >= 0 && r[ci.team] != null ? r[ci.team] : '').trim(),
+          ext: C.faToEn(String(ci.ext >= 0 && r[ci.ext] != null ? r[ci.ext] : '')).replace(/[^\d]/g, ''),
+          subgroup: sub === '—' || sub === '-' ? '' : sub
+        });
+      }
+      if (!pending.length) { $('#impPreview', m).innerHTML = '<div class="note bad">ردیفی (به‌جز سرستون) با مقدار «کارشناس» پیدا نشد.</div>'; return; }
+      const shown = pending.slice(0, 12);
+      $('#impPreview', m).innerHTML = `
+        <div class="note" style="margin-top:10px"><i class="fa-solid fa-check"></i> ${fa(pending.length)} ردیف آماده‌ی پردازش است${pending.length > 12 ? ' — ۱۲ ردیف اول:' : ':'}</div>
+        <div class="table-wrap" style="max-height:230px;overflow-y:auto;margin-top:6px"><table class="tbl" style="font-size:12px">
+          <thead><tr><th>کارشناس</th><th>تیم</th><th>CallerID</th><th>زیرمجموعه</th></tr></thead>
+          <tbody>${shown.map((x) => `<tr><td class="cell-main">${esc(x.name)}</td><td>${esc(x.team)}</td><td dir="ltr">${esc(x.ext)}</td><td>${esc(x.subgroup || '')}</td></tr>`).join('')}</tbody>
+        </table></div>`;
+      $('#impGo', m).disabled = false;
+    });
+    $('#impGo', m).addEventListener('click', async () => {
+      const btn = $('#impGo', m);
+      btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> در حال ارسال…';
+      try {
+        const res = await api.post('/api/agents/bulk', { rows: pending });
+        toast.success('ایمپورت انجام شد — افزوده: ' + fa(res.added) + '، به‌روز: ' + fa(res.updated) + (res.skipped ? '، نادیده: ' + fa(res.skipped) : ''));
+        if (res.errs && res.errs.length) toast.info(res.errs.join(' · '));
+        m.remove();
+        await App.boot();
+        $('#agView').value = 'flat';
+        load();
+      } catch (e) { toast.error(e.message); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> پردازش و به‌روزرسانی لیست'; }
+    });
+  }
+
   $('#agentAdd').addEventListener('click', () => agentForm(null));
   $('#teamAdd').addEventListener('click', teamForm);
+  $('#btnImport').addEventListener('click', importForm);
   $('#agSearch').addEventListener('input', debounce(renderAgents, 220));
   $('#agView').addEventListener('change', renderAgents);
   $('#agReload').addEventListener('click', load);

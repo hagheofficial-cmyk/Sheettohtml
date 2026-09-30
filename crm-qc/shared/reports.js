@@ -21,10 +21,14 @@
   /** فیلتر مشترک ردیف‌ها: بازه تاریخ بررسی + تیم + کارشناس + QC */
   function filterRows(rows, q) {
     q = q || {};
+    /* پشتیبانی از چندانتخابی: team و agent می‌تواند لیست (رشته با ',' یا آرایه) باشد */
+    var teamSet = null, agentSet = null;
+    if (q.team) teamSet = new Set((Array.isArray(q.team) ? q.team : String(q.team).split(',')).map(String).filter(Boolean));
+    if (q.agent) agentSet = new Set((Array.isArray(q.agent) ? q.agent : String(q.agent).split(',')).map(String).filter(Boolean));
     return rows.filter(function (r) {
       if (q.from || q.to) { if (!inRange(r.reviewDate, q.from, q.to)) return false; }
-      if (q.team && r.team !== q.team) return false;
-      if (q.agent && r.agentName !== q.agent) return false;
+      if (teamSet && !teamSet.has(r.team)) return false;
+      if (agentSet && !agentSet.has(r.agentName)) return false;
       if (q.qc && r.qcAgent !== q.qc) return false;
       return true;
     });
@@ -208,6 +212,62 @@
 
   /* ----------------------------------------------------- پرونده کارشناس */
   /** کارشناس با نام یا داخلی (ext) → جزئیات کامل */
+  /* ---------------------------- گزارش تماس (ردیفی) + نمرهی اقلام کلی ---------------------------- */
+  function callReport(data, level, q, crit) {
+    q = q || {}; crit = crit || {};
+    var criteriaFor = crit.criteriaFor || function () { return []; };
+    var labelOf = crit.labelOf || function (t, k) { return k; };
+    var teamSet = null, agentSet = null;
+    if (q.team) teamSet = new Set((Array.isArray(q.team) ? q.team : String(q.team).split(',')).map(String).filter(Boolean));
+    if (q.agent) agentSet = new Set((Array.isArray(q.agent) ? q.agent : String(q.agent).split(',')).map(String).filter(Boolean));
+    function teamN(rr) { return teamOf(data.agents, rr.expertName) || rr.team || ''; }
+    var rowsFB = (data.callFeedbacks || []).filter(function (r) {
+      if ((q.from || q.to) && !inRange(r.reviewDate || '', q.from, q.to)) return false;
+      if (teamSet && !teamSet.has(teamN(r))) return false;
+      if (agentSet && !agentSet.has(r.expertName)) return false;
+      if (q.form && r.formType !== q.form) return false;
+      return true;
+    });
+    var group = level === 'team' ? teamN : function (r) { return r.expertName; };
+    var seen = {}, names = [];
+    rowsFB.forEach(function (r) { var g = group(r); if (g && !seen[g]) { seen[g] = 1; names.push(g); } });
+    function avgOf(rr) { return avgScore(rr); }
+    var rows = names.map(function (name) {
+      var rs = rowsFB.filter(function (r) { return group(r) === name; });
+      var tele = rs.filter(function (r) { return r.formType === 'tele'; });
+      var acc = rs.filter(function (r) { return r.formType === 'account'; });
+      var mlm = rs.filter(function (r) { return r.formType === 'mlm'; });
+      return {
+        name: name,
+        team: level === 'team' ? name : (teamOf(data.agents, name) || (rs[0] && rs[0].team) || ''),
+        count: scoredRows(rs).length,
+        avgScore: avgOf(rs),
+        redlines: rs.filter(function (r) { return r.redline === 1; }).length,
+        teleCount: tele.length, teleAvg: avgOf(tele),
+        accCount: acc.length, accAvg: avgOf(acc),
+        mlmCount: mlm.length, mlmAvg: avgOf(mlm),
+        total: rs.length
+      };
+    });
+    function rates(type) {
+      var subset = rowsFB.filter(function (r) { return r.formType === type; });
+      return (criteriaFor(type) || []).map(function (k) {
+        var ok = 0, bad = 0;
+        subset.forEach(function (r) {
+          var v = (r.elements || {})[k];
+          if (v === 1) ok++; else if (v === 0) bad++;
+        });
+        var tot = ok + bad;
+        return { key: k, label: labelOf(type, k), form: type, ok: ok, bad: bad, total: tot,
+                 successRate: tot ? C.round2(100 * ok / tot) : '', errorRate: tot ? C.round2(100 * bad / tot) : '' };
+      });
+    }
+    var elements = [].concat(rates('tele'), rates('account'), rates('mlm'))
+      .filter(function (r) { return r.total > 0; })
+      .sort(function (a, b) { return (b.errorRate || 0) - (a.errorRate || 0); });
+    return { rows: rows, elements: elements };
+  }
+
   function agentByIdent(agents, ident) {
     ident = C.faToEn(String(ident == null ? '' : ident)).trim().toLowerCase();
     if (!ident) return null;
@@ -321,12 +381,15 @@
     var criteriaFor = crit.criteriaFor || function () { return []; };
     var labelOf = crit.labelOf || function (t, k) { return k; };
 
-    /* فیلتر مشترک (تاریخ/تیم/کارشناس/فرم) */
+    /* فیلتر مشترک (تاریخ/تیم/کارشناس/فرم) — با پشتیبانی چندانتخابی */
+    var teamSet = null, agentSet = null;
+    if (q.team) teamSet = new Set((Array.isArray(q.team) ? q.team : String(q.team).split(',')).map(String).filter(Boolean));
+    if (q.agent) agentSet = new Set((Array.isArray(q.agent) ? q.agent : String(q.agent).split(',')).map(String).filter(Boolean));
     var Ph = (data.callFeedbacks || []).filter(function (r) {
       if ((q.from || q.to) && !inRange(r.reviewDate || '', q.from, q.to)) return false;
       if (q.form && r.formType !== q.form) return false;
-      if (q.agent && r.expertName !== q.agent) return false;
-      if (q.team) { var tn = teamOf(data.agents, r.expertName) || r.team || ''; if (tn !== q.team) return false; }
+      if (agentSet && !agentSet.has(r.expertName)) return false;
+      if (teamSet) { var tn = teamOf(data.agents, r.expertName) || r.team || ''; if (!teamSet.has(tn)) return false; }
       return true;
     });
 
@@ -470,7 +533,7 @@
   return {
     inRange: inRange, filterRows: filterRows, scoredRows: scoredRows,
     monthlyBreakdown: monthlyBreakdown, combinedAgentReport: combinedAgentReport, agentByIdent: agentByIdent, agentProfile: agentProfile,
-    ticketReport: ticketReport, socialReport: socialReport, dashboard: dashboard,
+    ticketReport: ticketReport, socialReport: socialReport, callReport: callReport, dashboard: dashboard,
     callAnalysis: callAnalysis
   };
 });

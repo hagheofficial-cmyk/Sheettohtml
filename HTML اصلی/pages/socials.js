@@ -197,7 +197,29 @@ async function listPage(root) {
   const filters = $('#filters');
   const mk = (html) => { const d = el(html); filters.appendChild(d); return d; };
   const fSearch = mk(`<div class="field" style="flex:2"><label>جستجو</label><input class="input" placeholder="نام کارشناس، پیامرسان، کامنت…"></div>`);
-  const fTeam = mk(`<div class="field"><label>تیم</label><select class="input"><option value="">همه تیم‌ها</option>${st.teams.map((t) => `<option>${esc(t)}</option>`).join('')}</select></div>`);
+  /* فیلتر چندانتخابی تیم + کارشناس */
+  const __allAgents = (st.agents || []).filter((a) => a.active !== false);
+  const __agentItems = (teams) => (teams && teams.length ? __allAgents.filter((a) => teams.indexOf(a.team) !== -1) : __allAgents)
+    .slice().sort((a, b) => a.name.localeCompare(b.name, 'fa'))
+    .map((a) => ({ value: a.name, label: a.name, sub: a.team || '' }));
+  const fAgent = UI.multiSelect({
+    label: 'کارشناس', allLabel: 'همه کارشناسان', placeholder: 'جستجوی کارشناس…',
+    items: __agentItems(), onChange: () => { F.page = 1; load(); }
+  });
+  filters.appendChild(fAgent);
+  const fTeam = UI.multiSelect({
+    label: 'تیم', allLabel: 'همه تیم‌ها', placeholder: 'جستجوی تیم…',
+    items: (st.teams || []).map((t) => ({ value: t, label: t })),
+    onChange: (vals) => {
+      const keep = fAgent.getValues();
+      const items = __agentItems(vals);
+      const allowed = new Set(items.map((x) => x.value));
+      fAgent.setItems(items, false);
+      fAgent.setValues(keep.filter((v) => allowed.has(v)));
+      F.page = 1; load();
+    }
+  });
+  filters.insertBefore(fTeam, fAgent);
   const fQc = mk(`<div class="field"><label>کارشناس QC</label><select class="input"><option value="">همه</option>${st.qcAgents.map((t) => `<option>${esc(t)}</option>`).join('')}</select></div>`);
   const fSla = mk(`<div class="field"><label>وضعیت SLA</label><select class="input"><option value="">همه</option><option>رعایت شده</option><option>رعایت نشده</option><option>بدون پاسخ</option><option>اطلاعات ناقص</option></select></div>`);
   const fFrom = mk(`<div class="field"><label>از تاریخ بررسی</label>
@@ -212,7 +234,8 @@ async function listPage(root) {
   function query() {
     const p = new URLSearchParams();
     if ($('input', fSearch).value.trim()) p.set('search', $('input', fSearch).value.trim());
-    if ($('select', fTeam).value) p.set('team', $('select', fTeam).value);
+    const __tv = fTeam.getValues(); if (__tv.length) p.set('team', __tv.join(','));
+    const __av = fAgent.getValues(); if (__av.length) p.set('agent', __av.join(','));
     if ($('select', fQc).value) p.set('qc', $('select', fQc).value);
     if ($('select', fSla).value) p.set('sla', $('select', fSla).value);
     const jf = C.parseJalali($('input', fFrom).value), jt = C.parseJalali($('input', fTo).value);
@@ -307,14 +330,15 @@ async function listPage(root) {
 
   const reload1 = debounce(() => { F.page = 1; load(); }, 350);
   $('input', fSearch).addEventListener('input', reload1);
-  $('select', fTeam).addEventListener('change', reload1);
   $('select', fQc).addEventListener('change', reload1);
   $('select', fSla).addEventListener('change', reload1);
   [$('input', fFrom), $('input', fTo)].forEach((i) => i.addEventListener('change', () => { F.page = 1; load(); }));
   JCal.attach($('.cal-btn', fFrom), { onPick(j) { $('input', fFrom).value = j ? C.formatJalali(j) : ''; F.page = 1; load(); } });
   JCal.attach($('.cal-btn', fTo), { onPick(j) { $('input', fTo).value = j ? C.formatJalali(j) : ''; F.page = 1; load(); } });
   $('button', btnReset).addEventListener('click', () => {
-    $('input', fSearch).value = ''; $('select', fTeam).value = ''; $('select', fQc).value = ''; $('select', fSla).value = '';
+    $('input', fSearch).value = ''; $('select', fQc).value = '';
+    fTeam.setValues([]); fTeam.setItems((st.teams || []).map((t) => ({ value: t, label: t })), false);
+    fAgent.setValues([]); fAgent.setItems(__agentItems(), false); $('select', fSla).value = '';
     $('input', fFrom).value = ''; $('input', fTo).value = ''; F.page = 1; load();
   });
   $('button', btnXls).addEventListener('click', async () => {

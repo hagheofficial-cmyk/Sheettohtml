@@ -112,6 +112,26 @@ window.QCExport = {
   tickets(rows, settings) { download(ticketsWorkbook(rows, settings), `QC_Ticket_Evaluation_${stamp()}.xlsx`); },
   socials(rows, settings) { download(socialsWorkbook(rows, settings), `QC_Social_Evaluation_${stamp()}.xlsx`); },
   reports(type, agentRows, teamRows) { download(reportsWorkbook(type, agentRows, teamRows), `QC_${type === 'social' ? 'Social' : 'Ticket'}_Report_${stamp()}.xlsx`); },
+  calls(agentRows, teamRows, elements) {
+    const wb = XLSX.utils.book_new();
+    const mk = (aoa) => {
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = aoa[0].map((h) => ({ wch: Math.max(14, String(h).length * 1.1) }));
+      return ws;
+    };
+    const hA = ['نام کارشناس', 'تیم', 'تعداد نمره‌دار', 'میانگین نمره / 100', 'ردلاین',
+      'تلفنی (ت)', 'میانگین تلفنی', 'اکانت (ت)', 'میانگین اکانت', 'MLM (ت)', 'میانگین MLM', 'مجموع ریت'];
+    const hT = ['نام تیم', 'تعداد نمره‌دار', 'میانگین نمره / 100', 'ردلاین',
+      'تلفنی (ت)', 'میانگین تلفنی', 'اکانت (ت)', 'میانگین اکانت', 'MLM (ت)', 'میانگین MLM', 'مجموع ریت'];
+    XLSX.utils.book_append_sheet(wb, mk([hA, ...agentRows.map((r) => [r.name, r.team, r.count, r.avgScore, r.redlines, r.teleCount, r.teleAvg, r.accCount, r.accAvg, r.mlmCount, r.mlmAvg, r.total])]), 'Agent Report');
+    XLSX.utils.book_append_sheet(wb, mk([hT, ...teamRows.map((r) => [r.name, r.count, r.avgScore, r.redlines, r.teleCount, r.teleAvg, r.accCount, r.accAvg, r.mlmCount, r.mlmAvg, r.total])]), 'Team Report');
+    if (elements && elements.length) {
+      const FORM_FA = { tele: 'تلفنی', account: 'اکانت', mlm: 'MLM' };
+      const hE = ['المان', 'فرم', 'رعایت‌شده', 'عدم رعایت', 'مجموع', 'نرخ رعایت ٪', 'نرخ عدم رعایت ٪'];
+      XLSX.utils.book_append_sheet(wb, mk([hE, ...elements.map((x) => [x.label, FORM_FA[x.form] || x.form, x.ok, x.bad, x.total, x.successRate, x.errorRate])]), 'المان‌های کلی');
+    }
+    download(wb, `QC_Call_Report_${stamp()}.xlsx`);
+  },
   combined(rows) {
     const wb = XLSX.utils.book_new();
     const h = ['کارشناس', 'تیم', 'تیکت (ت)', 'میانگین تیکت', 'ردلاین صفر تیکت', 'سوشال (ت)', 'میانگین سوشال', 'SLA سوشال', 'عدم پاسخ سوشال', 'تماس (ت)', 'میانگین تماس', 'ردلاین تماس', 'مجموع', 'میانگین کل'];

@@ -526,6 +526,10 @@ async function handleApi(req, res, pathname, query) {
     const level = query.level === 'team' ? 'team' : 'agent';
     const q = { from: query.from, to: query.to, team: query.team, agent: query.agent, qc: query.qc };
     if (type === 'combined') return ok(res, { type, level, rows: QCReports.combinedAgentReport(db, q) });
+    if (type === 'call') {
+      const rep = QCReports.callReport(db, level, q, { criteriaFor: P.criteriaFor, labelOf: P.labelOf });
+      return ok(res, { type: 'call', level, rows: rep.rows, elements: rep.elements });
+    }
     const tt = type === 'ticket' ? 'ticket' : 'social';
     const rows = tt === 'ticket' ? QCReports.ticketReport(db, level, q) : QCReports.socialReport(db, level, q);
     return ok(res, { type: tt, level, rows });
@@ -709,12 +713,45 @@ async function handleApi(req, res, pathname, query) {
   }
   if (parts[1] === 'agents') {
     if (parts.length === 2 && method === 'GET') return ok(res, db.agents);
+    /* ایمپورت انبوه از اکسل زیرمجموعه/کارشناس/تیم/CallerID — به‌روزرسانی + افزودن */
+    if (parts.length === 3 && parts[2] === 'bulk' && method === 'POST') {
+      const rows = Array.isArray(body.rows) ? body.rows : [];
+      let added = 0, updated = 0, skipped = 0;
+      const errs = [];
+      rows.forEach((r, i) => {
+        const name = str(r.name);
+        let team = str(r.team);
+        const sub = str(r.subgroup || r.sub || '');
+        const ext = r.ext === '' || r.ext == null ? null : (String(r.ext).match(/^\d+$/) ? +r.ext : null);
+        if (!name) { skipped++; errs.push('ردیف ' + (i + 1) + ': نام خالی است'); return; }
+        /* نرمال‌سازی نام تیم: به‌جای ساخت تیم جدید با املای متفاوت، نام موجود را برگردان */
+        if (team) {
+          const canon = db.agents.find((x) => x.team && x.team.toLowerCase() === team.toLowerCase());
+          if (canon) team = canon.team;
+        }
+        /* کارشناس موجود را بر اساس نام یا داخلی پیدا کن */
+        let a = db.agents.find((x) => x.name === name);
+        if (!a && ext != null) a = db.agents.find((x) => x.ext === ext);
+        if (a) {
+          if (team) a.team = team;
+          if (ext != null) a.ext = ext;
+          if (sub) a.subgroup = sub;
+          a.active = true;
+          updated++;
+        } else {
+          db.agents.push({ id: db.seq.agent++, ext, name, team: team || str(r.team) || '', subgroup: sub, active: true });
+          added++;
+        }
+      });
+      saveStore();
+      return ok(res, { added, updated, skipped, errs: errs.slice(0, 10), total: db.agents.length });
+    }
     if (parts.length === 2 && method === 'POST') {
       const name = str(body.name), team = str(body.team), ext = body.ext === '' || body.ext == null ? null : +body.ext;
       if (!name || !team) return bad(res, 'نام و تیم الزامی است');
       if (db.agents.some((a) => a.name === name)) return bad(res, 'کارشناسی با این نام وجود دارد');
       if (ext != null && db.agents.some((a) => a.ext === ext)) return bad(res, 'این شماره داخلی تکراری است');
-      const a = { id: db.seq.agent++, ext, name, team, active: true };
+      const a = { id: db.seq.agent++, ext, name, team, subgroup: str(body.subgroup) || undefined, active: true };
       db.agents.push(a);
       saveStore();
       return ok(res, a);
@@ -738,6 +775,7 @@ async function handleApi(req, res, pathname, query) {
         if (newExt != null && db.agents.some((x) => x.ext === newExt && x.id !== a.id)) return bad(res, 'این شماره داخلی تکراری است');
         a.ext = newExt;
       }
+      if (body.subgroup !== undefined) a.subgroup = str(body.subgroup);
       if (body.active !== undefined) a.active = !!body.active;
       saveStore();
       return ok(res, a);

@@ -63,6 +63,7 @@ async function render(root) {
         <div class="field grow-0"><label>تیم QC</label>
           <div class="tabs" id="formTabs">${tabs.map((t, i) => `<button data-t="${esc(t.key)}" class="${i === 0 ? 'active' : ''}"><i class="fa-solid ${t.icon}"></i> ${esc(t.label)}</button>`).join('')}</div>
         </div>
+        <div id="fAgentSlot"></div>
         <div class="field grow-0"><label>از تاریخ</label>
           <div class="date-f"><input class="input" id="fFrom" dir="ltr" style="text-align:right;padding-left:34px" inputmode="numeric" placeholder="۱۴۰۵/۰۱/۰۱">
             <button type="button" class="cal-btn" id="fFromBtn" title="انتخاب از تقویم"><i class="fa-regular fa-calendar"></i></button></div>
@@ -80,6 +81,19 @@ async function render(root) {
   JCal.attach($('#fFromBtn'), { onPick(j) { $('#fFrom').value = j ? C.formatJalali(j) : ''; load(); } });
   JCal.attach($('#fToBtn'), { onPick(j) { $('#fTo').value = j ? C.formatJalali(j) : ''; load(); } });
 
+  /* فیلتر چندانتخابی کارشناس — آیتم‌ها بر اساس تیم انتخاب‌شده به‌روز می‌شوند */
+  const allAgents = (st.agents || []).filter((a) => a.active !== false);
+  function agentItemsFor(team) {
+    const list = team ? allAgents.filter((a) => a.team === team) : allAgents;
+    return list.slice().sort((a, b) => a.name.localeCompare(b.name, 'fa'))
+      .map((a) => ({ value: a.name, label: a.name, sub: a.team || '' }));
+  }
+  const msAgents = UI.multiSelect({
+    label: 'کارشناس (چندانتخابی)', allLabel: 'همه کارشناسان', placeholder: 'جستجوی کارشناس…',
+    items: agentItemsFor(), onChange: () => load()
+  });
+  $('#fAgentSlot').replaceWith(msAgents);
+
   $('#formTabs').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-t]');
     if (!b) return;
@@ -87,11 +101,18 @@ async function render(root) {
     F.team = b.dataset.t;
     /* تیم → فرم مرتبط (برای بدست آوردن معیارهای تحلیل) */
     if (F.team === '') F.form = ''; else F.form = teamFormMap[F.team.toLowerCase()] || '';
+    /* آیتم‌های کارشناس را با تیم هماهنگ کن */
+    const keep = msAgents.getValues();
+    const items = agentItemsFor(F.team || null);
+    const allowed = new Set(items.map((x) => x.value));
+    msAgents.setItems(items, false);
+    msAgents.setValues(keep.filter((v) => allowed.has(v)));
     load();
   });
   $('#fReset').addEventListener('click', () => {
     F.team = ''; F.form = ''; F.from = ''; F.to = '';
     $('#fFrom').value = ''; $('#fTo').value = '';
+    msAgents.setItems(agentItemsFor(), false); msAgents.setValues([]);
     $$('#formTabs button').forEach((x, i) => x.classList.toggle('active', i === 0));
     load();
   });
@@ -100,6 +121,7 @@ async function render(root) {
     const p = new URLSearchParams();
     if (F.form) p.set('form', F.form);
     if (F.team) p.set('team', F.team);
+    const av = msAgents.getValues(); if (av.length) p.set('agent', av.join(','));
     const jf = C.parseJalali($('#fFrom').value), jt = C.parseJalali($('#fTo').value);
     if (jf) p.set('from', C.formatJalali(jf));
     if (jt) p.set('to', C.formatJalali(jt));
@@ -130,7 +152,7 @@ async function render(root) {
 
     const kpiRow = `
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:16px">
-      ${kpi('fa-phone-volume', 'تعداد فیدبک تماس', fa(k.totalCalls || 0), '#38bdf8')}
+      ${kpi('fa-phone-volume', 'تعداد ریت تماس', fa(k.totalCalls || 0), '#38bdf8')}
       ${kpi('fa-star-half-stroke', 'میانگین نمره', k.avgScore === '' ? '—' : fa(k.avgScore), '#34d399')}
       ${kpi('fa-ban', 'ردلاین', fa(k.redlineCount || 0), '#f87171')}
       ${kpi('fa-user-check', 'کارشناسان ارزیابی شده', fa(k.expertsWithData || 0), '#a78bfa')}

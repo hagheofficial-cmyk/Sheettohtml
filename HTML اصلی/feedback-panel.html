@@ -803,9 +803,9 @@
             <span id="userRoleBadge" style="display:none; background: rgba(56,189,248,0.1); color: var(--brand); padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: bold; border: 1px solid var(--brand);"></span>
             <span id="storageStatusBadge" title="وضعیت پوشه دیتا روی دیسک" style="display:none; background: rgba(34,197,94,0.08); color: var(--good); padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: bold; border: 1px solid var(--good);"><i class="fa-solid fa-folder"></i> پوشه دیتا: متصل نشده</span>
             <button class="btn success" id="btnConnectFolder" onclick="connectDataFolder()"><i class="fa-solid fa-folder-open"></i> اتصال پوشه دیتا</button>
-            <button class="btn" id="btnManualSave" style="display:none;" onclick="manualExportRecovery()" title="دانلود فایل ریکاوری دیتا (حالت سازگاری)"><i class="fa-solid fa-download"></i> ذخیره دیتا</button>
+            <button class="btn" id="btnManualSave" onclick="manualExportRecovery()" title="دانلود فایل ریکاوری دیتا (حالت سازگاری)"><i class="fa-solid fa-download"></i> ذخیره دیتا</button>
             <input type="file" id="manualRecoveryInput" accept=".json" style="display:none;" onchange="manualImportRecovery(event)">
-            <button class="btn" id="btnManualLoad" style="display:none;" onclick="document.getElementById('manualRecoveryInput').click()" title="بازیابی فایل ریکاوری دیتا (حالت سازگاری)"><i class="fa-solid fa-upload"></i> بازیابی دیتا</button>
+            <button class="btn" id="btnManualLoad" onclick="document.getElementById('manualRecoveryInput').click()" title="بازیابی فایل ریکاوری دیتا (حالت سازگاری)"><i class="fa-solid fa-upload"></i> بازیابی دیتا</button>
             <button class="btn purple" id="btnInitFeedback" style="display:none;" onclick="openConfidentialGate()"><i class="fa-solid fa-lock"></i> جلسه بازخورد محرمانه</button>
             <button class="btn gold" id="btnReupload" style="display: none;" onclick="resetAnalysisForNewFiles()"><i class="fa-solid fa-rotate"></i> ریست و شروع بررسی جدید</button>
             <button class="btn" id="themeToggleBtn" onclick="toggleTheme()" title="تغییر حالت نمایش"><i class="fa-solid fa-sun"></i> حالت روشن</button>
@@ -3435,8 +3435,8 @@
         setDisplay('teleBox', isAdmin || team === 'tele');
         setDisplay('accBox', isAdmin || team === 'account');
         setDisplay('mlmBox', isAdmin || team === 'mlm');
-        setDisplay('btnManualSave', isAdmin && !FS_SUPPORTED);
-        setDisplay('btnManualLoad', isAdmin && !FS_SUPPORTED);
+        setDisplay('btnManualSave', true);
+        setDisplay('btnManualLoad', true);
 
         setDisplay('kpiContainer', hasVisibleData && !mlmOnly);
         setDisplay('kpiCombinedCard', isAdmin && hasVisibleData);

@@ -157,6 +157,12 @@ i { font-style: normal; }
 .field > label { font-size: 12.3px; font-weight: 700; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
 .field > label .req { color: var(--bad); }
 .field > label .hint { font-weight: 400; color: var(--muted); font-size: 11px; }
+
+/* یادداشت راهنما */
+.note { background: var(--brand-soft); border: 1px dashed var(--brand); color: var(--ink); border-radius: var(--r-sm); padding: 9px 12px; font-size: 12.3px; line-height: 1.9; }
+.note i { margin-inline-end: 6px; color: var(--brand); }
+.note.bad { background: var(--bad-soft); border-color: var(--bad); }
+.note.bad i { color: var(--bad); }
 .input, select.input, textarea.input {
   background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 9.5px 12px;
   color: var(--ink); outline: none; transition: border-color .15s, box-shadow .15s; width: 100%;
@@ -183,6 +189,24 @@ input[type="time"].input { direction: ltr; text-align: center; }
 .combo .menu-item:hover, .combo .menu-item.hl { background: var(--soft); }
 .combo .menu-item .tm { font-size: 11px; color: var(--muted); background: var(--bg-2); border-radius: 6px; padding: 1px 8px; }
 .combo .menu-empty { padding: 12px; color: var(--muted); text-align: center; font-size: 12.5px; }
+
+/* چندانتخابی (فیلترها) */
+.mselect { position: relative; }
+.mselect .ms-btn { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 165px; cursor: pointer; }
+.mselect .ms-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px; }
+.mselect .ms-menu {
+  position: absolute; z-index: 55; top: calc(100% + 5px); inset-inline-start: 0; min-width: 235px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r-md);
+  max-height: 290px; overflow-y: auto; box-shadow: var(--shadow); display: none; padding: 6px;
+}
+.mselect.open .ms-menu { display: block; }
+.mselect .ms-search { margin: 2px 2px 6px; }
+.mselect .ms-item { display: flex; align-items: center; gap: 9px; padding: 7px 9px; border-radius: var(--r-sm); cursor: pointer; font-size: 12.6px; margin: 0; }
+.mselect .ms-item:hover { background: var(--soft); }
+.mselect .ms-item input[type=checkbox] { accent-color: var(--brand); width: 15px; height: 15px; cursor: pointer; }
+.mselect .ms-item .tm { margin-inline-start: auto; font-size: 11px; color: var(--muted); background: var(--bg-2); border-radius: 6px; padding: 1px 8px; }
+.mselect .ms-all { border-bottom: 1px solid var(--line-soft); margin-bottom: 4px; padding-bottom: 9px; font-weight: 700; }
+.mselect .menu-empty { padding: 12px; color: var(--muted); text-align: center; font-size: 12.5px; }
 
 /* سه‌حالته المان‌ها (رعایت / عدم رعایت / نامرتبط) */
 .tri { display: flex; background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
@@ -412,6 +436,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
   .kpi-val { font-size: 20px; }
   .today-chip span { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
+
 /* -------- JCal popup (تقویم جلالی) -------- */
 .jcal-pop {
   display: none;

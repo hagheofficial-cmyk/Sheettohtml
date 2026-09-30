@@ -156,8 +156,13 @@ function route(method, url, body) {
     const type = q.type || 'social';
     const level = q.level === 'team' ? 'team' : 'agent';
     if (type === 'combined') return { type, level, rows: R.combinedAgentReport(db, q) };
+    if (type === 'call' && R.callReport) {
+      const crit = window.QCParse ? { criteriaFor: (t) => window.QCParse.criteriaFor(t), labelOf: (t, k) => window.QCParse.labelOf(t, k) } : {};
+      const rep = R.callReport(db, level, q, crit);
+      return { type: 'call', level, rows: rep.rows, elements: rep.elements };
+    }
     const tt = type === 'ticket' ? 'ticket' : 'social';
-    return { type: tt, level, rows: tt === 'ticket' ? R.ticketReport(db, tt === 'ticket' ? level : level, q) : R.socialReport(db, level, q) };
+    return { type: tt, level, rows: tt === 'ticket' ? R.ticketReport(db, level, q) : R.socialReport(db, level, q) };
   }
 
   /* پرونده تلفنی کارشناس: نام یا داخلی */
@@ -484,6 +489,24 @@ function route(method, url, body) {
   if (name === 'dashboard' && method === 'GET') return R.dashboard(db, q);
 
   if (name === 'agents' && method === 'GET' && id == null) return clone(db.agents);
+  /* ایمپورت انبوه اکسل کارشناسان — هم‌خوان با روت POST /api/agents/bulk سرور */
+  if (name === 'agents' && method === 'POST' && body && Array.isArray(body.rows)) {
+    let added = 0, updated = 0, skipped = 0;
+    body.rows.forEach((r) => {
+      const name = str(r.name);
+      let team = str(r.team);
+      const sub = str(r.subgroup || r.sub || '');
+      const ext = r.ext === '' || r.ext == null ? null : (/^\d+$/.test(String(r.ext)) ? +String(r.ext) : null);
+      if (!name) { skipped++; return; }
+      if (team) { const canon = db.agents.find((x) => x.team && x.team.toLowerCase() === team.toLowerCase()); if (canon) team = canon.team; }
+      let a = db.agents.find((x) => x.name === name);
+      if (!a && ext != null) a = db.agents.find((x) => x.ext === ext);
+      if (a) { if (team) a.team = team; if (ext != null) a.ext = ext; if (sub) a.subgroup = sub; a.active = true; updated++; }
+      else { db.agents.push({ id: db.seq.agent++, name, team, ext, subgroup: sub || undefined, active: true }); added++; }
+    });
+    saveDb();
+    return { added, updated, skipped, errs: [], total: db.agents.length };
+  }
   if (name === 'agents' && method === 'POST') {
     const b = body;
     if (!str(b.name) || !str(b.team)) bad('نام و تیم الزامی است');
@@ -491,7 +514,7 @@ function route(method, url, body) {
     let ext = b.ext != null && b.ext !== '' ? b.ext : undefined;
     if (ext != null && db.agents.some((a) => a.ext === ext)) bad('این داخلی تکراری است');
     if (ext == null) { do { ext = 9000 + Math.floor(Math.random() * 999); } while (db.agents.some((a) => a.ext === ext)); }
-    const a = { id: db.seq.agent++, name: str(b.name), team: str(b.team), ext, active: true };
+    const a = { id: db.seq.agent++, name: str(b.name), team: str(b.team), ext, subgroup: str(b.subgroup) || undefined, active: true };
     db.agents.push(a); saveDb(); return clone(a);
   }
   if (name === 'agents' && id != null) {
@@ -500,6 +523,7 @@ function route(method, url, body) {
       if (body.name != null) { const nm = str(body.name); if (!nm) bad('نام نمی‌تواند خالی باشد'); if (db.agents.some(x => x.name === nm && x.id !== a.id)) bad('این نام تکراری است'); a.name = nm; }
       if (body.team != null) { const tm = str(body.team); if (!tm) bad('تیم نمی‌تواند خالی باشد'); a.team = tm; }
       if (body.ext !== undefined) { const ex = body.ext === '' || body.ext == null ? null : +body.ext; if (ex != null && db.agents.some(x => x.ext === ex && x.id !== a.id)) bad('این داخلی تکراری است'); a.ext = ex; }
+      if (body.subgroup !== undefined) a.subgroup = str(body.subgroup);
       if (typeof body.active === 'boolean') a.active = body.active; saveDb(); return clone(a);
     }
     if (method === 'DELETE') { a.active = false; saveDb(); return { ok: true, archived: true }; }

@@ -15,12 +15,22 @@ function el(html) { const t = document.createElement('template'); t.innerHTML = 
 function debounce(fn, ms) { let t; return function (...a) { clearTimeout(t); t = setTimeout(() => fn.apply(this, a), ms); }; }
 
 /* ------------------------------------------------------------------- API */
-/* نسخه مستقل: لایه داده = localStorage (window.LocalApi در storage.js) */
 const api = {
-  get: (url) => window.LocalApi.get(url),
-  post: (url, b) => window.LocalApi.post(url, b || {}),
-  put: (url, b) => window.LocalApi.put(url, b || {}),
-  del: (url) => window.LocalApi.del(url)
+  async req(method, url, body) {
+    const res = await fetch(url, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    });
+    let data = null;
+    try { data = await res.json(); } catch (e) { /* پاسخ خالی */ }
+    if (!res.ok) { const err = new Error((data && data.error) || 'خطای ارتباط با سرور (' + res.status + ')'); err.status = res.status; throw err; }
+    return data;
+  },
+  get: (url) => api.req('GET', url),
+  post: (url, b) => api.req('POST', url, b || {}),
+  put: (url, b) => api.req('PUT', url, b || {}),
+  del: (url) => api.req('DELETE', url)
 };
 
 /* ----------------------------------------------------------------- توست */
@@ -149,6 +159,79 @@ function combo(opts) {
     return wrap._value || (exact ? exact.value : '');
   };
   if (opts.value) wrap.setValue(opts.value);
+  return wrap;
+}
+
+/** چندانتخابی جستجوپذیر (چک‌باکسی) — برای فیلترها */
+function multiSelect(opts) {
+  // opts: {label, items:[{value,label,sub}], allLabel, placeholder, onChange, width}
+  const allLabel = opts.allLabel || 'همه';
+  const wrap = el(`<div class="field grow-0">
+    <label>${esc(opts.label)}</label>
+    <div class="mselect">
+      <button type="button" class="input ms-btn"${opts.width ? ` style="width:${opts.width}px"` : ''}>
+        <span class="ms-label">${esc(allLabel)}</span><i class="fa-solid fa-caret-down"></i>
+      </button>
+      <div class="ms-menu">
+        <div class="ms-search"><input class="input sm" placeholder="${esc(opts.placeholder || 'جستجو…')}"></div>
+        <label class="ms-item ms-all"><input type="checkbox" checked><span>${esc(allLabel)}</span></label>
+        <div class="ms-list"></div>
+      </div>
+    </div>
+  </div>`);
+  const box = $('.mselect', wrap), btn = $('.ms-btn', wrap), lbl = $('.ms-label', wrap),
+    menu = $('.ms-menu', wrap), search = $('.ms-search input', wrap),
+    allCb = $('.ms-all input', wrap), list = $('.ms-list', wrap);
+  let items = opts.items || [];
+
+  function renderList(f) {
+    const q = (f || '').trim();
+    const shown = items.filter((it) => !q || it.label.includes(q) || (it.sub || '').includes(q));
+    if (!shown.length) { list.innerHTML = '<div class="menu-empty">موردی یافت نشد</div>'; return; }
+    list.innerHTML = shown.map((it) =>
+      `<label class="ms-item"><input type="checkbox" data-v="${esc(it.value)}" ${it._sel ? 'checked' : ''}><span>${esc(it.label)}</span>${it.sub ? `<span class="tm">${esc(it.sub)}</span>` : ''}</label>`).join('');
+    $$('input[type=checkbox]', list).forEach((cb) => cb.addEventListener('change', onItem));
+  }
+  function onItem() {
+    items.forEach((it) => {
+      const cb = list.querySelector(`input[data-v="${CSS.escape(String(it.value))}"]`);
+      if (cb) it._sel = cb.checked;
+    });
+    const selN = items.filter((x) => x._sel).length;
+    allCb.checked = selN === 0;
+    syncLabel();
+    if (opts.onChange) opts.onChange(getValues());
+  }
+  function syncLabel() {
+    const sel = items.filter((x) => x._sel);
+    allCb.checked = sel.length === 0;
+    if (!sel.length) { lbl.textContent = allLabel; return; }
+    if (sel.length === 1) { lbl.textContent = sel[0].label; return; }
+    lbl.textContent = C.toFaDigits(sel.length) + ' مورد انتخاب شد';
+  }
+  function getValues() { return items.filter((x) => x._sel).map((x) => x.value); }
+
+  btn.addEventListener('click', (e) => { e.stopPropagation(); const was = box.classList.contains('open'); $$('.mselect.open').forEach((x) => x.classList.remove('open')); if (!was) { box.classList.add('open'); search.value = ''; renderList(''); search.focus(); } });
+  menu.addEventListener('click', (e) => e.stopPropagation());
+  search.addEventListener('input', () => renderList(search.value));
+  allCb.addEventListener('change', () => {
+    if (allCb.checked) { items.forEach((it) => { it._sel = false; }); renderList(search.value); syncLabel(); if (opts.onChange) opts.onChange([]); }
+  });
+  document.addEventListener('click', () => box.classList.remove('open'));
+  wrap.addEventListener('destroy', () => {});
+
+  wrap.getValues = getValues;
+  wrap.setValues = (vals) => {
+    const set = new Set(vals || []);
+    items.forEach((it) => { it._sel = set.has(it.value); });
+    syncLabel();
+  };
+  wrap.setItems = (arr, keepSel) => {
+    const prev = keepSel ? new Set(getValues()) : new Set();
+    items = (arr || []).map((it) => ({ value: it.value, label: it.label, sub: it.sub, _sel: prev.has(it.value) }));
+    if (box.classList.contains('open')) renderList(search.value);
+    syncLabel();
+  };
   return wrap;
 }
 
@@ -362,5 +445,5 @@ const App = {
 
 // اکسپورت سراسری
 window.App = App;
-window.UI = { C, $, $$, esc, fa, el, api, toast, modal, modalHead, confirmDlg, dateField, combo, triSwitch, redlineSwitch, selectField, scorePill, markBadge, slaBadge, durText, rateCell, pager, emptyState, debounce };
+window.UI = { C, $, $$, esc, fa, el, api, toast, modal, modalHead, confirmDlg, dateField, combo, multiSelect, triSwitch, redlineSwitch, selectField, scorePill, markBadge, slaBadge, durText, rateCell, pager, emptyState, debounce };
 })();
