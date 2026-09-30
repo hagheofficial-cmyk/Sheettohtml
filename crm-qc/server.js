@@ -861,6 +861,22 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('سامانه کنترل کیفیت CRM اجرا شد  →  http://0.0.0.0:' + PORT);
   // راه‌اندازی اتصال پوشه‌ی دیتای تماس (بازبینی هر ۱۵ ثانیه data/calls)
   loadStore();
+  /* بازیابی خودکار دیتای نمونه‌ی تماس: محیط پیش‌نمایش فایل‌های gitignore را
+   * بین نوبت‌ها نگه نمی‌دارد؛ نسخه‌ی ترک‌شده در data/seed-calls به data/calls برمی‌گردد. */
+  try {
+    const callsDir = path.join(DATA_DIR, 'calls');
+    const seedCalls = path.join(DATA_DIR, 'seed-calls');
+    if (fs.existsSync(seedCalls)) {
+      fs.mkdirSync(callsDir, { recursive: true });
+      const hasXlsx = fs.readdirSync(callsDir).some((f) => /\.xlsx?$/i.test(f));
+      if (!hasXlsx) {
+        fs.readdirSync(seedCalls).filter((f) => /\.xlsx?$/i.test(f)).forEach((f) => {
+          fs.copyFileSync(path.join(seedCalls, f), path.join(callsDir, f));
+        });
+        console.log('[calls] فایل‌های نمونه از seed-calls برگردانده شدند');
+      }
+    }
+  } catch (e) { console.warn('[calls] seed-calls:', e.message); }
   CallWatcher.start(db, () => saveStore());
 });
 
