@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>سامانه کنترل کیفیت CRM — نسخه مستقل</title>
+<link href="vendor/fontawesome/css/all.min.css" rel="stylesheet">
+<script src="vendor/chart.umd.min.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+</head>
+<body>
+
+<div id="app" class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-logo"><i class="fa-solid fa-shield-halved"></i></div>
+      <div class="brand-text">
+        <strong id="orgName">سامانه کنترل کیفیت</strong>
+        <span>CRM Quality Assurance</span>
+      </div>
+      <button class="sidebar-close" id="sidebarClose" aria-label="بستن"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <nav class="nav" id="nav">
+      <a href="#/dashboard" class="nav-item" data-route="dashboard"><i class="fa-solid fa-gauge-high"></i><span>داشبورد</span></a>
+
+      <div class="nav-group">
+        <div class="nav-group-title" data-toggle="tickets">
+          <i class="fa-solid fa-ticket"></i><span>ارزیابی تیکت</span>
+          <i class="fa-solid fa-chevron-down chevron"></i>
+        </div>
+        <div class="nav-sub" id="sub-tickets">
+          <a href="#/tickets/new" class="nav-subitem" data-route="tickets-new"><i class="fa-solid fa-plus"></i><span>ثبت ارزیابی</span></a>
+          <a href="#/tickets" class="nav-subitem" data-route="tickets"><i class="fa-solid fa-list-check"></i><span>سوابق ارزیابی</span></a>
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title" data-toggle="socials">
+          <i class="fa-solid fa-comments"></i><span>ارزیابی سوشال</span>
+          <i class="fa-solid fa-chevron-down chevron"></i>
+        </div>
+        <div class="nav-sub" id="sub-socials">
+          <a href="#/socials/new" class="nav-subitem" data-route="socials-new"><i class="fa-solid fa-plus"></i><span>ثبت ارزیابی</span></a>
+          <a href="#/socials" class="nav-subitem" data-route="socials"><i class="fa-solid fa-list-check"></i><span>سوابق ارزیابی</span></a>
+        </div>
+      </div>
+
+      <a href="#/reports" class="nav-item" data-route="reports"><i class="fa-solid fa-chart-pie"></i><span>گزارش‌ها</span></a>
+      <a href="#/portfolio" class="nav-item" data-route="portfolio"><i class="fa-solid fa-id-card-clip"></i><span>پرونده کارشناس</span></a>
+      <a href="#/data" class="nav-item" data-route="data"><i class="fa-solid fa-database"></i><span>مرکز داده</span></a>
+      <a href="#/call-analysis" class="nav-item" data-route="call-analysis"><i class="fa-solid fa-chart-line"></i><span>تحلیل فیدبک تماس</span></a>
+      <a href="#/directory" class="nav-item" data-route="directory"><i class="fa-solid fa-users-gear"></i><span>مدیریت پایه</span></a>
+      <a href="#/agents" class="nav-item" data-route="agents"><i class="fa-solid fa-user-group"></i><span>مدیریت کارشناسان</span></a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="mini-stat"><i class="fa-solid fa-database"></i><span id="footCounts">—</span></div>
+      <div class="mini-stat" style="margin-top:6px" title="داده‌ها در مرورگر شما (localStorage) ذخیره می‌شود"><i class="fa-solid fa-laptop" style="color:var(--violet)"></i><span>نسخه مستقل — بدون سرور</span></div>
+    </div>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="hamburger" id="hamburger" aria-label="منو"><i class="fa-solid fa-bars"></i></button>
+      <div class="topbar-title" id="pageTitle">داشبورد</div>
+      <div class="topbar-left">
+        <div class="today-chip" id="todayChip"><i class="fa-regular fa-calendar"></i><span></span></div>
+      </div>
+    </header>
+
+    <main class="content" id="content">
+      <div class="loading-page"><div class="spinner"></div><p>در حال بارگذاری…</p></div>
+    </main>
+  </div>
+</div>
+
+<div id="toastZone" class="toast-zone"></div>
+<div id="modalRoot"></div>
+
+<script src="calc.js"></script>
+<script src="jcal.js"></script>
+<script src="parseQc.js"></script>
+<script src="seed-data.js"></script>
+<script src="reports.js"></script>
+<script src="storage.js"></script>
+<script src="export.js"></script>
+<script src="app.js"></script>
+<script src="pages/dashboard.js"></script>
+<script src="pages/tickets.js"></script>
+<script src="pages/socials.js"></script>
+<script src="pages/reports.js"></script>
+<script src="pages/portfolio.js"></script>
+<script src="pages/data.js"></script>
+<script src="pages/callAnalysis.js"></script>
+<script src="pages/directory.js"></script>
+<script src="pages/agents.js"></script>
+<script>App.init();</script>
+</body>
+</html>
