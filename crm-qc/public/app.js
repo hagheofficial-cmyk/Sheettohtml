@@ -16,21 +16,61 @@ function debounce(fn, ms) { let t; return function (...a) { clearTimeout(t); t =
 
 /* ------------------------------------------------------------------- API */
 const api = {
+  /* اگر سرور در دسترس نباشد (محیط پیش‌نمایش بیرون از نوبت کاری خاموش می‌شود)،
+   * به‌طور خودکار روی لایه‌ی لوكال مرورگر (LocalApi) کار می‌کنیم — برنامه هرگز
+   * با خطای «عدم اتصال به سرور» متوقف نمی‌شود و به محض برگشتن سرور
+   * به‌صورت خودکار آنلاین برمی‌گردیم. */
+  offline: false,
+  _lastProbe: 0,
   async req(method, url, body) {
-    const res = await fetch(url, {
-      method,
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
-      body: body ? JSON.stringify(body) : undefined
-    });
-    let data = null;
-    try { data = await res.json(); } catch (e) { /* پاسخ خالی */ }
-    if (!res.ok) { const err = new Error((data && data.error) || 'خطای ارتباط با سرور (' + res.status + ')'); err.status = res.status; throw err; }
-    return data;
+    if (!api.offline) {
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: body ? { 'Content-Type': 'application/json' } : undefined,
+          body: body ? JSON.stringify(body) : undefined
+        });
+        let data = null;
+        try { data = await res.json(); } catch (e) { /* پاسخ خالی */ }
+        if (!res.ok) { const err = new Error((data && data.error) || 'خطای ارتباط با سرور (' + res.status + ')'); err.status = res.status; throw err; }
+        return data;
+      } catch (e) {
+        /* خطاهای واقعی (۴xx/۵xx) سرور جزو فallback نیستند؛ فقط شبکه‌ی قطع */
+        if (!(e instanceof TypeError) || !window.LocalApi) throw e;
+        api.offline = true; api._lastProbe = Date.now(); api._showOfflineTag();
+        toast.error('اتصال به سرور قطع شد — حالت آفلاین فعال است (داده در مرورگر ذخیره می‌شود)');
+      }
+    }
+    /* حالت آفلاین: هر ۸ ثانیه یک‌بار سرور را چک کن تا به‌تنهایی آنلاین برگردیم */
+    if (Date.now() - api._lastProbe > 8000) {
+      api._lastProbe = Date.now();
+      try {
+        const res = await fetch('/api/bootstrap');
+        if (res.ok) {
+          api.offline = false; api._lastProbe = 0; api._hideOfflineTag();
+          toast.success('اتصال به سرور برقرار شد — حالت آنلاین فعال است');
+          return api.req(method, url, body);
+        }
+      } catch (e) { /* هنوز آفلاین */ }
+    }
+    const m = method === 'GET' ? 'get' : method === 'POST' ? 'post' : method === 'PUT' ? 'put' : 'del';
+    try {
+      return await window.LocalApi[m](url, body);
+    } catch (err) {
+      const e2 = new Error(err && err.message ? err.message : 'خطای حالت آفلاین');
+      e2.status = err && err.status;
+      throw e2;
+    }
   },
   get: (url) => api.req('GET', url),
   post: (url, b) => api.req('POST', url, b || {}),
   put: (url, b) => api.req('PUT', url, b || {}),
-  del: (url) => api.req('DELETE', url)
+  del: (url) => api.req('DELETE', url),
+  _showOfflineTag() {
+    if (document.getElementById('offlineBadge')) return;
+    document.body.appendChild(el(`<div id="offlineBadge"><i class="fa-solid fa-plug-circle-xmark"></i> حالت آفلاین — داده‌های این دستگاه ذخیره می‌شوند</div>`));
+  },
+  _hideOfflineTag() { const b = document.getElementById('offlineBadge'); if (b) b.remove(); }
 };
 
 /* ----------------------------------------------------------------- توست */

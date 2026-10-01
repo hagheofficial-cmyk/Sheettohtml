@@ -482,3 +482,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
   font-size: 15px; padding: 4px;
 }
 .date-f .cal-btn:hover { color: var(--brand); }
+
+/* نشان حالت آفلاین */
+#offlineBadge { position: fixed; bottom: 14px; inset-inline-start: 14px; z-index: 1200; background: var(--warn-soft); border: 1px solid var(--warn); color: var(--warn); border-radius: 10px; padding: 7px 13px; font-size: 12.2px; font-weight: 800; box-shadow: var(--shadow); display: flex; align-items: center; gap: 7px; }
+#offlineBadge i { font-size: 13px; }
