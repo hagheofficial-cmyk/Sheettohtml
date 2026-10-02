@@ -525,14 +525,16 @@ async function handleApi(req, res, pathname, query) {
     const type = query.type || 'social';
     const level = query.level === 'team' ? 'team' : 'agent';
     const q = { from: query.from, to: query.to, team: query.team, agent: query.agent, qc: query.qc };
-    if (type === 'combined') return ok(res, { type, level, rows: QCReports.combinedAgentReport(db, q) });
+    /* نرخ اقلام نسبت به کل دیتای فیلترشده — برای همه‌ی تب‌ها */
+    const elements = QCReports.elementRates(db, q);
+    if (type === 'combined') return ok(res, { type, level, rows: QCReports.combinedAgentReport(db, q), elements });
     if (type === 'call') {
       const rep = QCReports.callReport(db, level, q, { criteriaFor: P.criteriaFor, labelOf: P.labelOf });
-      return ok(res, { type: 'call', level, rows: rep.rows, elements: rep.elements });
+      return ok(res, { type: 'call', level, rows: rep.rows, elements: Object.assign({}, elements, { call: rep.elements }) });
     }
     const tt = type === 'ticket' ? 'ticket' : 'social';
     const rows = tt === 'ticket' ? QCReports.ticketReport(db, level, q) : QCReports.socialReport(db, level, q);
-    return ok(res, { type: tt, level, rows });
+    return ok(res, { type: tt, level, rows, elements });
   }
 
   /* پرونده کارشناس (نام یا داخلی) */

@@ -441,8 +441,7 @@ const App = {
     ));
 
     // نابودسازی نمودارهای قبلی
-    this.charts.forEach((ch) => { try { ch.destroy(); } catch (e) {} });
-    this.charts = [];
+    this.clearCharts();
 
     const content = $('#content');
     let spec = this.routes[name] || this.routes.dashboard;
@@ -459,12 +458,15 @@ const App = {
   },
 
   chart(canvas, cfg) {
+    if (!canvas) { console.warn('[chart] canvas موجود نیست — رندر این نمودار رد شد', cfg && cfg.type); return null; }
     Chart.defaults.font.family = 'Vazirmatn';
     Chart.defaults.color = '#8ea0bd';
     const ch = new Chart(canvas, cfg);
     this.charts.push(ch);
     return ch;
   },
+
+  clearCharts() { this.charts.forEach((ch) => { try { ch.destroy(); } catch (e) {} }); this.charts = []; },
 
   closeSidebar() { $('#sidebar').classList.remove('open'); $('#sidebarBackdrop').classList.remove('show'); },
 
@@ -478,8 +480,13 @@ const App = {
     $$('.nav-group-title').forEach((g) => g.addEventListener('click', () => g.parentElement.classList.toggle('open')));
 
     window.addEventListener('hashchange', () => this.route());
-    if (!location.hash) location.hash = '#/dashboard';
-    await this.route();
+    /* fix: قبلاً hash هم از اینجا ست می‌شد (رویداد) و هم await route() — دو رندر هم‌زمان
+     * می‌ساخت که چارت‌ها را خراب می‌کرد؛ حالا فقط یک مسیر واحد اجرا می‌شود. */
+    if (location.hash && location.hash.length > 1) {
+      await this.route();
+    } else {
+      location.hash = '#/dashboard'; // رویداد hashchange خودش route را اجرا می‌کند
+    }
   }
 };
 

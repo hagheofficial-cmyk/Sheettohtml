@@ -57,7 +57,10 @@ App.register('dashboard', {
     }
 
     async function load() {
+      /* هر ری‌رندر: نمودارهای قبلی نابود شوند تا کنواس آزاد شود */
+      App.clearCharts();
       const cont = $('#dContent');
+      if (!cont.isConnected) return; /* رندر اول قدیمی است — رد شود */
       cont.innerHTML = `<div class="loading-page"><div class="spinner"></div><p>در حال دریافت آمار…</p></div>`;
       const rng = currentRange();
       const q = new URLSearchParams();
@@ -134,18 +137,26 @@ App.register('dashboard', {
       </div>`;
 
       /* نمودارها */
-      App.chart($('#chDist'), {
-        type: 'doughnut',
-        data: {
-          labels: ['۱۰۰–۹۰', '۹۰–۷۵', '۷۵–۵۰', 'کمتر از ۵۰'],
-          datasets: [{
-            data: d.dist || [0, 0, 0, 0],
-            backgroundColor: ['rgba(52,211,153,.7)', 'rgba(56,189,248,.7)', 'rgba(251,191,36,.7)', 'rgba(248,113,113,.7)'],
-            borderColor: '#111a2e', borderWidth: 3
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '62%' }
-      });
+      const distSum = (d.dist || []).reduce((a, b) => a + (b || 0), 0);
+      if (distSum > 0) {
+        App.chart($('#chDist'), {
+          type: 'doughnut',
+          data: {
+            labels: ['۱۰۰–۹۰', '۹۰–۷۵', '۷۵–۵۰', 'کمتر از ۵۰'],
+            datasets: [{
+              data: d.dist || [0, 0, 0, 0],
+              backgroundColor: ['rgba(52,211,153,.7)', 'rgba(56,189,248,.7)', 'rgba(251,191,36,.7)', 'rgba(248,113,113,.7)'],
+              borderColor: '#111a2e', borderWidth: 3
+            }]
+          },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '62%' }
+        });
+      } else {
+        const dCv = $('#chDist');
+        if (dCv && dCv.closest('.chart-box')) {
+          dCv.closest('.chart-box').innerHTML = emptyState('fa-chart-pie', 'بدون داده در این بازه', 'بازه‌ی دیگری انتخاب کنید یا ارزیابی ثبت کنید.');
+        }
+      }
 
       const slaParts = [
         ['رعایت واقعی', d.slaOk || 0, 'rgba(52,211,153,.8)'],
@@ -162,7 +173,10 @@ App.register('dashboard', {
           options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '62%' }
         });
       } else {
-        $('#chSla').closest('.chart-box').innerHTML = emptyState('fa-stopwatch', 'بدون داده SLA', 'با این بازه داده‌ای نیست.');
+        const slaCv = $('#chSla');
+        if (slaCv && slaCv.closest('.chart-box')) {
+          slaCv.closest('.chart-box').innerHTML = emptyState('fa-stopwatch', 'بدون داده SLA', 'با این بازه داده‌ای نیست.');
+        }
       }
     }
 

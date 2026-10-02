@@ -268,6 +268,39 @@
     return { rows: rows, elements: elements };
   }
 
+  /* ---------------------------- نرخ اقلام نسبت به کل دیتا (وزن‌دار) ----------------------------
+   * به‌جای میانگین نرخ تک‌به‌تک کارشناس‌ها، رعایت/عدم‌رعایت را روی کل ردیف‌های
+   * فیلترشده جمع می‌زند — دقیقاً معادل اینکه کل گروه یک شیت واحد باشد. */
+  function elementRates(data, q) {
+    q = q || {};
+    function ratesFor(rows, keys) {
+      return keys.map(function (k) {
+        var ok = 0, bad = 0;
+        rows.forEach(function (r) {
+          var v = C.normalizeTri(r[k[0]]);
+          if (v === 1) ok++;
+          else if (v === 0) bad++;
+        });
+        var tot = ok + bad;
+        return {
+          key: k[0], label: k[1], form: k[2], ok: ok, bad: bad, total: tot,
+          successRate: tot ? C.round2(100 * ok / tot) : '',
+          errorRate: tot ? C.round2(100 * bad / tot) : ''
+        };
+      });
+    }
+    var T = scoredRows(filterRows(data.tickets, q));
+    var S = scoredRows(filterRows(data.socials, q));
+    return {
+      ticket: ratesFor(T, [
+        ['q1', 'پیگیری', 'ticket'], ['q2', 'یادداشت', 'ticket'], ['q3', 'دلیل بستن', 'ticket'], ['q4', 'اکشن CRM', 'ticket']
+      ]),
+      social: ratesFor(S, [
+        ['qSla', 'المان SLA', 'social'], ['qFollow', 'پیگیری', 'social'], ['qClosing', 'پایان‌بندی', 'social'], ['qTone', 'لحن', 'social']
+      ])
+    };
+  }
+
   function agentByIdent(agents, ident) {
     ident = C.faToEn(String(ident == null ? '' : ident)).trim().toLowerCase();
     if (!ident) return null;
@@ -533,7 +566,7 @@
   return {
     inRange: inRange, filterRows: filterRows, scoredRows: scoredRows,
     monthlyBreakdown: monthlyBreakdown, combinedAgentReport: combinedAgentReport, agentByIdent: agentByIdent, agentProfile: agentProfile,
-    ticketReport: ticketReport, socialReport: socialReport, callReport: callReport, dashboard: dashboard,
+    ticketReport: ticketReport, socialReport: socialReport, callReport: callReport, elementRates: elementRates, dashboard: dashboard,
     callAnalysis: callAnalysis
   };
 });

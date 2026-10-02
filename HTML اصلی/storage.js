@@ -161,14 +161,15 @@ function route(method, url, body) {
   if (name === 'reports' && method === 'GET') {
     const type = q.type || 'social';
     const level = q.level === 'team' ? 'team' : 'agent';
-    if (type === 'combined') return { type, level, rows: R.combinedAgentReport(db, q) };
+    const elements = R.elementRates ? R.elementRates(db, q) : undefined;
+    if (type === 'combined') return { type, level, rows: R.combinedAgentReport(db, q), elements };
     if (type === 'call' && R.callReport) {
       const crit = window.QCParse ? { criteriaFor: (t) => window.QCParse.criteriaFor(t), labelOf: (t, k) => window.QCParse.labelOf(t, k) } : {};
       const rep = R.callReport(db, level, q, crit);
-      return { type: 'call', level, rows: rep.rows, elements: rep.elements };
+      return { type: 'call', level, rows: rep.rows, elements: Object.assign({}, elements, { call: rep.elements }) };
     }
     const tt = type === 'ticket' ? 'ticket' : 'social';
-    return { type: tt, level, rows: tt === 'ticket' ? R.ticketReport(db, level, q) : R.socialReport(db, level, q) };
+    return { type: tt, level, rows: tt === 'ticket' ? R.ticketReport(db, level, q) : R.socialReport(db, level, q), elements };
   }
 
   /* پرونده تلفنی کارشناس: نام یا داخلی */

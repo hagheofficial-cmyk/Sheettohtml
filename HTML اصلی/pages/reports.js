@@ -151,6 +151,44 @@ async function render(root) {
 
   const scoreColor = (v) => v >= 90 ? 'rgba(52,211,153,.8)' : v >= 75 ? 'rgba(56,189,248,.8)' : v >= 50 ? 'rgba(251,191,36,.8)' : 'rgba(248,113,113,.8)';
 
+  /* نمودار افقی نرخ اقلام (وزن‌دار روی کل دیتا) — تیکت + سوشال یک‌جا */
+  function drawElementsBar(canvas, data) {
+    const els = ((data.elements && data.elements.ticket) || []).map((x) => ({ ...x, frm: 'تیکت' }))
+      .concat(((data.elements && data.elements.social) || []).map((x) => ({ ...x, frm: 'سوشال' })));
+    const valid = els.filter((x) => x.total > 0);
+    if (!canvas || !valid.length) return;
+    App.chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: valid.map((x) => `${x.label} · ${x.frm}`),
+        datasets: [{
+          data: valid.map((x) => x.successRate === '' ? 0 : x.successRate),
+          backgroundColor: valid.map((x) => x.frm === 'تیکت' ? 'rgba(56,189,248,.8)' : 'rgba(52,211,153,.8)'),
+          borderRadius: 6, borderSkipped: false, barPercentage: .68
+        }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (c) => ' نرخ رعایت: ' + fa(valid[c.dataIndex].successRate === '' ? '—' : valid[c.dataIndex].successRate) + '%',
+              afterLabel: (c) => {
+                const x = valid[c.dataIndex];
+                return `رعایت: ${fa(x.ok)} · عدم رعایت: ${fa(x.bad)} · مجموع: ${fa(x.total)}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: { min: 0, max: 100, grid: { color: 'rgba(34,48,79,.5)' }, ticks: { callback: (v) => v + '٪' } },
+          y: { grid: { display: false }, ticks: { font: { size: 11.5 } } }
+        }
+      }
+    });
+  }
+
   function drawBar(canvas, labels, vals, tooltipLabel) {
     App.chart(canvas, {
       type: 'bar',
@@ -164,6 +202,7 @@ async function render(root) {
   }
 
   async function load() {
+    App.clearCharts();
     const wrap = $('#tblWrap'), charts = $('#chartsRow');
     wrap.innerHTML = `<div class="loading-page"><div class="spinner"></div></div>`;
     let data;
@@ -189,8 +228,16 @@ async function render(root) {
       return;
     }
 
-    App.charts.forEach((c) => { try { c.destroy(); } catch (e) {} });
-    App.charts = [];
+    /* کارت «نمره‌ی اقلام نسبت به کل دیتا» — تیکت و سوشال، وزن‌دار روی تمام ردیف‌های فیلترشده */
+    function elementsCardHTML(cls) {
+      const t = ((data.elements && data.elements.ticket) || []).reduce((n, x) => n + x.total, 0);
+      const s = ((data.elements && data.elements.social) || []).reduce((n, x) => n + x.total, 0);
+      if (!t && !s) return '';
+      return `<div class="card"><div class="card-head ${cls}"><div class="head-icon"><i class="fa-solid fa-square-poll-vertical"></i></div>
+          <div><h3>نمره‌ی اقلام نسبت به کل دیتا (تیکت + سوشال)</h3>
+          <div class="sub">نرخ رعایت هر المان روی کل دیتای فیلترشده — تیکت: ${fa(t)} سابقه · سوشال: ${fa(s)} سابقه</div></div></div>
+        <div class="chart-box" style="height:300px"><canvas id="chEls"></canvas></div></div>`;
+    }
 
     const rows = data.rows;
     const labels = rows.map((r) => r.name.length > 18 ? r.name.slice(0, 18) + '…' : r.name);
@@ -201,8 +248,10 @@ async function render(root) {
         <div class="card"><div class="card-head"><div class="head-icon"><i class="fa-solid fa-chart-column"></i></div><h3>میانگین کل نمره</h3></div>
           <div class="chart-box"><canvas id="ch1"></canvas></div></div>
         <div class="card"><div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-chart-column"></i></div><h3>توزیع تعداد ارزیابی (تیکت / سوشال / تماس)</h3></div>
-          <div class="chart-box"><canvas id="ch2"></canvas></div></div>`;
+          <div class="chart-box"><canvas id="ch2"></canvas></div></div>
+${elementsCardHTML('teal')}`;
       drawBar($('#ch1'), labels, rows.map((r) => r.avgScore === '' ? 0 : r.avgScore), 'میانگین کل');
+      drawElementsBar($('#chEls'), data);
       App.chart($('#ch2'), {
         type: 'bar',
         data: {
@@ -245,7 +294,7 @@ async function render(root) {
       /* کارت نمره‌ی اقلام کلی — «کلا روی کدام المان چه نمره‌ای گرفته‌شده» */
       const FORM_FA = { tele: 'تلفنی', account: 'اکانت', mlm: 'MLM' };
       const FORM_COLOR = { tele: '#38bdf8', account: '#a78bfa', mlm: '#34d399' };
-      const els = data.elements || [];
+      const els = (data.elements && data.elements.call) || [];
       $('#elemCardWrap').innerHTML = els.length ? `
         <div class="card" style="margin-bottom:16px">
           <div class="card-head"><div class="head-icon"><i class="fa-solid fa-list-check"></i></div>
@@ -265,30 +314,11 @@ async function render(root) {
     } else {
       $('#elemCardWrap').innerHTML = '';
       charts.innerHTML = `
-        <div class="card"><div class="card-head"><div class="head-icon"><i class="fa-solid fa-chart-column"></i></div><h3>میانگین نمره ${F.level === 'agent' ? 'کارشناسان' : 'تیم‌ها'}</h3></div>
+        <div class="card"><div class="card-head"><div class="head-icon"><i class="fa-solid fa-chart-column"></i></div><h3>میانگین نمره ${F.level === 'agent' ? 'کارشناسان' : 'تیم‌ها'} — ${F.type === 'social' ? 'سوشال' : 'تیکت'}</h3></div>
           <div class="chart-box"><canvas id="ch1"></canvas></div></div>
-        <div class="card"><div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-layer-group"></i></div><h3>نرخ المان‌ها (تجمیعی)</h3></div>
-          <div class="chart-box"><canvas id="ch2"></canvas></div></div>`;
+${elementsCardHTML('teal')}`;
       drawBar($('#ch1'), labels, rows.map((r) => r.avgScore === '' ? 0 : r.avgScore), 'میانگین');
-      const elemKeys = F.type === 'social'
-        ? [['qSlaRate', 'SLA', 'rgba(56,189,248,.85)'], ['qFollowRate', 'پیگیری', 'rgba(167,139,250,.85)'], ['qClosingRate', 'پایان‌بندی', 'rgba(52,211,153,.85)'], ['qToneRate', 'لحن', 'rgba(251,191,36,.85)']]
-        : [['q1Rate', 'پیگیری', 'rgba(56,189,248,.85)'], ['q2Rate', 'یادداشت', 'rgba(167,139,250,.85)'], ['q3Rate', 'دلیل بستن', 'rgba(52,211,153,.85)'], ['q4Rate', 'اکشن CRM', 'rgba(251,191,36,.85)']];
-      const avgRate = (k) => {
-        const arr = rows.map((r) => r[k]).filter((x) => x !== '' && x != null);
-        return arr.length ? C.round2(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
-      };
-      App.chart($('#ch2'), {
-        type: 'polarArea',
-        data: {
-          labels: elemKeys.map((e) => e[1]),
-          datasets: [{ data: elemKeys.map((e) => avgRate(e[0])), backgroundColor: elemKeys.map((e) => e[2].replace('.85', '.55')), borderColor: '#111a2e' }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (c) => ' ' + c.label + ': ' + fa(c.parsed.r) + '٪' } } },
-          scales: { r: { max: 100, ticks: { display: false }, grid: { color: 'rgba(34,48,79,.5)' } } }
-        }
-      });
+      drawElementsBar($('#chEls'), data);
     }
 
     wrap.innerHTML = `<table class="tbl"><thead><tr>${cols.map((c) => `<th>${c[1]}</th>`).join('')}</tr></thead>
