@@ -1,516 +1,522 @@
 {
-  "version": 1,
-  "agents": [
-    {
-      "id": 1,
-      "ext": 3073,
-      "name": "مبینا سیدآبادی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 2,
-      "ext": 3082,
-      "name": "حامد میرزایی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 3,
-      "ext": 3086,
-      "name": "محمد توجهی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 4,
-      "ext": 3090,
-      "name": "هلیا هنرکار",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 5,
-      "ext": 3095,
-      "name": "مهناز جبارزاده",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 6,
-      "ext": 3097,
-      "name": "جواهر باکودزفولی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 7,
-      "ext": 3109,
-      "name": "پریناز ناظمیان پور",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 8,
-      "ext": 3110,
-      "name": "آزاده فیروزی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 9,
-      "ext": 3127,
-      "name": "سجاد موسوی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 10,
-      "ext": 3129,
-      "name": "محمدایلیا ممانی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 11,
-      "ext": 3132,
-      "name": "بردیا جانفشان",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 12,
-      "ext": 3136,
-      "name": "آتوسا آرامی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 13,
-      "ext": 3140,
-      "name": "آتنا نوربخش",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 14,
-      "ext": 3145,
-      "name": "یگانه ویسی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 15,
-      "ext": 3165,
-      "name": "مهتاب چراغی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 16,
-      "ext": 3196,
-      "name": "محمدمهدی علیپور",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 17,
-      "ext": 3204,
-      "name": "هانیه معزز",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 18,
-      "ext": 3212,
-      "name": "آسیه احمدی فر",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 19,
-      "ext": 3214,
-      "name": "مهرداد سعیدمهدوی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 20,
-      "ext": 3220,
-      "name": "آرزو محمودکلایه",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 21,
-      "ext": 3222,
-      "name": "صبا یاری",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 22,
-      "ext": 3226,
-      "name": "مریم رئوف",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 23,
-      "ext": 3238,
-      "name": "محدثه کریمی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 24,
-      "ext": 3239,
-      "name": "سارا زرآینه",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 25,
-      "ext": 3241,
-      "name": "سحر ثامنی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 26,
-      "ext": 3242,
-      "name": "زهرا شجاعی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 27,
-      "ext": 3244,
-      "name": "صدیقه هوشمندی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 28,
-      "ext": 3258,
-      "name": "امیررادمان رشیدی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 29,
-      "ext": 3259,
-      "name": "مهسا موسوی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 30,
-      "ext": 3266,
-      "name": "حامد جبروتی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 31,
-      "ext": 3268,
-      "name": "نرگس پورخلیلی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 32,
-      "ext": 3274,
-      "name": "لیلا بیاتی",
-      "team": "Tele sales",
-      "active": true
-    },
-    {
-      "id": 33,
-      "ext": 3022,
-      "name": "رعنا غیاثی‌نژاد",
-      "team": "MLM",
-      "active": true
-    },
-    {
-      "id": 34,
-      "ext": 3246,
-      "name": "محمد بوئینی",
-      "team": "MLM",
-      "active": true
-    },
-    {
-      "id": 35,
-      "ext": 3249,
-      "name": "شاهین حسنی زاد",
-      "team": "MLM",
-      "active": true
-    },
-    {
-      "id": 36,
-      "ext": 3065,
-      "name": "نیوشا موسوی",
-      "team": "MLM",
-      "active": true
-    },
-    {
-      "id": 37,
-      "ext": 3265,
-      "name": "پوریا لرستانی",
-      "team": "MLM",
-      "active": true
-    },
-    {
-      "id": 38,
-      "ext": 3172,
-      "name": "الهه عسگری",
-      "team": "MLM",
-      "active": true
-    },
-    {
-      "id": 39,
-      "ext": 3173,
-      "name": "سمیرا شکیب",
-      "team": "MLM",
-      "active": true
-    },
-    {
-      "id": 40,
-      "ext": 3248,
-      "name": "سپهر فلاح دوست بدایی",
-      "team": "MLM",
-      "active": true
-    },
-    {
-      "id": 41,
-      "ext": 3245,
-      "name": "مائده بهنامی‌فر",
-      "team": "MLM",
-      "active": true
-    },
-    {
-      "id": 42,
-      "ext": 3146,
-      "name": "الهام شمس نیا",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 43,
-      "ext": 3111,
-      "name": "ریحانه روح بخش",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 44,
-      "ext": 3081,
-      "name": "سیما معصومی",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 45,
-      "ext": 3118,
-      "name": "نرگس یوسفیان",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 46,
-      "ext": 3261,
-      "name": "هانیه مظهری",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 47,
-      "ext": 3263,
-      "name": "ترانه محمودی",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 48,
-      "ext": 3264,
-      "name": "زینب میرزاده",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 49,
-      "ext": 3210,
-      "name": "آیسان نورافکن",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 50,
-      "ext": 3155,
-      "name": "پریا شیشه گر",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 51,
-      "ext": 3176,
-      "name": "سیده متین سید حسینی",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 52,
-      "ext": 3067,
-      "name": "عارفه ایزدان",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 53,
-      "ext": 3151,
-      "name": "متین تدین خواه",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 54,
-      "ext": 3125,
-      "name": "مریم بیات",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 55,
-      "ext": 3128,
-      "name": "نیلوفر رنجبر",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 56,
-      "ext": 3069,
-      "name": "آنیتا کرمانشاه",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 57,
-      "ext": 3079,
-      "name": "زهرا میرزائی",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 58,
-      "ext": 3194,
-      "name": "عاطفه گلباز",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 59,
-      "ext": 3103,
-      "name": "مائده سرمدی",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 60,
-      "ext": 3122,
-      "name": "محمدرضا محتشمیان کاشانی",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 61,
-      "ext": 3225,
-      "name": "مینا فرنام",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 62,
-      "ext": 3106,
-      "name": "هما میرزائی",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 63,
-      "ext": 3276,
-      "name": "فاطمه حسنوند",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 64,
-      "ext": 3275,
-      "name": "شادی قنبری",
-      "team": "Account",
-      "active": true
-    },
-    {
-      "id": 65,
-      "ext": 3139,
-      "name": "علیرضا قمی",
-      "team": "BNPL",
-      "active": true
-    }
-  ],
-  "qcAgents": [
-    "هادی",
-    "مبینا",
-    "شیدا",
-    "هانیه"
-  ],
-  "lists": {
-    "messengers": [
-      "بله",
-      "روبیکا",
-      "ایتا",
-      "تلگرام",
-      "واتساپ",
-      "پیامک"
-    ],
-    "responseStatuses": [
-      "پاسخ داده شده",
-      "عدم پاسخ"
-    ],
-    "delayReasons": [
-      "ندارد",
-      "اختلال سامانه یا پیام‌رسان",
-      "خارج از ساعت کاری",
-      "عدم دسترسی به اطلاعات ضروری",
-      "حجم بالای پیام‌ها",
-      "فراموشی یا عدم پیگیری",
-      "سایر"
-    ],
-    "reasonVerdicts": [
-      "موجه و تأییدشده",
-      "بدون دلیل موجه",
-      "در انتظار بررسی"
-    ]
+ "version": 1,
+ "agents": [
+  {
+   "id": 1,
+   "ext": 3073,
+   "name": "مبینا سیدآبادی",
+   "team": "Tele sales",
+   "active": true
   },
-  "settings": {
-    "ticketWeights": [
-      40,
-      20,
-      20,
-      20
-    ],
-    "socialWeights": [
-      30,
-      30,
-      25,
-      15
-    ],
-    "slaMinutes": 60,
-    "workStart": "09:00",
-    "workEnd": "18:00",
-    "weekendDays": [
-      4,
-      5
-    ],
-    "orgName": "سامانه یکپارچه کنترل کیفیت"
+  {
+   "id": 2,
+   "ext": 3082,
+   "name": "حامد میرزایی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 3,
+   "ext": 3086,
+   "name": "محمد توجهی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 4,
+   "ext": 3090,
+   "name": "هلیا هنرکار",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 5,
+   "ext": 3095,
+   "name": "مهناز جبارزاده",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 6,
+   "ext": 3097,
+   "name": "جواهر باکودزفولی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 7,
+   "ext": 3109,
+   "name": "پریناز ناظمیان پور",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 8,
+   "ext": 3110,
+   "name": "آزاده فیروزی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 9,
+   "ext": 3127,
+   "name": "سجاد موسوی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 10,
+   "ext": 3129,
+   "name": "محمدایلیا ممانی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 11,
+   "ext": 3132,
+   "name": "بردیا جانفشان",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 12,
+   "ext": 3136,
+   "name": "آتوسا آرامی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 13,
+   "ext": 3140,
+   "name": "آتنا نوربخش",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 14,
+   "ext": 3145,
+   "name": "یگانه ویسی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 15,
+   "ext": 3165,
+   "name": "مهتاب چراغی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 16,
+   "ext": 3196,
+   "name": "محمدمهدی علیپور",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 17,
+   "ext": 3204,
+   "name": "هانیه معزز",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 18,
+   "ext": 3212,
+   "name": "آسیه احمدی فر",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 19,
+   "ext": 3214,
+   "name": "مهرداد سعیدمهدوی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 20,
+   "ext": 3220,
+   "name": "آرزو محمودکلایه",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 21,
+   "ext": 3222,
+   "name": "صبا یاری",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 22,
+   "ext": 3226,
+   "name": "مریم رئوف",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 23,
+   "ext": 3238,
+   "name": "محدثه کریمی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 24,
+   "ext": 3239,
+   "name": "سارا زرآینه",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 25,
+   "ext": 3241,
+   "name": "سحر ثامنی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 26,
+   "ext": 3242,
+   "name": "زهرا شجاعی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 27,
+   "ext": 3244,
+   "name": "صدیقه هوشمندی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 28,
+   "ext": 3258,
+   "name": "امیررادمان رشیدی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 29,
+   "ext": 3259,
+   "name": "مهسا موسوی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 30,
+   "ext": 3266,
+   "name": "حامد جبروتی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 31,
+   "ext": 3268,
+   "name": "نرگس پورخلیلی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 32,
+   "ext": 3274,
+   "name": "لیلا بیاتی",
+   "team": "Tele sales",
+   "active": true
+  },
+  {
+   "id": 33,
+   "ext": 3022,
+   "name": "رعنا غیاثی‌نژاد",
+   "team": "MLM",
+   "active": true
+  },
+  {
+   "id": 34,
+   "ext": 3246,
+   "name": "محمد بوئینی",
+   "team": "MLM",
+   "active": true
+  },
+  {
+   "id": 35,
+   "ext": 3249,
+   "name": "شاهین حسنی زاد",
+   "team": "MLM",
+   "active": true
+  },
+  {
+   "id": 36,
+   "ext": 3065,
+   "name": "نیوشا موسوی",
+   "team": "MLM",
+   "active": true
+  },
+  {
+   "id": 37,
+   "ext": 3265,
+   "name": "پوریا لرستانی",
+   "team": "MLM",
+   "active": true
+  },
+  {
+   "id": 38,
+   "ext": 3172,
+   "name": "الهه عسگری",
+   "team": "MLM",
+   "active": true
+  },
+  {
+   "id": 39,
+   "ext": 3173,
+   "name": "سمیرا شکیب",
+   "team": "MLM",
+   "active": true
+  },
+  {
+   "id": 40,
+   "ext": 3248,
+   "name": "سپهر فلاح دوست بدایی",
+   "team": "MLM",
+   "active": true
+  },
+  {
+   "id": 41,
+   "ext": 3245,
+   "name": "مائده بهنامی‌فر",
+   "team": "MLM",
+   "active": true
+  },
+  {
+   "id": 42,
+   "ext": 3146,
+   "name": "الهام شمس نیا",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 43,
+   "ext": 3111,
+   "name": "ریحانه روح بخش",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 44,
+   "ext": 3081,
+   "name": "سیما معصومی",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 45,
+   "ext": 3118,
+   "name": "نرگس یوسفیان",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 46,
+   "ext": 3261,
+   "name": "هانیه مظهری",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 47,
+   "ext": 3263,
+   "name": "ترانه محمودی",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 48,
+   "ext": 3264,
+   "name": "زینب میرزاده",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 49,
+   "ext": 3210,
+   "name": "آیسان نورافکن",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 50,
+   "ext": 3155,
+   "name": "پریا شیشه گر",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 51,
+   "ext": 3176,
+   "name": "سیده متین سید حسینی",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 52,
+   "ext": 3067,
+   "name": "عارفه ایزدان",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 53,
+   "ext": 3151,
+   "name": "متین تدین خواه",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 54,
+   "ext": 3125,
+   "name": "مریم بیات",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 55,
+   "ext": 3128,
+   "name": "نیلوفر رنجبر",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 56,
+   "ext": 3069,
+   "name": "آنیتا کرمانشاه",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 57,
+   "ext": 3079,
+   "name": "زهرا میرزائی",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 58,
+   "ext": 3194,
+   "name": "عاطفه گلباز",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 59,
+   "ext": 3103,
+   "name": "مائده سرمدی",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 60,
+   "ext": 3122,
+   "name": "محمدرضا محتشمیان کاشانی",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 61,
+   "ext": 3225,
+   "name": "مینا فرنام",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 62,
+   "ext": 3106,
+   "name": "هما میرزائی",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 63,
+   "ext": 3276,
+   "name": "فاطمه حسنوند",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 64,
+   "ext": 3275,
+   "name": "شادی قنبری",
+   "team": "Account",
+   "active": true
+  },
+  {
+   "id": 65,
+   "ext": 3139,
+   "name": "علیرضا قمی",
+   "team": "BNPL",
+   "active": true
   }
+ ],
+ "qcAgents": [
+  "هادی",
+  "مبینا",
+  "شیدا",
+  "هانیه"
+ ],
+ "lists": {
+  "messengers": [
+   "بله",
+   "روبیکا",
+   "ایتا",
+   "تلگرام",
+   "واتساپ",
+   "پیامک"
+  ],
+  "responseStatuses": [
+   "پاسخ داده شده",
+   "عدم پاسخ"
+  ],
+  "delayReasons": [
+   "ندارد",
+   "اختلال سامانه یا پیام‌رسان",
+   "خارج از ساعت کاری",
+   "عدم دسترسی به اطلاعات ضروری",
+   "حجم بالای پیام‌ها",
+   "فراموشی یا عدم پیگیری",
+   "سایر"
+  ],
+  "reasonVerdicts": [
+   "موجه و تأییدشده",
+   "بدون دلیل موجه",
+   "در انتظار بررسی"
+  ]
+ },
+ "settings": {
+  "ticketWeights": [
+   40,
+   20,
+   20,
+   20
+  ],
+  "socialWeights": [
+   30,
+   30,
+   25,
+   15
+  ],
+  "slaMinutes": 60,
+  "workStart": "09:00",
+  "workEnd": "18:00",
+  "weekendDays": [
+   4,
+   5
+  ],
+  "orgName": "سامانه یکپارچه کنترل کیفیت",
+  "scoreBands": [
+   90,
+   75,
+   50
+  ],
+  "defaultPreset": "cur"
+ }
 }

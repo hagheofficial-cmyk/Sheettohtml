@@ -73,6 +73,8 @@ i { font-style: normal; }
   background: linear-gradient(135deg, var(--brand-deep), #075985); color: #e0f2fe;
   box-shadow: 0 6px 16px rgba(14,165,233,.35); flex-shrink: 0;
 }
+.brand-logo-img { background: transparent; box-shadow: none; overflow: hidden; }
+.brand-logo-img img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .brand-text { display: flex; flex-direction: column; line-height: 1.35; }
 .brand-text strong { font-size: 14px; font-weight: 800; }
 .brand-text span { font-size: 10px; color: var(--muted); letter-spacing: .4px; }

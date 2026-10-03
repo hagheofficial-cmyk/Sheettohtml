@@ -26,6 +26,8 @@ function loadDb() {
   if (!db.agentActions) db.agentActions = {};
   if (!db.seq.action) db.seq.action = 1;
   if (!Array.isArray(db.callFeedbacks)) db.callFeedbacks = [];
+  if (!db.settings.scoreBands) db.settings.scoreBands = [90, 75, 50];
+  if (!db.settings.defaultPreset) db.settings.defaultPreset = 'cur';
 }
 function saveDb(sync) {
   const w = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {} };
@@ -180,7 +182,7 @@ function route(method, url, body) {
     return prof;
   }
 
-  /* ایمپورت دیتای فیدبک تماس (qc_recovery.json پنل) */
+  /* ایمپورت دیتای ریت تماس (qc_recovery.json پنل) */
   /* دیتای نمونه — منعکس روت‌های سرور */
   if (name === 'demo' && method === 'POST') {
     const agents = db.agents.filter((a) => a.active);
@@ -557,6 +559,10 @@ function route(method, url, body) {
     if (b.workEnd && /^([01]\d|2[0-3]):[0-5]\d$/.test(b.workEnd)) db.settings.workEnd = b.workEnd;
     if (Array.isArray(b.weekendDays) && b.weekendDays.length) db.settings.weekendDays = b.weekendDays;
     if (typeof b.orgName === 'string' && b.orgName.trim()) db.settings.orgName = str(b.orgName);
+    if (Array.isArray(b.scoreBands) && b.scoreBands.length === 3) {
+      db.settings.scoreBands = b.scoreBands.map((x) => Math.min(100, Math.max(0, +x || 0))).sort((a, b) => b - a);
+    }
+    if (['cur', 'prev', 'all'].indexOf(b.defaultPreset) !== -1) db.settings.defaultPreset = b.defaultPreset;
     saveDb(); return clone(db.settings);
   }
   bad('not found', 404);

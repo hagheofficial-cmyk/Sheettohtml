@@ -2,7 +2,7 @@
  * جستجو با نام یا داخلی + بازه تاریخِ تقویم. محاسبات به‌ازای هر تاریخ با منابع ترکیب می‌شود. */
 (function () {
 'use strict';
-const { C, $, $$, api, fa, esc, el, toast, scorePill, rateCell, emptyState, debounce } = UI;
+const { C, $, $$, api, fa, esc, el, toast, scorePill, rateCell, emptyState, debounce, scoreColorHex } = UI;
 
 const FORM_TYPE_FA = { tele: 'رفتار تلفنی', account: 'تیم اکانت', mlm: 'MLM/BNPL' };
 
@@ -190,7 +190,7 @@ async function render(root) {
         <td dir="ltr">${fa(r.reviewDate)}</td><td>${slaTxt(r)}</td><td>${scorePill(r.score)}</td></tr>`).join('')}</tbody></table>`;
   }
   function callTable(rows) {
-    if (!rows.length) return emptyState('fa-headset', 'بدون دیتای فیدبک تماس', 'فایل فرمان QC را در data/calls بگذار یا با دکمه‌ی ایمپورت در صفحه‌ی مدیریت پایه وارد کن');
+    if (!rows.length) return emptyState('fa-headset', 'بدون دیتای ریت تماس', 'فایل فرمان QC را در data/calls بگذار یا با دکمه‌ی ایمپورت در صفحه‌ی مدیریت پایه وارد کن');
     return `<table class="tbl"><thead><tr><th>تاریخ بررسی</th><th>لید</th><th>نوع</th><th>نمره</th><th>ردلاین</th><th>زمان</th></tr></thead>
       <tbody>${rows.slice().sort((a, b) => (b.reviewDate || '').localeCompare(a.reviewDate || '')).map(r => `<tr>
         <td dir="ltr">${fa(r.reviewDate || '—')}</td>
@@ -265,7 +265,7 @@ async function render(root) {
         const cid = 'cr-' + bi + '-' + ri;
         ids.push(cid);
         const st = r.successRate === '' ? null : r.successRate;
-        const bar = st == null ? `width:0%` : st >= 90 ? `width:${st}%;background:#34d399` : st >= 75 ? `width:${st}%;background:#38bdf8` : st >= 50 ? `width:${st}%;background:#fbbf24` : `width:${st}%;background:#f87171`;
+        const bar = st == null ? 'width:0%' : `width:${st}%;background:${scoreColorHex(st)}`;
         return `<tr>
           <td style="font-size:12px">${esc(lbl)} <span style="color:var(--muted);font-size:10px">(${fa(r.ok)}/${fa(r.total)})</span></td>
           <td style="width:1%;white-space:nowrap;text-align:center">
@@ -324,7 +324,7 @@ async function render(root) {
 
     const typeRows = Ph.byType.length
       ? Ph.byType.map(t => `<span class="tag-team">${FORM_TYPE_FA[t.type] || t.type}: ${fa(t.count)} تماس · میانگین ${t.avg === '' ? '—' : scorePill(t.avg)}</span>`).join(' ')
-      : '<span class="tag-team" style="opacity:.5">دیتای فیدبک تماس برای این کارشناس یافت نشد</span>';
+      : '<span class="tag-team" style="opacity:.5">دیتای ریت تماس برای این کارشناس یافت نشد</span>';
 
     body.innerHTML = `
       <!-- شناسنامه -->
@@ -351,7 +351,7 @@ async function render(root) {
         ${kpi('fa-comments', 'ارزیابی سوشال', `${fa(S.count)}`,
           `${S.slaReal === '' ? '' : 'SLA ' + fa(S.slaReal) + '٪'}${S.unanswered ? ' · عدم پاسخ ' + fa(S.unanswered) : ''}`,
           S.slaReal !== '' && S.slaReal < 70 ? 'warn' : '')}
-        ${kpi('fa-headset', 'فیدبک تماس', `${fa(Ph.count)}`,
+        ${kpi('fa-headset', 'ریت تماس', `${fa(Ph.count)}`,
           Ph.avgScore === '' ? '' : `میانگین ${fa(Ph.avgScore)}${Ph.redlineCount ? ' · ردلاین ' + fa(Ph.redlineCount) : ''}`,
           Ph.redlineCount > 0 ? 'danger' : '')}
       </div>
@@ -378,7 +378,7 @@ async function render(root) {
           <div class="table-wrap" style="max-height:340px;overflow-y:auto">${socialTable(S.rows)}</div>
         </div>
         <div class="card">
-          <div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-headset"></i></div><div><h3>فیدبک تماس (${fa(Ph.count)})</h3></div></div>
+          <div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-headset"></i></div><div><h3>ریت تماس (${fa(Ph.count)})</h3></div></div>
           <div class="card-pad" style="border-bottom:1px solid var(--border);padding:9px 14px;font-size:12px">${typeRows}</div>
           <div class="table-wrap" style="max-height:340px;overflow-y:auto">${callTable(Ph.rows)}</div>
         </div>

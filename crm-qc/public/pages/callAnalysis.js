@@ -1,11 +1,11 @@
-/* callAnalysis.js — تحلیل فیدبک تماس (بومی: جایگزین قابلیت‌های داشبورد پنل)
+/* callAnalysis.js — تحلیل ریت تماس (بومی: جایگزین قابلیت‌های داشبورد پنل)
  *   همه‌ی خروجی‌های پنل دستیار فیدبک، روی دیتای ادغام‌شده‌ی سامانه:
  *   KPI، نرخ موفقیت معیارها، هیت‌مپ خطا، رتبه‌بندی، ردلاین‌ها، کامنت‌های QC، روند ماهانه.
  *   + فیلتر تاریخ جلالی (از/تا) مشترک با بقیه صفحات و خروجی اکسل چندشیتی.
  */
 (function () {
 'use strict';
-const { C, $, $$, api, fa, esc, toast, scorePill, rateCell, emptyState } = UI;
+const { C, $, $$, api, fa, esc, toast, scorePill, rateCell, emptyState, scoreColorHex, scoreColorRgba } = UI;
 
 const FORM_TABS = [
   { key: '', label: 'همه تیم‌ها', icon: 'fa-layer-group' },
@@ -51,7 +51,7 @@ async function render(root) {
     <div class="page-head">
       <div class="ph-ic"><i class="fa-solid fa-chart-line"></i></div>
       <div>
-        <h2>تحلیل فیدبک تماس</h2>
+        <h2>تحلیل ریت تماس</h2>
         <p>تحلیل بومی دیتای تماس — نمره، معیارها، خطاها و ردلاین. تیم را انتخاب کن تا معیارهای همان تیم دیده شود.</p>
       </div>
       <div class="spacer"></div>
@@ -187,7 +187,7 @@ async function render(root) {
             <div style="display:flex;align-items:center;gap:10px">
               <div style="flex:0 0 280px;font-size:12px">${esc(r.label)} <span style="color:var(--muted);font-size:10px">(${fa(r.ok)}/${fa(r.total)})</span></div>
               <div style="flex:1;height:8px;background:rgba(148,163,184,.12);border-radius:999px;overflow:hidden">
-                <div style="width:${r.successRate === '' ? 0 : r.successRate}%;height:100%;border-radius:999px;background:${r.successRate >= 90 ? '#34d399' : r.successRate >= 75 ? '#38bdf8' : r.successRate >= 50 ? '#fbbf24' : '#f87171'}"></div>
+                <div style="width:${r.successRate === '' ? 0 : r.successRate}%;height:100%;border-radius:999px;background:${scoreColorHex(r.successRate === '' ? -1 : r.successRate)}"></div>
               </div>
               <div style="flex:0 0 54px;text-align:center;font-weight:600">${r.successRate === '' ? '—' : fa(r.successRate) + '٪'}</div>
             </div>`).join('')}
@@ -329,7 +329,7 @@ async function render(root) {
     const title = $('#chElTitle');
     if (title) title.textContent = 'نرخ موفقیت معیارها — ' + (FORM_FA[curF] || curF);
     if (c2 && withD.length) {
-      const scoreColor = (v) => v >= 90 ? 'rgba(52,211,153,.8)' : v >= 75 ? 'rgba(56,189,248,.8)' : v >= 50 ? 'rgba(251,191,36,.8)' : 'rgba(248,113,113,.8)';
+      const scoreColor = scoreColorRgba;
       App.chart(c2, {
         type: 'bar',
         data: {
@@ -377,12 +377,12 @@ async function render(root) {
       ['ماه', 'تعداد فیدبک', 'میانگین', 'ردلاین'],
       ...(an.monthly || []).map((m) => [m.month, m.count, m.avgScore === '' ? '' : m.avgScore, m.redlines])
     ]});
-    window.QCExport.sheets('تحلیل فیدبک تماس', sheets);
+    window.QCExport.sheets('تحلیل ریت تماس', sheets);
     toast.success('فایل اکسل تحلیل دانلود شد (' + fa(sheets.length) + ' شیت)');
   });
 
   load();
 }
 
-App.register('call-analysis', { title: 'تحلیل فیدبک تماس', render });
+App.register('call-analysis', { title: 'تحلیل ریت تماس', render });
 })();

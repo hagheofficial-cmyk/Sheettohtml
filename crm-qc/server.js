@@ -46,6 +46,8 @@ function loadStore() {
   }
   /* میگریشن‌های ساختاری بدون ریسک */
   if (!db.agentActions) db.agentActions = {};
+  if (!db.settings.scoreBands) db.settings.scoreBands = [90, 75, 50];
+  if (!db.settings.defaultPreset) db.settings.defaultPreset = 'cur';
   if (!db.seq) db.seq = { ticket: 1, social: 1, agent: 1, action: 1 };
   if (!db.seq.action) db.seq.action = 1;
   if (!Array.isArray(db.callFeedbacks)) db.callFeedbacks = [];
@@ -823,6 +825,10 @@ async function handleApi(req, res, pathname, query) {
       if (body.workEnd && C.parseTime(body.workEnd)) s.workEnd = body.workEnd;
       if (Array.isArray(body.weekendDays)) s.weekendDays = body.weekendDays.map((x) => +x).filter((x) => x >= 0 && x <= 6);
       if (body.orgName) s.orgName = str(body.orgName);
+      if (Array.isArray(body.scoreBands) && body.scoreBands.length === 3) {
+        s.scoreBands = body.scoreBands.map((x) => Math.min(100, Math.max(0, +x || 0))).sort((a, b) => b - a);
+      }
+      if (['cur', 'prev', 'all'].indexOf(body.defaultPreset) !== -1) s.defaultPreset = body.defaultPreset;
       saveStore();
       return ok(res, s);
     }

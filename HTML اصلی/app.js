@@ -340,9 +340,23 @@ function selectField(opts) {
 }
 
 /* ---------------------------------------------------------- رندر مشترک */
+/* آستانه‌بندی قابل تنظیم نمره از مدیریت پایه — پیش‌فرض [90,75,50] */
+function scoreBands() {
+  const b = (App.state && App.state.settings && App.state.settings.scoreBands);
+  return (Array.isArray(b) && b.length === 3) ? b : [90, 75, 50];
+}
+function scoreColorHex(v) {
+  const B = scoreBands();
+  return v >= B[0] ? '#34d399' : v >= B[1] ? '#38bdf8' : v >= B[2] ? '#fbbf24' : '#f87171';
+}
+function scoreColorRgba(v) {
+  const B = scoreBands();
+  return v >= B[0] ? 'rgba(52,211,153,.8)' : v >= B[1] ? 'rgba(56,189,248,.8)' : v >= B[2] ? 'rgba(251,191,36,.8)' : 'rgba(248,113,113,.8)';
+}
 function scorePill(score) {
   if (score == null || score === '') return '<span class="pill-score s-na">—</span>';
-  const cls = score >= 90 ? 's-good' : score >= 75 ? 's-mid' : score >= 50 ? 's-warn' : 's-bad';
+  const B = scoreBands();
+  const cls = score >= B[0] ? 's-good' : score >= B[1] ? 's-mid' : score >= B[2] ? 's-warn' : 's-bad';
   return `<span class="pill-score ${cls}">${fa(C.round2(score))}</span>`;
 }
 function markBadge(v) {
@@ -368,7 +382,8 @@ function durText(mins, err) {
 }
 function rateCell(rate) {
   if (rate === '' || rate == null) return '<span style="color:var(--muted)">—</span>';
-  const c = rate >= 90 ? 'var(--good)' : rate >= 70 ? 'var(--brand)' : rate >= 50 ? 'var(--warn)' : 'var(--bad)';
+  const B = scoreBands();
+  const c = rate >= B[0] ? 'var(--good)' : rate >= B[1] ? 'var(--brand)' : rate >= B[2] ? 'var(--warn)' : 'var(--bad)';
   return `<span style="font-weight:800;color:${c}">${fa(rate)}٪</span> <span class="mini-bar"><div style="width:${rate}%;background:${c}"></div></span>`;
 }
 
@@ -492,5 +507,5 @@ const App = {
 
 // اکسپورت سراسری
 window.App = App;
-window.UI = { C, $, $$, esc, fa, el, api, toast, modal, modalHead, confirmDlg, dateField, combo, multiSelect, triSwitch, redlineSwitch, selectField, scorePill, markBadge, slaBadge, durText, rateCell, pager, emptyState, debounce };
+window.UI = { C, $, $$, esc, fa, el, api, toast, modal, modalHead, confirmDlg, dateField, combo, multiSelect, triSwitch, redlineSwitch, selectField, scorePill, markBadge, slaBadge, durText, rateCell, pager, emptyState, debounce, scoreBands, scoreColorHex, scoreColorRgba };
 })();

@@ -1,7 +1,7 @@
 /* reports.js — گزارش‌های تجمیعی کارشناس/تیم برای تیکت و سوشال + گزارش تجمیعی + ماه مالی */
 (function () {
 'use strict';
-const { C, $, $$, api, fa, esc, el, toast, scorePill, rateCell, emptyState, debounce } = UI;
+const { C, $, $$, api, fa, esc, el, toast, scorePill, rateCell, emptyState, debounce, scoreColorRgba } = UI;
 
 const SOCIAL_COLS_AGENT = [
   ['name', 'کارشناس'], ['team', 'تیم'], ['count', 'تعداد نمره‌دار'], ['avgScore', 'میانگین نمره'],
@@ -149,7 +149,7 @@ async function render(root) {
     return p.toString();
   }
 
-  const scoreColor = (v) => v >= 90 ? 'rgba(52,211,153,.8)' : v >= 75 ? 'rgba(56,189,248,.8)' : v >= 50 ? 'rgba(251,191,36,.8)' : 'rgba(248,113,113,.8)';
+  const scoreColor = scoreColorRgba;
 
   /* نمودار افقی نرخ اقلام (وزن‌دار روی کل دیتا) — تیکت + سوشال یک‌جا */
   function drawElementsBar(canvas, data) {

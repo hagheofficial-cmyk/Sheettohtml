@@ -35,6 +35,7 @@ App.register('dashboard', {
           <div class="field grow-0" style="min-width:120px"><label>دید پیش‌فرض</label>
             <div class="tabs" style="width:100%">
               <button data-p="cur" class="active">ماه جاری</button>
+              <button data-p="prev">ماه قبل</button>
               <button data-p="all">همه</button>
             </div>
           </div>
@@ -44,14 +45,23 @@ App.register('dashboard', {
 
       <div id="dContent"><div class="loading-page"><div class="spinner"></div><p>در حال دریافت آمار…</p></div></div>`;
 
-    let preset = 'cur';
+    const DEFAULT_PRESET = (App.state && App.state.settings && App.state.settings.defaultPreset) || 'cur';
+    let preset = DEFAULT_PRESET;
+
+    function presetRange(p) {
+      if (p === 'all') return { from: null, to: null };
+      const t = C.todayJalali();
+      if (p === 'prev') {
+        const pm = t.jm === 1 ? { jy: t.jy - 1, jm: 12 } : { jy: t.jy, jm: t.jm - 1 };
+        const r = C.jalaliMonthRange(pm.jy, pm.jm);
+        return { from: C.formatJalali(r.from), to: C.formatJalali(r.to) };
+      }
+      const r = C.jalaliMonthRange(t.jy, t.jm);
+      return { from: C.formatJalali(r.from), to: C.formatJalali(r.to) };
+    }
 
     function currentRange() {
-      if (preset === 'cur') {
-        const t = C.todayJalali();
-        const rng = C.jalaliMonthRange(t.jy, t.jm);
-        return { from: C.formatJalali(rng.from), to: C.formatJalali(rng.to) };
-      }
+      if (preset !== 'custom') return presetRange(preset);
       const jf = C.parseJalali($('#dFrom').value), jt = C.parseJalali($('#dTo').value);
       return { from: jf ? C.formatJalali(jf) : null, to: jt ? C.formatJalali(jt) : null };
     }
@@ -195,27 +205,33 @@ App.register('dashboard', {
     $('#dFrom').addEventListener('change', () => { preset = 'custom'; load(); });
     $('#dTo').addEventListener('change', () => { preset = 'custom'; load(); });
 
+    /* هم‌راستاسازی اولیه دکمه‌ها و ورودی‌ها با preset پیش‌فرض تنظیمات */
+    (function initPresetUI() {
+      $$('[data-p]').forEach((x) => x.classList.remove('active'));
+      const btn = $(`[data-p="${preset}"]`) || $('[data-p="cur"]');
+      if (btn) btn.classList.add('active');
+      const r = presetRange(preset);
+      refreshInputs({ from: r.from || '', to: r.to || '' });
+    })();
+
     $$('[data-p]').forEach((b) => b.addEventListener('click', () => {
       $$('[data-p]').forEach((x) => x.classList.remove('active'));
       b.classList.add('active');
       preset = b.dataset.p;
-      if (preset === 'cur') {
-        const t0 = C.todayJalali();
-        const r0 = C.jalaliMonthRange(t0.jy, t0.jm);
-        refreshInputs({ from: C.formatJalali(r0.from), to: C.formatJalali(r0.to) });
-      } else if (preset === 'all') {
-        $('#dFrom').value = ''; $('#dTo').value = '';
-      }
+      refreshInputs(preset === 'custom' ? {} : Object.assign({ from: '', to: '' }, (() => {
+        const r = presetRange(preset);
+        return { from: r.from || '', to: r.to || '' };
+      })()));
       load();
     }));
 
     $('#dReset').addEventListener('click', () => {
+      preset = DEFAULT_PRESET;
       $$('[data-p]').forEach((x) => x.classList.remove('active'));
-      $('[data-p="cur"]').classList.add('active');
-      preset = 'cur';
-      const t0 = C.todayJalali();
-      const r0 = C.jalaliMonthRange(t0.jy, t0.jm);
-      refreshInputs({ from: C.formatJalali(r0.from), to: C.formatJalali(r0.to) });
+      const btn = $(`[data-p="${preset}"]`) || $('[data-p="cur"]');
+      if (btn) btn.classList.add('active');
+      const r = presetRange(preset);
+      refreshInputs({ from: r.from || '', to: r.to || '' });
       load();
     });
 

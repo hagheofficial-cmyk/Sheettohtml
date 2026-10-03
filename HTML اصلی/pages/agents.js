@@ -32,7 +32,7 @@ async function render(root) {
       <div class="ph-ic"><i class="fa-solid fa-users-gear"></i></div>
       <div>
         <h2>مدیریت کارشناسان</h2>
-        <p>نام، تیم‌بندی و شماره داخلی — نما گروهی بر اساس تیم + ویرایش آن‌لاین</p>
+        <p>نام، تیم‌بندی، شماره داخلی و کارشناسان QC — همه‌ی مدیریت انسانی در همین صفحه (سینک از مدیریت پایه)</p>
       </div>
       <div class="spacer"></div>
       <button class="btn soft" id="btnImport"><i class="fa-solid fa-file-import"></i> ایمپورت اکسل کارشناسان</button>
@@ -52,6 +52,19 @@ async function render(root) {
           </select>
         </div>
         <div class="field grow-0"><label>&nbsp;</label><button class="btn ghost" id="agReload"><i class="fa-solid fa-rotate"></i> تازه‌سازی</button></div>
+      </div>
+    </div>
+
+    <!-- کارشناسان کنترل کیفیت — منتقل‌شده از مدیریت پایه (سینک همه‌ی مدیریت انسانی همین‌جا) -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-user-shield"></i></div>
+        <div><h3>کارشناسان کنترل کیفیت</h3><div class="sub">این نام‌ها در فرم‌های ثبت ارزیابی تیکت و سوشال قابل انتخاب‌اند</div></div></div>
+      <div class="card-pad">
+        <div class="chips" id="qcChips"></div>
+        <div style="display:flex;gap:9px;margin-top:13px;max-width:520px">
+          <input class="input" id="qcNew" placeholder="نام کارشناس QC جدید…" style="flex:1">
+          <button class="btn soft" id="qcAdd"><i class="fa-solid fa-plus"></i> افزودن</button>
+        </div>
       </div>
     </div>
 
@@ -403,6 +416,24 @@ async function render(root) {
   $('#agView').addEventListener('change', renderAgents);
   $('#agReload').addEventListener('click', load);
 
+  /* ------------------------------- کارشناسان QC ------------------------------- */
+  function qcChips() {
+    $('#qcChips').innerHTML = App.state.qcAgents.map((n) =>
+      `<span class="chip">${esc(n)}<button data-n="${esc(n)}" title="حذف"><i class="fa-solid fa-xmark"></i></button></span>`).join('') ||
+      '<span style="color:var(--muted);font-size:12px">موردی ثبت نشده</span>';
+    $$('#qcChips button').forEach((b) => b.addEventListener('click', async () => {
+      try { await api.del('/api/qc-agents/' + encodeURIComponent(b.dataset.n)); toast('حذف شد', 'success'); await App.boot(); qcChips(); }
+      catch (e) { toast(e.message, 'error'); }
+    }));
+  }
+  $('#qcAdd').addEventListener('click', async () => {
+    const name = $('#qcNew').value.trim();
+    if (!name) return;
+    try { await api.post('/api/qc-agents', { name }); $('#qcNew').value = ''; toast('افزوده شد', 'success'); await App.boot(); qcChips(); }
+    catch (e) { toast(e.message, 'error'); }
+  });
+
+  qcChips();
   load();
 }
 

@@ -3,8 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>سامانه کنترل کیفیت CRM — نسخه مستقل</title>
+<title>سامانه یکپارچه کنترل کیفیت CRM</title>
 <link href="vendor/fontawesome/css/all.min.css" rel="stylesheet">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="logo.png">
 <script src="vendor/chart.umd.min.js"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="styles.css">
@@ -13,9 +15,10 @@
 <body>
 
 <div id="app" class="app">
+  <!-- نوار کناری -->
   <aside class="sidebar" id="sidebar">
     <div class="brand">
-      <div class="brand-logo"><i class="fa-solid fa-shield-halved"></i></div>
+      <div class="brand-logo brand-logo-img"><img src="logo.png" alt="لوگو"></div>
       <div class="brand-text">
         <strong id="orgName">سامانه کنترل کیفیت</strong>
         <span>CRM Quality Assurance</span>
@@ -51,7 +54,7 @@
       <a href="#/reports" class="nav-item" data-route="reports"><i class="fa-solid fa-chart-pie"></i><span>گزارش‌ها</span></a>
       <a href="#/portfolio" class="nav-item" data-route="portfolio"><i class="fa-solid fa-id-card-clip"></i><span>پرونده کارشناس</span></a>
       <a href="#/data" class="nav-item" data-route="data"><i class="fa-solid fa-database"></i><span>مرکز داده</span></a>
-      <a href="#/call-analysis" class="nav-item" data-route="call-analysis"><i class="fa-solid fa-chart-line"></i><span>تحلیل فیدبک تماس</span></a>
+      <a href="#/call-analysis" class="nav-item" data-route="call-analysis"><i class="fa-solid fa-chart-line"></i><span>تحلیل ریت تماس</span></a>
       <a href="#/callreport" class="nav-item" data-route="callreport"><i class="fa-solid fa-phone"></i><span>گزارش تماس</span></a>
       <a href="#/directory" class="nav-item" data-route="directory"><i class="fa-solid fa-users-gear"></i><span>مدیریت پایه</span></a>
       <a href="#/agents" class="nav-item" data-route="agents"><i class="fa-solid fa-user-group"></i><span>مدیریت کارشناسان</span></a>
@@ -59,11 +62,11 @@
 
     <div class="sidebar-foot">
       <div class="mini-stat"><i class="fa-solid fa-database"></i><span id="footCounts">—</span></div>
-      <div class="mini-stat" style="margin-top:6px" title="داده‌ها در مرورگر شما (localStorage) ذخیره می‌شود"><i class="fa-solid fa-laptop" style="color:var(--violet)"></i><span>نسخه مستقل — بدون سرور</span></div>
     </div>
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
+  <!-- ستون اصلی -->
   <div class="main">
     <header class="topbar">
       <button class="hamburger" id="hamburger" aria-label="منو"><i class="fa-solid fa-bars"></i></button>
@@ -83,11 +86,11 @@
 <div id="modalRoot"></div>
 
 <script src="calc.js"></script>
-<script src="jcal.js"></script>
 <script src="parseQc.js"></script>
 <script src="seed-data.js"></script>
 <script src="reports.js"></script>
 <script src="storage.js"></script>
+<script src="jcal.js"></script>
 <script src="export.js"></script>
 <script src="app.js"></script>
 <script src="pages/dashboard.js"></script>

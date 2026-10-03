@@ -4,7 +4,7 @@
  *   ۱) نمای کلی: چقدر تیکت/سوشال/تماس روی سیستم است؟
  *   ۲) آپلود اکسل QC تیم‌ها (تلفنی/اکانت/MLM) — تشخیص خودکار نوع فرم
  *   ۳) بک‌اپ کامل (همه دیتا یا بازه‌دار) → فایل JSON
- *   ۴) بازیابی از فایل بک‌اپ / qc_recovery.json
+ *   ۴) بازیابی از فایل بک‌اپ JSON
  *   ۵) پاک‌سازی دیتای تماس کامل یا بازه‌دار
  */
 (function () {
@@ -44,12 +44,12 @@ async function render(root) {
     </div>
   </div>
 
-  <!-- آپلود اکسل فیدبک تماس -->
+  <!-- آپلود اکسل ریت تماس -->
   <div class="card" style="margin-bottom:16px">
     <div class="card-head">
       <div class="head-icon" style="background:rgba(167,139,250,.12);color:#a78bfa"><i class="fa-solid fa-cloud-arrow-up"></i></div>
       <div>
-        <h3>آپلود اکسل‌های فیدبک تماس</h3>
+        <h3>آپلود اکسل‌های ریت تماس</h3>
         <div class="sub">اکسل‌های QC تلفنی / اکانت / MLM را اینجا رها کن — نوع فرم خودکار تشخیص داده می‌شود.</div>
       </div>
     </div>
@@ -98,12 +98,12 @@ async function render(root) {
     <div class="card">
       <div class="card-head">
         <div class="head-icon" style="background:rgba(251,191,36,.12);color:#fbbf24"><i class="fa-solid fa-file-export"></i></div>
-        <div><h3>بازیابی / ایمپورت دیتا</h3><div class="sub">فایل بک‌اپ JSON (که قبلاً دانلود کردی) یا فایل qc_recovery.json از پنل فیدبک</div></div>
+        <div><h3>بازیابی / ایمپورت دیتا</h3><div class="sub">فایل بک‌اپ JSON که قبلاً از همین‌جا دانلود کردی</div></div>
       </div>
       <div class="card-pad" style="display:flex;flex-direction:column;gap:12px">
         <div class="note" style="margin:0">
           <i class="fa-solid fa-circle-info"></i>
-          <span>نوع فایل خودکار تشخیص داده می‌شود: فایل <b>بک‌اپ کامل</b> کل دیتا را جایگزین می‌کند، فایل <b>qc_recovery.json</b> فقط دیتای فیدبک تماس را می‌آورد.</span>
+          <span>فایل <b>بک‌اپ کامل</b> سامانه را انتخاب کنید — کل دیتای مرکز (تیکت، سوشال، ریت تماس) با آن جایگزین یا ادغام می‌شود.</span>
         </div>
         <button class="btn soft" id="btnRestoreSel"><i class="fa-solid fa-file-arrow-up" style="color:#14b8a6"></i> انتخاب فایل بازیابی…</button>
         <input type="file" id="restoreInp" accept=".json,application/json" hidden>
@@ -362,7 +362,7 @@ async function render(root) {
 
   $('#btnClearCallsAll').addEventListener('click', () => {
     confirmDlg('پاک‌سازی کامل دیتای تماس',
-      'همه ردیف‌های فیدبک تماس (تلفنی، اکانت، MLM) برای همیشه پاک می‌شود. فایل‌های آپلودی در پوشه می‌مانند و با بازخوانی بعدی سرور دوباره آمده‌اند.',
+      'همه ردیف‌های ریت تماس (تلفنی، اکانت، MLM) برای همیشه پاک می‌شود. فایل‌های آپلودی در پوشه می‌مانند و با بازخوانی بعدی سرور دوباره آمده‌اند.',
       async () => {
         try {
           const r = await api.del('/api/calls');
