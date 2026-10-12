@@ -8,7 +8,7 @@ const { C, $, $$, api, fa, esc, el, toast, emptyState, debounce, confirmDlg } = 
 
 /* تربیت تیم‌ها برای آینه‌ی فرم QC — نام‌گذاری تمیز */
 const TEAM_NORMAL = [
-  { key: 'tele',    label: 'تلفنی — فروش',      match: (s) => /tele|تلفن|فروش/i.test(s) },
+  { key: 'tele',    label: 'Telesales',      match: (s) => /tele|تلفن|فروش/i.test(s) },
   { key: 'account', label: 'اکانت',             match: (s) => /account|اکانت/i.test(s) },
   { key: 'mlm',     label: 'MLM / BNPL',        match: (s) => /mlm|bnpl/i.test(s) }
 ];
@@ -35,6 +35,8 @@ async function render(root) {
         <p>نام، تیم‌بندی، شماره داخلی و کارشناسان QC — همه‌ی مدیریت انسانی در همین صفحه (سینک از مدیریت پایه)</p>
       </div>
       <div class="spacer"></div>
+      <button class="btn success-soft" id="agentTemplate"><i class="fa-solid fa-file-excel"></i> اکسل نمونه</button>
+      <button class="btn danger-soft" id="agentsDeleteAll"><i class="fa-solid fa-trash-can"></i> حذف تمام کارشناسان</button>
       <button class="btn soft" id="btnImport"><i class="fa-solid fa-file-import"></i> ایمپورت اکسل کارشناسان</button>
       <button class="btn success-soft" id="teamAdd"><i class="fa-solid fa-plus"></i> تیم جدید</button>
       <button class="btn brand" id="agentAdd"><i class="fa-solid fa-user-plus"></i> کارشناس جدید</button>
@@ -51,6 +53,7 @@ async function render(root) {
             <option value="flat">نمای تخت (همه کارشناسان)</option>
           </select>
         </div>
+        <div class="field grow-0"><label style="display:flex;align-items:center;gap:7px"><input type="checkbox" id="showArchived"> نمایش بایگانی‌ها</label></div>
         <div class="field grow-0"><label>&nbsp;</label><button class="btn ghost" id="agReload"><i class="fa-solid fa-rotate"></i> تازه‌سازی</button></div>
       </div>
     </div>
@@ -76,7 +79,7 @@ async function render(root) {
   async function load(showArchived) {
     try {
       allAgents = await api.get('/api/agents');
-      if (!showArchived) allAgents = allAgents.filter((a) => a.active !== false);
+      if (!$('#showArchived',root).checked) allAgents = allAgents.filter((a) => a.active !== false);
       renderAgents();
     } catch (e) {
       $('#agentsBody').innerHTML = `<div class="card">${emptyState('fa-triangle-exclamation', 'خطا', e.message)}</div>`;
@@ -112,14 +115,14 @@ async function render(root) {
         <td class="cell-main">${esc(a.name)}${a.active === false ? ' <span class="badge gray">بایگانی</span>' : ''}${sub}</td>
         <td><input type="text" class="row-ext" dir="ltr" inputmode="numeric" data-ed="1" value="${a.ext == null ? '' : esc(String(a.ext))}" style="width:74px;text-align:center;font-size:12px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px"></td>
         <td><input type="text" class="row-team" data-ed="1" value="${esc(a.team)}" list="teamsDlAll" style="flex:1;min-width:140px;font-size:12px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 8px"></td>
-        <td style="font-size:11px">${a.active !== false ? '<button class="btn soft sm" data-act="archive">بایگانی</button>' : '<button class="btn success-soft sm" data-act="restore">بازیابی</button>'}</td>
+        <td class="agent-row-edit"><button class="btn soft sm" data-act="edit"><i class="fa-solid fa-user-pen"></i> ویرایش</button> ${a.active !== false ? '<button class="btn soft sm" data-act="archive">بایگانی</button>' : '<button class="btn success-soft sm" data-act="restore">بازیابی</button>'}</td>
       </tr>`;
     }
 
     function teamSection(teamName) {
       const arr = byTeam[teamName] || [];
       const k = normTeamKey(teamName);
-      const FORM = { tele: 'فرم فیدبک تلفنی', account: 'فرم فیدبک اکانت', mlm: 'فرم فیدبک MLM' };
+      const FORM = { tele: 'فرم ریت Telesales', account: 'فرم ریت اکانت', mlm: 'فرم ریت MLM' };
       return `<div class="card" style="margin-bottom:14px">
         <div class="card-head" style="border-bottom:1px solid var(--line-soft);cursor:pointer" data-team="${esc(teamName)}">
           <div class="head-icon">${teamBadge(teamName)}</div>
@@ -135,7 +138,7 @@ async function render(root) {
         </div>
         <div class="table-wrap team-body" style="max-height:340px;overflow-y:auto">
           <table class="tbl" style="font-size:13px">
-            <thead><tr><th style="width:30px"><input type="checkbox" class="sel-all"></th><th>نام</th><th style="width:110px">داخلی</th><th>تیم</th><th style="width:95px"></th></tr></thead>
+            <thead><tr><th style="width:30px"><input type="checkbox" class="sel-all"></th><th>نام</th><th style="width:110px">داخلی</th><th>تیم</th><th style="width:185px">عملیات</th></tr></thead>
             <tbody>${arr.map(rowHtml).join('')}</tbody>
           </table>
         </div>
@@ -153,7 +156,7 @@ async function render(root) {
       body.innerHTML = `<div class="card">
         <div class="table-wrap" style="max-height:600px;overflow-y:auto">
           <table class="tbl" style="font-size:13px">
-            <thead><tr><th style="width:30px"><input type="checkbox" class="sel-all"></th><th>نام</th><th style="width:110px">داخلی</th><th>تیم</th><th style="width:95px"></th></tr></thead>
+            <thead><tr><th style="width:30px"><input type="checkbox" class="sel-all"></th><th>نام</th><th style="width:110px">داخلی</th><th>تیم</th><th style="width:185px">عملیات</th></tr></thead>
             <tbody>${flatRows}</tbody>
           </table>
         </div></div>
@@ -188,15 +191,16 @@ async function render(root) {
       const payload = {};
       const oldExt = (a.ext == null) ? '' : String(a.ext);
       if (newExt !== oldExt || newTeam !== a.team) {
-        const numExt = newExt.replace(/[^\d]/g, '');
+        const numExt = C.faToEn(newExt);
+        if (numExt && !/^\d+$/.test(numExt)) { toast.error('داخلی باید عدد صحیح باشد'); tr.querySelector('.row-ext').value = oldExt; return; }
         payload.ext = newExt === '' ? '' : numExt;
         payload.team = newTeam;
-        api.put('/api/agents/' + id, payload).then(() => {
+        api.put('/api/agents/' + id, payload).then((saved) => {
           toast.success('به‌روز شد');
           a.ext = payload.ext === '' ? null : +numExt;
           if (payload.team) { a.team = payload.team; load(); }
           App.boot(); // App.boot تیم‌های bootstrap را هم تازه می‌کند
-        }).catch((e) => toast.error(e.message));
+        }).catch((e) => { toast.error(e.message); tr.querySelector('.row-ext').value = oldExt; tr.querySelector('.row-team').value = a.team; });
       }
     }
 
@@ -244,6 +248,8 @@ async function render(root) {
         } catch (e) { toast.error(e.message); }
       });
     });
+
+    $$('[data-act="edit"]',root).forEach(button => button.addEventListener('click', () => agentForm(allAgents.find(a => a.id === Number(button.closest('tr').dataset.id)))));
 
     /* بایگانی/بازیابی */
     $$('#agentsBody [data-act="archive"], #agentsBody [data-act="restore"]').forEach((b) => {
@@ -297,7 +303,7 @@ async function render(root) {
           <input class="input" id="aT" list="teamsAll" value="${esc(agent ? agent.team : App.state.teams[0] || '')}" placeholder="مثلاً Tele sales">
           <datalist id="teamsAll">${App.state.teams.map((t) => `<option value="${esc(t)}">`).join('')}</datalist></div>
         <div class="field"><label>شماره داخلی</label>
-          <input class="input" id="aE" dir="ltr" style="text-align:right" inputmode="numeric" value="${agent && agent.ext != null ? agent.ext : ''}" placeholder="مثلاً ۳۰۲۲"></div>
+          <input class="input" id="aE" dir="ltr" style="text-align:right" inputmode="numeric" value="${agent && agent.ext != null ? esc(agent.ext) : ''}" placeholder="مثلاً ۳۰۲۲"></div>
         <div class="field"><label>زیرمجموعه (واحد)</label>
           <input class="input" id="aS" value="${esc(agent && agent.subgroup ? agent.subgroup : '')}" placeholder="مثلاً Shams Team"></div>
       </div></div>
@@ -380,7 +386,7 @@ async function render(root) {
         pending.push({
           name,
           team: String(ci.team >= 0 && r[ci.team] != null ? r[ci.team] : '').trim(),
-          ext: C.faToEn(String(ci.ext >= 0 && r[ci.ext] != null ? r[ci.ext] : '')).replace(/[^\d]/g, ''),
+          ext: C.faToEn(String(ci.ext >= 0 && r[ci.ext] != null ? r[ci.ext] : '')).trim(),
           subgroup: sub === '—' || sub === '-' ? '' : sub
         });
       }
@@ -409,12 +415,29 @@ async function render(root) {
     });
   }
 
+  $('#agentTemplate').addEventListener('click', () => QCExport.sheets('نمونه کارشناسان', [
+    { name:'کارشناسان', rows:[['کارشناس','تیم','CallerID','زیرمجموعه اصلی'],['نام کارشناس اول','Telesales',3011,'واحد فروش'],['نام کارشناس دوم','Account',3012,'واحد اکانت'],['نام کارشناس سوم','MLM',3013,'واحد MLM']] },
+    { name:'راهنما', rows:[['راهنما'],['نام‌های نمونه را با نام دقیق افراد واقعی جایگزین کنید.'],['داخلی یکتا، عددی و اختیاری است.'],['نام تیم و نام کارشناس الزامی است. نام در فرم QC و این فایل یکسان باشد.'],['ورودی نام موجود، تیم/داخلی را به‌روزرسانی می‌کند؛ داخلی متعلق به شخص دیگر پذیرفته نمی‌شود.']] }
+  ]));
+  $('#agentsDeleteAll').addEventListener('click', () => {
+    const m=UI.modal(`${UI.modalHead('حذف تمام کارشناسان','fa-trash-can')}<div class="modal-body">
+      <div class="note bad">تمام کارشناسان فعال و بایگانی از فهرست مدیریت حذف می‌شوند. ریت‌های تیکت، سوشال و تماس و کارشناسان QC پاک نمی‌شوند. با ورود دوباره‌ی اسامی یکسان، سوابق آنها قابل بررسی است.</div>
+      <div class="field"><label>برای تأیید، کلمه «حذف» را بنویسید</label><input class="input" id="agentsDeleteConfirm" autocomplete="off"></div></div>
+      <div class="modal-foot"><button class="btn ghost" data-close>انصراف</button><button class="btn danger-soft" id="agentsDeleteGo" disabled>حذف تمام کارشناسان</button></div>`);
+    $('#agentsDeleteConfirm',m).addEventListener('input',()=>{ $('#agentsDeleteGo',m).disabled=$('#agentsDeleteConfirm',m).value.trim()!=='حذف'; });
+    $('#agentsDeleteGo',m).addEventListener('click',async()=>{
+      const button=$('#agentsDeleteGo',m);button.disabled=true;
+      try{const result=await api.del('/api/agents',{confirmation:'DELETE_ALL_AGENTS'});m.close();sel.clear();await App.boot();await load();toast.success(fa(result.removed)+' کارشناس حذف شد؛ سوابق ریت محفوظ است');}
+      catch(e){toast.error(e.message);button.disabled=false;}
+    });
+  });
   $('#agentAdd').addEventListener('click', () => agentForm(null));
   $('#teamAdd').addEventListener('click', teamForm);
   $('#btnImport').addEventListener('click', importForm);
   $('#agSearch').addEventListener('input', debounce(renderAgents, 220));
   $('#agView').addEventListener('change', renderAgents);
-  $('#agReload').addEventListener('click', load);
+  $('#agReload').addEventListener('click', () => load());
+  $('#showArchived').addEventListener('change', () => load());
 
   /* ------------------------------- کارشناسان QC ------------------------------- */
   function qcChips() {

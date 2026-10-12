@@ -6,15 +6,15 @@
     <title>گزارش تماس روزانه تیم ها / شرکای بیمه بازار</title>
     <!-- Libraries -->
     <script src="vendor/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="vendor/exceljs.min.js"></script>
+    <script src="vendor/html2canvas.min.js"></script>
+    <script src="vendor/jspdf.umd.min.js"></script>
     <script src="vendor/chart.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="vendor/jszip.min.js"></script>
     <link href="vendor/fontawesome/css/all.min.css" rel="stylesheet">
     
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;900&display=swap');
+        @import url('./fonts.css');
         
         * { font-family: 'Vazirmatn', Tahoma, Arial, sans-serif; box-sizing: border-box; }
         
@@ -479,6 +479,7 @@
         .col-top-btn.active[data-col="task"]   { background:rgba(167,139,250,0.14); border-color:#a78bfa; color:#c4b5fd; }
         .col-top-btn.active[data-col="shift"]  { background:rgba(34,211,238,0.14);  border-color:#22d3ee; color:#67e8f9; }
     </style>
+<link rel="stylesheet" href="callReportTheme.css">
 </head>
 <body>
     <div class="container">

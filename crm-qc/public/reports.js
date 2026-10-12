@@ -6,9 +6,9 @@
  * ورودی توابع: data = { tickets: [], socials: [], agents: [] }
  * ========================================================================= */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./calc.js'));
-  else root.QCReports = factory(root.QCCalc);
-})(typeof self !== 'undefined' ? self : this, function (C) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./calc.js'), require('./parseQc.js'));
+  else root.QCReports = factory(root.QCCalc, root.QCParse);
+})(typeof self !== 'undefined' ? self : this, function (C, P) {
   'use strict';
 
   /* ----------------------------------------------------------- ابزارها */
@@ -33,7 +33,7 @@
     return list.length ? new Set(list) : null;
   }
   function teamOf(agents, name) {
-    var a = (agents || []).find(function (x) { return x.name === name; });
+    var a = P.resolveExpert(agents || [], name).agent;
     return a ? a.team : '';
   }
   function rowTeam(data, row) { return teamOf(data && data.agents, row.expertName || row.agentName) || row.team || ''; }
@@ -42,9 +42,15 @@
   function filterRows(rows, q, data) {
     q = q || {};
     var teamSet = valueSet(q.team), agentSet = valueSet(q.agent);
-    return (rows || []).filter(function (r) {
+    if (teamSet) teamSet = new Set(Array.from(teamSet).map(P.teamKey));
+    return (rows || []).map(function (r) {
+      if (!data) return r;
+      var field = r.expertName !== undefined ? 'expertName' : 'agentName';
+      var match = P.resolveExpert(data.agents || [], r[field]).agent;
+      return match && match.name !== r[field] ? Object.assign({}, r, { [field]: match.name }) : r;
+    }).filter(function (r) {
       if ((q.from || q.to) && !inRange(r.reviewDate, q.from, q.to)) return false;
-      if (teamSet && !teamSet.has(data ? rowTeam(data, r) : r.team)) return false;
+      if (teamSet && !teamSet.has(P.teamKey(data ? rowTeam(data, r) : r.team))) return false;
       if (agentSet && !agentSet.has(r.agentName || r.expertName)) return false;
       if (q.qc && r.qcAgent !== q.qc) return false;
       return true;
@@ -72,13 +78,30 @@
     (rows || []).filter(function (r) { return !type || r.formType === type; })
       .forEach(function (r) { Object.keys(r.elements || {}).forEach(function (k) { present.add(k); }); });
     var ordered = crit && crit.criteriaFor ? crit.criteriaFor(type) : [];
+    var configured = false, active = new Set();
+    if (crit && crit.definitionsFor) (rows || []).forEach(function(r) {
+      var team = r.criteriaTeam || r.team || (crit.rowTeam ? crit.rowTeam(r) : '');
+      var custom = crit.configured ? crit.configured(type, team) : P.hasConfiguration(type, team);
+      if (custom) { configured = true; crit.definitionsFor(type, team).filter(d => d.active !== false).forEach(d => active.add(d.key)); }
+      else Object.keys(r.elements || {}).forEach(k => active.add(k));
+    });
+    if (configured) return Array.from(active);
     return (ordered || []).filter(function (k) { return present.has(k); })
       .concat(Array.from(present).filter(function (k) { return (ordered || []).indexOf(k) === -1; }));
   }
-  function criterionStats(rows, key) {
+  function configuredCriteria(data, supplied) {
+    return Object.assign({}, P.resolver((data.settings || {}).callCriteria), supplied || {}, { rowTeam: r => rowTeam(data, r), elementValue: (r,k) => P.elementValue(Object.assign({},r,{team:r.criteriaTeam||r.team||rowTeam(data,r)}),k,(data.settings||{}).callCriteria||null) });
+  }
+  function criterionLabel(rows, type, key, crit) {
+    const team = rows.length ? rows[0].criteriaTeam || rows[0].team || (crit.rowTeam ? crit.rowTeam(rows[0]) : '') : '';
+    return crit.labelOf ? crit.labelOf(type, key, team) : key;
+  }
+
+  function criterionStats(rows, key, crit) {
     var ok = 0, bad = 0, na = 0, missing = 0;
     rows.forEach(function (r) {
-      var value = C.normalizeTri((r.elements || {})[key]);
+      var value = crit && crit.elementValue ? crit.elementValue(r,key) : C.normalizeTri((r.elements || {})[key]);
+      if (crit && crit.configured && crit.configured(r.formType, r.team || (crit.rowTeam ? crit.rowTeam(r) : '')) && !crit.criteriaFor(r.formType, r.team || (crit.rowTeam ? crit.rowTeam(r) : '')).includes(key)) value = '';
       if (value === 1) ok++; else if (value === 0) bad++; else if (value === '-') na++; else missing++;
     });
     var applicable = ok + bad;
@@ -249,7 +272,7 @@
   /** کارشناس با نام یا داخلی (ext) → جزئیات کامل */
   /* ---------------------------- گزارش تماس (ردیفی) + نمرهی اقلام کلی ---------------------------- */
   function callReport(data, level, q, crit) {
-    q = q || {}; crit = crit || {};
+    q = q || {}; crit = configuredCriteria(data, crit);
     var criteriaFor = crit.criteriaFor || function () { return []; };
     var labelOf = crit.labelOf || function (t, k) { return k; };
     var agentSet = valueSet(q.agent);
@@ -279,7 +302,7 @@
     function rates(type) {
       var subset = rowsFB.filter(function (r) { return r.formType === type; });
       return criteriaKeys(subset, type, crit).map(function (key) {
-        return Object.assign(criterionStats(subset, key), { label: labelOf(type, key), form: type });
+        return Object.assign(criterionStats(subset, key, crit), { label: criterionLabel(subset, type, key, crit), form: type });
       });
     }
     var elements = [].concat(rates('tele'), rates('account'), rates('mlm'))
@@ -332,11 +355,12 @@
   function agentByIdent(agents, ident) {
     ident = C.faToEn(String(ident == null ? '' : ident)).trim().toLowerCase();
     if (!ident) return null;
+    const resolved = P.resolveExpert(agents, ident).agent; if (resolved) return resolved;
     var exact = agents.find(function (a) { return a.name && String(a.name).toLowerCase().trim() === ident; })
       || agents.find(function (a) { return a.ext != null && String(a.ext).toLowerCase() === ident; });
     if (exact) return exact;
-    return agents.filter(function (a) { return a.name && String(a.name).toLowerCase().indexOf(ident) !== -1; })[0]
-      || null;
+    const possible = agents.filter(a => a.name && String(a.name).toLowerCase().includes(ident));
+    return possible.length === 1 ? possible[0] : null;
   }
   function agentProfile(data, ident, q) {
     q = q || {};
@@ -347,9 +371,9 @@
     } else {
       // کارشناسی که فقط در دیتای تماس دیده شده (هنوز در رجیستری نیست)
       var nm = String(ident || '').trim();
-      var hit = (data.callFeedbacks || []).filter(function (r) { return r.expertName === nm; });
+      var hit = (data.callFeedbacks || []).filter(r=>r.expertName===nm).concat((data.tickets||[]).filter(r=>r.agentName===nm),(data.socials||[]).filter(r=>r.agentName===nm));
       if (!hit.length) return null;
-      a = { id: 0, name: nm, team: '(دیتای تماس)', active: true, internal: '', role: 'کارشناس از فایل تماس' };
+      a = { id:0,name:nm,team:hit[0].team||'بدون تیم',active:true,ext:null,role:'کارشناس از داده‌های واردشده' };
       name = nm;
     }
     var T = filterRows(data.tickets, q, data).filter(function (r) { return r.agentName === name; });
@@ -371,17 +395,11 @@
     var byTypeRates = ['tele', 'account', 'mlm'].map(function (ft) {
       var rs = Ph.filter(function (r) { return r.formType === ft; });
       if (!rs.length) return null;
-      /* هر کلیدی که در یکی از ردیف‌ها مقدار ۰/۱ دارد */
-      var keys = {};
-      rs.forEach(function (r) {
-        Object.keys(r.elements || {}).forEach(function (k) {
-          var v = C.normalizeTri(r.elements[k]);
-          if (v === 1 || v === 0 || v === '-') keys[k] = 1;
-        });
-      });
-      var list = Object.keys(keys).map(function (k) {
-        var stats = criterionStats(rs, k);
-        return Object.assign({}, stats, { total: stats.applicable, observations: stats.total });
+      var criteria = configuredCriteria(data);
+      var keys = criteriaKeys(rs, ft, criteria);
+      var list = keys.map(function (k) {
+        var stats = criterionStats(rs, k, criteria);
+        return Object.assign({}, stats, { total: stats.applicable, observations: stats.total, label: criterionLabel(rs, ft, k, criteria) });
       }).sort(function (x, y) {
         return (x.successRate === '' ? 101 : x.successRate) - (y.successRate === '' ? 101 : y.successRate);
       });
@@ -397,6 +415,7 @@
 
     return {
       agent: a,
+      scope: { from: q && q.from ? C.formatJalali(C.parseDate(q.from)) : '', to: q && q.to ? C.formatJalali(C.parseDate(q.to)) : '' },
       tickets: {
         rows: T, count: T.length, scoredCount: scoredRows(T).length, avgScore: avgScore(T),
         q1Rate: rateAll(T, 'q1'), q2Rate: rateAll(T, 'q2'), q3Rate: rateAll(T, 'q3'), q4Rate: rateAll(T, 'q4'),
@@ -435,7 +454,7 @@
    */
   function callAnalysis(data, q, crit) {
     q = q || {};
-    crit = crit || {};
+    crit = configuredCriteria(data, crit);
     var criteriaFor = crit.criteriaFor || function () { return []; };
     var labelOf = crit.labelOf || function (t, k) { return k; };
 
@@ -465,8 +484,8 @@
     /* نرخ هر معیار — جدا برای هر نوع فرم به ترتیب پنل */
     function ratesOf(rows, type) {
       return criteriaKeys(rows, type, crit).map(function (key) {
-        var stats = criterionStats(rows, key);
-        return Object.assign({}, stats, { label: labelOf(type, key), total: stats.applicable, observations: stats.total });
+        var stats = criterionStats(rows, key, crit);
+        return Object.assign({}, stats, { label: criterionLabel(rows,type,key,crit), total: stats.applicable, observations: stats.total });
       });
     }
     var elementRates = {
@@ -484,7 +503,7 @@
         var ers = rows.filter(function (r) { return r.expertName === name; });
         var cells = keys.map(function (k) {
           var ok = 0, bad = 0;
-          ers.forEach(function (r) { var v = C.normalizeTri((r.elements || {})[k]); if (v === 1) ok++; else if (v === 0) bad++; });
+          ers.forEach(function (r) { var v = crit.elementValue ? crit.elementValue(r,k) : C.normalizeTri((r.elements || {})[k]); if (v === 1) ok++; else if (v === 0) bad++; });
           var tot = ok + bad;
           return tot === 0 ? null : { ok: ok, bad: bad, total: tot, errorRate: C.round2(100 * bad / tot) };
         });
@@ -496,7 +515,7 @@
         var eb = b.cells.filter(Boolean).reduce(function (s, x) { return s + x.errorRate; }, 0) / Math.max(1, b.cells.filter(Boolean).length);
         return eb - ea;
       });
-      return { labels: keys.map(function (k) { return labelOf(type, k); }), keys: keys, agents: out };
+      return { labels: keys.map(function (k) { return criterionLabel(rows, type, k, crit); }), keys: keys, agents: out };
     }
     var heatmaps = { tele: heatmapOf('tele'), account: heatmapOf('account'), mlm: heatmapOf('mlm') };
 
@@ -589,6 +608,7 @@
     });
     return {
       tickets: T.length, socials: S.length, calls: Ph.length,
+      diagnostics: P.importDiagnostics(Ph, data.agents || []),
       byForm: { tele: Ph.filter(function (r) { return r.formType === 'tele'; }).length,
         account: Ph.filter(function (r) { return r.formType === 'account'; }).length,
         mlm: Ph.filter(function (r) { return r.formType === 'mlm'; }).length },

@@ -2,7 +2,7 @@
  *
  * یک صفحه برای همه چیز که با دیتا سر و کار دارد:
  *   ۱) نمای کلی: چقدر تیکت/سوشال/تماس روی سیستم است؟
- *   ۲) آپلود اکسل QC تیم‌ها (تلفنی/اکانت/MLM) — تشخیص خودکار نوع فرم
+ *   ۲) آپلود اکسل QC تیم‌ها (Telesales/اکانت/MLM) — تشخیص خودکار نوع فرم
  *   ۳) بک‌اپ کامل (همه دیتا یا بازه‌دار) → فایل JSON
  *   ۴) بازیابی از فایل بک‌اپ JSON
  *   ۵) پاک‌سازی دیتای تماس کامل یا بازه‌دار
@@ -41,7 +41,7 @@ async function render(root) {
       <div class="stat-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:11px" id="statusGrid">
         <div class="loading-page" style="grid-column:1/-1"><div class="spinner"></div></div>
       </div>
-      <div id="statusUndated"></div>
+      <div id="statusUndated"></div><div id="statusDiagnostics"></div>
     </div>
     <div class="table-wrap" id="statusTeams"></div>
   </div>
@@ -52,7 +52,7 @@ async function render(root) {
       <div class="head-icon" style="background:rgba(167,139,250,.12);color:#a78bfa"><i class="fa-solid fa-cloud-arrow-up"></i></div>
       <div>
         <h3>آپلود اکسل‌های ریت تماس</h3>
-        <div class="sub">اکسل‌های QC تلفنی / اکانت / MLM را اینجا رها کن — نوع فرم خودکار تشخیص داده می‌شود.</div>
+        <div class="sub">اکسل‌های QC Telesales / اکانت / MLM را اینجا رها کن — نوع فرم خودکار تشخیص داده می‌شود.</div>
       </div>
     </div>
     <div class="card-pad" style="display:flex;flex-direction:column;gap:12px">
@@ -68,12 +68,13 @@ async function render(root) {
         <i class="fa-solid fa-circle-info"></i>
         <span><b>روش دوم (بدون آپلود):</b> فایل‌ها را مستقیم در پوشه‌ی <code style="direction:ltr">crm-qc/data/calls/</code> بگذار — سرور هر ۱۵ ثانیه خودکار جارو می‌کند.</span>
       </div>` : ''}
+      <div class="field"><label>تیم مقصد برای نام‌های ثبت‌نشده (اختیاری)</label><select class="input" id="importTeam"><option value="">بر اساس مدیریت کارشناسان؛ بدون انتساب حدسی</option>${(App.state.teams||[]).map(team=>`<option value="${esc(team)}">${esc(QCParse.displayTeam(team))}</option>`).join('')}</select><small style="color:var(--muted)">فقط نام‌های ثبت‌نشده به این تیم منتسب می‌شوند؛ تیم کارشناسان شناخته‌شده از مدیریت خوانده می‌شود.</small></div>
       <div id="filesList" style="font-size:12px"></div>
     </div>
   </div>
 
   <!-- بک‌اپ و بازیابی -->
-  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(430px,1fr));margin-bottom:16px">
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr));margin-bottom:16px">
     <div class="card">
       <div class="card-head">
         <div class="head-icon" style="background:rgba(52,211,153,.12);color:#34d399"><i class="fa-solid fa-file-import"></i></div>
@@ -90,6 +91,9 @@ async function render(root) {
               <button type="button" class="cal-btn" id="bupToBtn" title="از تقویم"><i class="fa-regular fa-calendar"></i></button></div>
           </div>
         </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input class="input" id="backupYear" inputmode="numeric" dir="ltr" style="width:90px" value="${C.todayJalali().jy}" aria-label="سال بک اپ">
+          <select class="input" id="backupMonth" style="width:125px" aria-label="ماه بک اپ">${C.MONTHS_FA.map((name,index)=>`<option value="${index+1}" ${index+1===C.todayJalali().jm?'selected':''}>${name}</option>`).join('')}</select>
+          <button class="btn soft" id="backupMonthSet">انتخاب کل ماه</button><button class="btn ghost" id="backupUseGlobal">استفاده از بازه گزارش</button></div>
         <div class="note" style="margin:0"><i class="fa-solid fa-circle-info"></i> اگر تاریخ نزنی، کل دیتا دانلود می‌شود. با تاریخ فقط رکوردهای آن بازه.</div>
         <div style="display:flex;gap:9px;flex-wrap:wrap">
           <button class="btn success-soft" id="btnBackup"><i class="fa-solid fa-floppy-disk"></i> دانلود فایل بک‌اپ</button>
@@ -156,18 +160,19 @@ async function render(root) {
         ${stat('سوشال‌های ارزیابی', fa(cm.socials), '#a78bfa')}
         ${stat('کارشناسان فعال', fa(b.agents.length), '#34d399')}
         ${stat('کارشناسان QC', fa(b.qcAgents.length), '#fbbf24')}
-        ${stat('ریت‌های تماس', fa(cm.calls), '#fff')}
+        ${stat('ریت‌های تماس', fa(cm.calls), 'var(--ink)')}
         ${stat('تیم‌ها', fa(cm.byTeam.length), '#ff7a59')}
       ` + (callCounts ? `
         <div style="grid-column:1/-1;background:var(--panel-soft);border-radius:10px;padding:10px 14px;display:flex;gap:14px;flex-wrap:wrap;font-size:12px">
           <span style="color:var(--muted)">تماس‌ها به تفکیک فرم:</span>
-          <span>تلفنی <b>${fa(callCounts.tele || 0)}</b></span>
+          <span>Telesales <b>${fa(callCounts.tele || 0)}</b></span>
           <span>اکانت <b>${fa(callCounts.account || 0)}</b></span>
           <span>MLM <b>${fa(callCounts.mlm || 0)}</b></span>
         </div>` : '');
       teamTable.innerHTML = `<table class="tbl"><thead><tr><th>تیم</th><th>تعداد ریت تیکت</th><th>تعداد ریت سوشال</th><th>تعداد ریت تماس</th><th>مجموع داده</th></tr></thead>
         <tbody>${cm.byTeam.map((t) => `<tr><td><span class="tag-team">${esc(t.team)}</span></td>
           <td>${fa(t.ticketCount)}</td><td>${fa(t.socialCount)}</td><td>${fa(t.callCount)}</td><td><b>${fa(t.totalCount)}</b></td></tr>`).join('')}</tbody></table>`;
+      $('#statusDiagnostics',root).innerHTML = diagnosticsHTML(cm.diagnostics);
       const undated = cm.undated.tickets + cm.undated.socials + cm.undated.calls;
       $('#statusUndated').innerHTML = undated ? `<div class="note" style="margin:12px 0 0"><i class="fa-solid fa-circle-info"></i>
         ${fa(undated)} رکورد بدون تاریخ بررسی معتبر در سامانه وجود دارد (تیکت: ${fa(cm.undated.tickets)}، سوشال: ${fa(cm.undated.socials)}، تماس: ${fa(cm.undated.calls)}).
@@ -177,6 +182,13 @@ async function render(root) {
       teamTable.innerHTML = '';
       grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><i class="fa-solid fa-triangle-exclamation"></i> خطا: ${esc(e.message)}</div>`;
     }
+  }
+  function diagnosticsHTML(d) {
+    if(!d || !(d.unknownExperts.length||d.teamConflicts.length||d.ambiguous))return '';
+    return `<div class="diagnostics"><h4><i class="fa-solid fa-triangle-exclamation"></i> بررسی انتساب کارشناسان به تیم</h4>
+      ${d.unknownExperts.length?`<p>${fa(d.unknownExperts.reduce((n,x)=>n+x.count,0))} ریت متعلق به نام‌هایی است که در مدیریت ثبت نشده‌اند. نوع فرم MLM به‌تنهایی تیم قطعیِ شخص نیست؛ اگر تیم مقصد مشخص نشده باشد «بدون تیم» می‌ماند.</p><ul>${d.unknownExperts.map(x=>`<li>${esc(x.name)} — ${fa(x.count)} ریت (${x.forms.map(f=>({tele:'Telesales',account:'Account',mlm:'MLM / BNPL'})[f]||f).join(' / ')})</li>`).join('')}</ul>`:''}
+      ${d.teamConflicts.length?`<p>نوع فرم با تیم فعلی این کارشناسان متفاوت است؛ تیم مدیریت بدون تأیید شما عوض نمی‌شود:</p><ul>${d.teamConflicts.map(x=>`<li>${esc(x.name)} — تیم فعلی ${esc(QCParse.displayTeam(x.team))}، فرم ${esc(x.form)}؛ ${fa(x.count)} ریت</li>`).join('')}</ul>`:''}
+      ${d.ambiguous?`<p>${fa(d.ambiguous)} تطبیق نام مبهم است و به شخص حدسی منتسب نشده.</p>`:''}<a class="btn soft sm" href="#/agents">بررسی و اصلاح مدیریت کارشناسان</a></div>`;
   }
   function stat(label, val, color) {
     return `<div style="background:var(--panel-soft);border:1px solid var(--line-soft);border-radius:10px;padding:13px 15px">
@@ -208,21 +220,26 @@ async function render(root) {
     }
     if (!payload.length) {
       resEl.style.background = 'rgba(248,113,113,.08)'; resEl.style.color = '#f87171';
-      resEl.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> هیچ فایلی خوانده نشد — ${errs.join('، ')}`;
+      resEl.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> هیچ فایلی خوانده نشد — ${esc(errs.join('، '))}`;
       return;
     }
+    if(!root.isConnected)return;
+    const mode = await UI.confirmImport('ورود اکسل ریت', payload.map(f=>f.name+' — '+f.rows.length+' ردیف').join(' | '), 'فقط دیتای فایل‌های هم‌نام انتخاب‌شده جایگزین می‌شود؛ سایر فایل‌ها و تیکت/سوشال محفوظ‌اند.');
+    if(!mode){resEl.innerHTML='ورود فایل لغو شد؛ داده‌ای تغییر نکرد.';return;}
     try {
-      const r = await api.post('/api/calls/files', { files: payload });
+      const r = await api.post('/api/calls/files', { files: payload, mode, team: $('#importTeam',root).value });
+      if(!root.isConnected)return;
       const okF = (r.results || []).filter((x) => x.ok);
       const badF = (r.results || []).filter((x) => !x.ok);
-      const formFa = { tele: 'تلفنی', account: 'اکانت', mlm: 'MLM' };
+      const formFa = { tele: 'Telesales', account: 'اکانت', mlm: 'MLM' };
       resEl.style.background = 'rgba(52,211,153,.08)'; resEl.style.color = '#34d399';
       resEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> آپلود موفق: ` +
         okF.map((x) => `${esc(x.name)} → ${fa(x.count)} ردیف ${formFa[x.type] || x.type}`).join(' | ');
       if (badF.length || errs.length) {
-        resEl.innerHTML += `<div style="margin-top:7px;color:#fbbf24;font-size:11px"><i class="fa-solid fa-triangle-exclamation"></i> نادیده‌گرفته: ${[...badF.map((x) => x.name), ...errs].join('، ')}</div>`;
+        resEl.innerHTML += `<div style="margin-top:7px;color:#fbbf24;font-size:11px"><i class="fa-solid fa-triangle-exclamation"></i> نادیده‌گرفته: ${esc([...badF.map((x) => x.name+' ('+(x.reason||'نامعتبر')+')'), ...errs].join('، '))}</div>`;
       }
-      toast.success(`${fa((r.counts || {}).total || 0)} تماس وارد سیستم شد`);
+      const added=okF.reduce((n,x)=>n+(x.changes?x.changes.added:x.count),0), duplicates=okF.reduce((n,x)=>n+(x.changes?x.changes.duplicates:0),0);
+      toast.success(fa(added)+' ریت جدید وارد شد؛ '+fa(duplicates)+' ریت تکراری دوباره شمرده نشد');
       loadStatus(); App.refreshCounts();
       if (!STANDALONE) loadFiles();
     } catch (e) {
@@ -259,7 +276,7 @@ async function render(root) {
         fl.innerHTML = `<div style="color:var(--muted);text-align:center;padding:8px 0"><i class="fa-solid fa-inbox"></i> هنوز فایلی سیستم نیست</div>`;
         return;
       }
-      const formFa = { tele: 'تلفنی', account: 'اکانت', mlm: 'MLM' };
+      const formFa = { tele: 'Telesales', account: 'اکانت', mlm: 'MLM' };
       fl.innerHTML = `<div style="border-top:1px solid var(--line-soft);padding-top:10px;margin-top:10px">
         <div style="font-size:12px;color:var(--muted);margin-bottom:7px">فایل‌های منبع (تعداد ردیف کل فایل، مستقل از بازه‌ی گزارش):</div>
         <table class="tbl" style="font-size:12px;margin:0">
@@ -275,17 +292,24 @@ async function render(root) {
   }
 
   /* ------- تقویم‌های بک‌اپ / پاک‌سازی ------- */
-  JCal.attach($('#bupFromBtn'), { onPick(j) { $('#bupFrom').value = j ? C.formatJalali(j) : ''; } });
-  JCal.attach($('#bupToBtn'), { onPick(j) { $('#bupTo').value = j ? C.formatJalali(j) : ''; } });
-  JCal.attach($('#clrFromBtn'), { onPick(j) { $('#clrFrom').value = j ? C.formatJalali(j) : ''; } });
-  JCal.attach($('#clrToBtn'), { onPick(j) { $('#clrTo').value = j ? C.formatJalali(j) : ''; } });
+  JCal.attach($('#bupFromBtn'), { input:$('#bupFrom'), onPick(j) { $('#bupFrom').value = j ? C.formatJalali(j) : ''; } });
+  JCal.attach($('#bupToBtn'), { input:$('#bupTo'), onPick(j) { $('#bupTo').value = j ? C.formatJalali(j) : ''; } });
+  JCal.attach($('#clrFromBtn'), { input:$('#clrFrom'), onPick(j) { $('#clrFrom').value = j ? C.formatJalali(j) : ''; } });
+  JCal.attach($('#clrToBtn'), { input:$('#clrTo'), onPick(j) { $('#clrTo').value = j ? C.formatJalali(j) : ''; } });
+
+  $('#backupMonthSet',root).addEventListener('click',()=>{
+    const range=C.jalaliMonthRange(Number(C.faToEn($('#backupYear',root).value)),Number($('#backupMonth',root).value));
+    if(!range){toast.error('سال یا ماه نامعتبر است');return;} $('#bupFrom').value=C.formatJalali(range.from);$('#bupTo').value=C.formatJalali(range.to);
+  });
+  $('#backupUseGlobal',root).addEventListener('click',()=>{$('#bupFrom').value=App.dateRange.from;$('#bupTo').value=App.dateRange.to;});
 
   /* ------- بک‌اپ کامل ------- */
   $('#btnBackup').addEventListener('click', async () => {
     const b = $('#btnBackup'); b.disabled = true;
     try {
-      const fromJ = C.parseJalali($('#bupFrom').value.trim());
-      const toJ = C.parseJalali($('#bupTo').value.trim());
+      const rawRange={from:$('#bupFrom').value.trim(),to:$('#bupTo').value.trim()};
+      const error=QCReports.validateRange(rawRange);if(error)throw new Error(error);
+      const fromJ=C.parseDate(rawRange.from),toJ=C.parseDate(rawRange.to);
       const from = fromJ ? C.formatJalali(fromJ) : '';
       const to = toJ ? C.formatJalali(toJ) : '';
       const qs = (from || to) ? '?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to) : '';
@@ -295,7 +319,7 @@ async function render(root) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `crm-qc-backup-${dateStr}.json`;
+      a.download = `crm-qc-backup-${from?from.replaceAll('/','-'):'all'}_${to?to.replaceAll('/','-'):dateStr}.json`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success(`بک‌اپ دانلود شد — ${fa(data.agents.length)} کارشناس / ${fa(data.tickets.length)} تیکت / ${fa(data.socials.length)} سوشال / ${fa((data.callFeedbacks || []).length)} تماس`);
@@ -314,39 +338,21 @@ async function render(root) {
         const obj = JSON.parse(rd.result);
         const isBackup = obj.schema === 'crm-qc-backup';
         const isRecovery = obj.teleRawData || obj.accRawData || obj.mlmRawData;
-        if (!isBackup && !isRecovery) throw new Error('این فایل بک‌اپ سامانه یا فایل بازیابی پنل فیدبک نیست');
+        if (!isBackup && !isRecovery) throw new Error('این فایل بک‌اپ سامانه یا فایل بازیابی پنل ریت نیست');
         const resEl = $('#restoreResult');
         resEl.style.display = '';
-        confirmDlg(
-          isBackup ? 'بازیابی بک‌اپ کامل' : 'ایمپورت فایل پنل فیدبک',
-          isBackup
-            ? `کل دیتا (تیکت، سوشال، تماس، کارشناس‌ها، تنظیمات) با این فایل جایگزین می‌شود. از ادامه مطمئنی؟`
-            : `فایل بازیابی پنل فیدبک وارد می‌شود: ${fa((obj.teleRawData || []).length + (obj.accRawData || []).length + (obj.mlmRawData || []).length)} ردیف. از ادامه مطمئنی؟`,
-          async () => {
-            try {
-              if (isBackup) {
-                const r = await api.post('/api/backup', { backup: obj });
-                resEl.style.background = 'rgba(52,211,153,.08)'; resEl.style.color = '#34d399';
-                resEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> بازیابی موفق — ${fa(r.restored.agents)} کارشناس، ${fa(r.restored.tickets)} تیکت، ${fa(r.restored.socials)} سوشال، ${fa(r.restored.calls)} تماس`;
-                toast.success('بک‌اپ بازیابی شد');
-                await App.boot();
-                loadStatus();
-                if (!STANDALONE) loadFiles();
-              } else {
-                const r = await api.post('/api/calls', { recovery: obj });
-                resEl.style.background = 'rgba(52,211,153,.08)'; resEl.style.color = '#34d399';
-                resEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> ایمپورت موفق — تلفنی ${fa(r.counts.tele)} / اکانت ${fa(r.counts.account)} / MLM ${fa(r.counts.mlm)}`;
-                toast.success('دیتای فیدبک وارد شد');
-                loadStatus();
-                if (!STANDALONE) loadFiles();
-              }
-            } catch (e) {
-              resEl.style.background = 'rgba(248,113,113,.08)'; resEl.style.color = '#f87171';
-              resEl.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> خطا: ${esc(e.message)}`;
-            }
-          },
-          'بله، ادامه بده'
-        );
+        const summary=isBackup ? `${(obj.tickets||[]).length} تیکت، ${(obj.socials||[]).length} سوشال، ${(obj.callFeedbacks||[]).length} ریت تماس · بازه ${obj.range&&obj.range.from||'ابتدا'} تا ${obj.range&&obj.range.to||'انتها'}` : `${(obj.teleRawData||[]).length+(obj.accRawData||[]).length+(obj.mlmRawData||[]).length} ریت تماس`;
+        const mode=await UI.confirmImport(isBackup?'ورود آرشیو / بک‌اپ':'ورود فایل ریت',summary,isBackup?'تمام دیتای فعلیِ تیکت، سوشال، تماس و فهرست کارشناسان/تنظیمات با محتویات این بک‌اپ جایگزین می‌شود.':'فقط ریت‌های منبع qc_recovery.json جایگزین می‌شوند؛ سایر منابع محفوظ‌اند.');
+        if(!mode){resEl.textContent='عملیات لغو شد؛ دیتای فعلی تغییر نکرد.';return;}
+        try {
+          const r=isBackup?await api.post('/api/backup',{backup:obj,mode}):await api.post('/api/calls',{recovery:obj,mode});
+          if(!root.isConnected)return;
+          resEl.style.background='var(--good-soft)';resEl.style.color='var(--good)';
+          resEl.textContent=isBackup?`${mode==='append'?'ادغام':'جایگزینی'} موفق — اکنون ${r.restored.tickets} تیکت، ${r.restored.socials} سوشال، ${r.restored.calls} ریت تماس و ${r.restored.agents} کارشناس موجود است.`:'ورود ریت با روش انتخاب‌شده انجام شد.';
+          toast.success(mode==='append'?'داده اضافه شد؛ آرشیو قبلی محفوظ است':'داده با تأیید شما جایگزین شد');
+          await App.boot();await loadStatus();if(!STANDALONE)loadFiles();
+        } catch(error){resEl.style.color='var(--bad)';resEl.textContent='خطا: '+error.message;}
+
       } catch (ex) { toast.error(ex.message || 'فایل نامعتبر'); }
       e.target.value = '';
     };
@@ -355,8 +361,9 @@ async function render(root) {
 
   /* ------- پاک‌سازی تاریخی / کامل ------- */
   $('#btnClearCalls').addEventListener('click', () => {
-    const fromJ = C.parseJalali($('#clrFrom').value.trim());
-    const toJ = C.parseJalali($('#clrTo').value.trim());
+    const rawRange={from:$('#clrFrom').value.trim(),to:$('#clrTo').value.trim()};
+    const error=QCReports.validateRange(rawRange);if(error){toast.error(error);return;}
+    const fromJ=C.parseDate(rawRange.from),toJ=C.parseDate(rawRange.to);
     if (!fromJ && !toJ) { toast.info('حداقل یک تاریخ را انتخاب کنید، یا دکمه «پاک کردن کامل» را بزنید'); return; }
     const from = fromJ ? C.formatJalali(fromJ) : '';
     const to = toJ ? C.formatJalali(toJ) : '';
@@ -377,7 +384,7 @@ async function render(root) {
 
   $('#btnClearCallsAll').addEventListener('click', () => {
     confirmDlg('پاک‌سازی کامل دیتای تماس',
-      'همه ردیف‌های ریت تماس (تلفنی، اکانت، MLM) برای همیشه پاک می‌شود. فایل‌های آپلودی در پوشه می‌مانند و با بازخوانی بعدی سرور دوباره آمده‌اند.',
+      'همه ردیف‌های ریت تماس (Telesales، اکانت، MLM) برای همیشه پاک می‌شود. فایل‌های آپلودی در پوشه می‌مانند و با بازخوانی بعدی سرور دوباره آمده‌اند.',
       async () => {
         try {
           const r = await api.del('/api/calls');

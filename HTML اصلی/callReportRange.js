@@ -50,11 +50,13 @@ function apply(value) {
 }
 window.QCReportRange = { matches, afterRecompute: checkLegacySummary };
 window.addEventListener('message', (event) => {
-  if (event.source !== window.parent || !event.data || event.data.type !== 'crmqc:date-range') return;
+  if (event.source !== window.parent || !event.data) return;
   if (location.protocol !== 'file:' && event.origin !== location.origin) return;
-  apply(event.data.range || {});
+  if(event.data.type === 'crmqc:theme') { document.documentElement.dataset.theme = event.data.theme === 'light' ? 'light' : 'dark'; if(typeof avgDurationChart !== 'undefined' && avgDurationChart && avgDurationChart.update) avgDurationChart.update('none'); return; }
+  if(event.data.type === 'crmqc:date-range') apply(event.data.range || {});
 });
 window.addEventListener('DOMContentLoaded', () => apply(sourceRange));
 const query = new URLSearchParams(location.search);
+document.documentElement.dataset.theme=query.get('qcTheme') === 'light' ? 'light' : 'dark';
 apply({ from: query.get('qcFrom') || '', to: query.get('qcTo') || '' });
 })();

@@ -120,13 +120,13 @@ window.QCExport = {
       return ws;
     };
     const hA = ['نام کارشناس', 'تیم', 'تعداد نمره‌دار', 'میانگین نمره / 100', 'ردلاین',
-      'تلفنی (ت)', 'میانگین تلفنی', 'اکانت (ت)', 'میانگین اکانت', 'MLM (ت)', 'میانگین MLM', 'مجموع ریت'];
+      'Telesales (ت)', 'میانگین Telesales', 'اکانت (ت)', 'میانگین اکانت', 'MLM (ت)', 'میانگین MLM', 'مجموع ریت'];
     const hT = ['نام تیم', 'تعداد نمره‌دار', 'میانگین نمره / 100', 'ردلاین',
-      'تلفنی (ت)', 'میانگین تلفنی', 'اکانت (ت)', 'میانگین اکانت', 'MLM (ت)', 'میانگین MLM', 'مجموع ریت'];
+      'Telesales (ت)', 'میانگین Telesales', 'اکانت (ت)', 'میانگین اکانت', 'MLM (ت)', 'میانگین MLM', 'مجموع ریت'];
     XLSX.utils.book_append_sheet(wb, mk([hA, ...agentRows.map((r) => [r.name, r.team, r.count, r.avgScore, r.redlines, r.teleCount, r.teleAvg, r.accCount, r.accAvg, r.mlmCount, r.mlmAvg, r.total])]), 'Agent Report');
     XLSX.utils.book_append_sheet(wb, mk([hT, ...teamRows.map((r) => [r.name, r.count, r.avgScore, r.redlines, r.teleCount, r.teleAvg, r.accCount, r.accAvg, r.mlmCount, r.mlmAvg, r.total])]), 'Team Report');
     if (elements && elements.length) {
-      const FORM_FA = { tele: 'تلفنی', account: 'اکانت', mlm: 'MLM' };
+      const FORM_FA = { tele: 'Telesales', account: 'اکانت', mlm: 'MLM' };
       const hE = ['المان', 'رعایت شده', 'عدم رعایت', 'موضوعیت نداشته', 'مجموع', 'نرخ رعایت ٪', 'نرخ عدم رعایت ٪'];
       XLSX.utils.book_append_sheet(wb, mk([hE, ...elements.map((x) => [x.label + ' — ' + (FORM_FA[x.form] || x.form), x.ok, x.bad, x.na, x.total, x.successRate, x.errorRate])]), 'المان‌های کلی');
     }
@@ -137,7 +137,7 @@ window.QCExport = {
       const header = ['نام کارشناس', 'نمره کلی تماس', 'نام شریک', ...keys.map((key) => QCParse.labelOf(form, key)), 'ردلاین ها', 'توضیحات ردلاین'];
       const data = subset.map((r) => [r.expertName, C.normalizeScore(r.score), r.leadName,
         ...keys.map((key) => C.normalizeTri((r.elements || {})[key])), QCReports.hasRedline(r, 'call') ? 1 : '-', r.redlineReason || '']);
-      XLSX.utils.book_append_sheet(wb, mk([header, ...data]), 'جزئیات ' + ({ tele: 'تلفنی', account: 'اکانت', mlm: 'MLM' }[form]));
+      XLSX.utils.book_append_sheet(wb, mk([header, ...data]), 'جزئیات ' + ({ tele: 'Telesales', account: 'اکانت', mlm: 'MLM' }[form]));
     }
     download(wb, `QC_Call_Report_${stamp()}.xlsx`);
   },

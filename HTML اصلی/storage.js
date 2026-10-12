@@ -3,6 +3,7 @@
 (function () {
 'use strict';
 const C = window.QCCalc, R = window.QCReports, KEY = 'crmqc.db.v1';
+const Registry = window.QCRegistry, ImportData = window.QCImport;
 let db = null, saveTimer = null;
 
 function loadDb() {
@@ -22,6 +23,7 @@ function loadDb() {
     db.createdAt = new Date().toISOString();
     saveDb(true);
   }
+  if (!db.datasetId) db.datasetId = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : 'browser-' + Date.now() + '-' + Math.random().toString(36).slice(2);
   /* میگریشن ساختاری */
   if (!db.agentActions) db.agentActions = {};
   if (!db.seq.action) db.seq.action = 1;
@@ -175,7 +177,7 @@ function route(method, url, body) {
     const elements = R.elementRates ? R.elementRates(db, q) : undefined;
     if (type === 'combined') return { type, level, rows: R.combinedAgentReport(db, q), elements };
     if (type === 'call' && R.callReport) {
-      const crit = window.QCParse ? { criteriaFor: (t) => window.QCParse.criteriaFor(t), labelOf: (t, k) => window.QCParse.labelOf(t, k) } : {};
+      const crit = window.QCParse ? window.QCParse.resolver(db.settings.callCriteria) : {};
       const rep = R.callReport(db, level, q, crit);
       return { type: 'call', level, rows: rep.rows, calls: rep.calls, redlineRows: rep.redlineRows, elements: Object.assign({}, elements, { call: rep.elements }) };
     }
@@ -301,10 +303,7 @@ function route(method, url, body) {
       };
     };
     const all = [...tele.map((r) => norm(r, 'tele')), ...acc.map((r) => norm(r, 'account')), ...mlm.map((r) => norm(r, 'mlm'))].filter((r) => r.expertName);
-    /* recovery فقط ردیف‌های خودش — ردیف‌های اکسل‌های آپلودی و دمو حفظ می‌شوند */
-    db.callFeedbacks = (db.callFeedbacks || []).filter((r) =>
-      r.demo || (r.sourceFile && r.sourceFile !== 'qc_recovery.json')
-    ).concat(all);
+    const changes = ImportData.calls(db, all, body.mode || 'append', 'qc_recovery.json');
     db.callRaw = obj; // اسناد خام برای بازگردانی به پنل
     db.callImport = {
       importedAt: new Date().toISOString(),
@@ -313,7 +312,7 @@ function route(method, url, body) {
       voiceMeta: Object.fromEntries(Object.entries(obj.voiceMeta || {}).map(([k, v]) => [k, Array.isArray(v) ? { count: v.length } : v]))
     };
     saveDb();
-    return { ok: true, counts: db.callImport.counts };
+    return { ok: true, counts: db.callImport.counts, changes };
   }
   if (name === 'calls' && method === 'GET' && id == null) {
     const meta = db.callImport || null;
@@ -341,7 +340,7 @@ function route(method, url, body) {
     const to = q.to || '';
     const inRange = (d) => R.inRange(d, from, to);
     return clone({
-      schema: 'crm-qc-backup', version: 2, exportedAt: new Date().toISOString(),
+      schema: 'crm-qc-backup', version: 3, datasetId: db.datasetId, exportedAt: new Date().toISOString(),
       range: { from: from || null, to: to || null },
       settings: db.settings, agents: db.agents, qcAgents: db.qcAgents,
       agentActions: db.agentActions || {},
@@ -352,29 +351,14 @@ function route(method, url, body) {
     });
   }
   if (name === 'backup' && method === 'POST') {
-    const b = body.backup || body;
-    if (!b || b.schema !== 'crm-qc-backup') bad('ساختار فایل بک‌اپ شناسایی نشد');
-    if (b.settings) db.settings = Object.assign(db.settings, clone(b.settings));
-    if (Array.isArray(b.agents)) db.agents = clone(b.agents);
-    if (Array.isArray(b.qcAgents)) db.qcAgents = clone(b.qcAgents);
-    if (b.agentActions) db.agentActions = clone(b.agentActions);
-    if (Array.isArray(b.tickets)) db.tickets = clone(b.tickets);
-    if (Array.isArray(b.socials)) db.socials = clone(b.socials);
-    if (Array.isArray(b.callFeedbacks)) { db.callFeedbacks = clone(b.callFeedbacks); db.callRaw = null; }
-    if (b.callImport) db.callImport = clone(b.callImport);
-    db.seq = {
-      ticket: Math.max(0, ...db.tickets.map((t) => t.id || 0)) + 1,
-      social: Math.max(0, ...db.socials.map((s) => s.id || 0)) + 1,
-      agent: Math.max(0, ...db.agents.map((a) => a.id || 0)) + 1
-    };
-    saveDb();
-    return clone({ ok: true, restored: { agents: db.agents.length, tickets: db.tickets.length, socials: db.socials.length, calls: (db.callFeedbacks || []).length } });
+    const result = ImportData.restore(db, body.backup || body, body.mode);
+    saveDb(); return clone(result);
   }
   /* APIManager calls subrouts — standlone mirror of server:
    * POST /api/calls/files  { files: [{name, rows}] } — ردیف‌های پارس‌شده ورودی اکسل */
   /* تحلیل بومی تماس — معادل داشبورد پنل روی دیتای مرورگر */
   if (name === 'calls' && id === 'analysis' && method === 'GET') {
-    const crit = window.QCParse ? { criteriaFor: (t) => window.QCParse.criteriaFor(t), labelOf: (t, k) => window.QCParse.labelOf(t, k) } : null;
+    const crit = window.QCParse ? window.QCParse.resolver(db.settings.callCriteria) : null;
     return R.callAnalysis(db, q, crit || {});
   }
   if (name === 'calls' && (id === 'files' || id === 'rescan' || id === 'dirstatus')) {
@@ -387,13 +371,12 @@ function route(method, url, body) {
       for (const f of files.slice(0, 200)) {
         const fname = str(f.name) || 'unnamed.xlsx';
         const rows = Array.isArray(f.rows) ? f.rows : [];
-        const ftype = QP ? (QP.formTypeOfFileName(fname) || QP.sniffFormType(rows)) : null;
+        const ftype = QP ? (QP.formTypeOfFileName(fname) || QP.teamForm(str(body.team)) || QP.sniffFormType(rows, db.settings.callCriteria)) : null;
         if (!ftype) { results.push({ name: fname, ok: false, reason: 'نوع فرم تشخیص داده نشد' }); continue; }
-        const parsed = QP.parseRows(rows, ftype);
+        const parsed = QP.parseRows(rows, ftype, { agents: db.agents, criteria: db.settings.callCriteria, team: str(body.team) });
         if (!parsed.length) { results.push({ name: fname, ok: false, reason: 'ردیفی یافت نشد', type: ftype }); continue; }
-        db.callFeedbacks = db.callFeedbacks.filter((r) => r.sourceFile !== fname);
-        for (const r of parsed) db.callFeedbacks.push(Object.assign({ sourceFile: fname }, r));
-        results.push({ name: fname, ok: true, type: ftype, count: parsed.length });
+        const changes = ImportData.calls(db, parsed.map(r => Object.assign({ sourceFile: fname }, r)), body.mode || 'append', fname);
+        results.push({ name: fname, ok: true, type: ftype, count: parsed.length, changes, diagnostics: QP.importDiagnostics(parsed, db.agents) });
       }
       const seen = new Map(); const out = [];
       for (const r of db.callFeedbacks) {
@@ -495,45 +478,17 @@ function route(method, url, body) {
   }
   if (name === 'dashboard' && method === 'GET') return R.dashboard(db, q);
 
-  if (name === 'agents' && method === 'GET' && id == null) return clone(db.agents);
-  /* ایمپورت انبوه اکسل کارشناسان — هم‌خوان با روت POST /api/agents/bulk سرور */
-  if (name === 'agents' && method === 'POST' && body && Array.isArray(body.rows)) {
-    let added = 0, updated = 0, skipped = 0;
-    body.rows.forEach((r) => {
-      const name = str(r.name);
-      let team = str(r.team);
-      const sub = str(r.subgroup || r.sub || '');
-      const ext = r.ext === '' || r.ext == null ? null : (/^\d+$/.test(String(r.ext)) ? +String(r.ext) : null);
-      if (!name) { skipped++; return; }
-      if (team) { const canon = db.agents.find((x) => x.team && x.team.toLowerCase() === team.toLowerCase()); if (canon) team = canon.team; }
-      let a = db.agents.find((x) => x.name === name);
-      if (!a && ext != null) a = db.agents.find((x) => x.ext === ext);
-      if (a) { if (team) a.team = team; if (ext != null) a.ext = ext; if (sub) a.subgroup = sub; a.active = true; updated++; }
-      else { db.agents.push({ id: db.seq.agent++, name, team, ext, subgroup: sub || undefined, active: true }); added++; }
-    });
-    saveDb();
-    return { added, updated, skipped, errs: [], total: db.agents.length };
+  if (name === 'agents') {
+    if (method === 'GET' && id == null) return clone(db.agents);
+    if (method === 'DELETE' && id == null) { const result = Registry.removeAll(db, body); saveDb(); return result; }
+    if (method === 'POST' && id === 'bulk') { const result = Registry.bulk(db, body.rows); saveDb(); return result; }
+    if (method === 'POST' && id == null) { const row = Registry.save(db, body); saveDb(); return clone(row); }
+    if (method === 'PUT' && id != null) { const row = Registry.save(db, body, +id); saveDb(); return clone(row); }
+    if (method === 'DELETE' && id != null) { const a = db.agents.find(a => a.id === +id); if (!a) bad('یافت نشد', 404); a.active = false; saveDb(); return { ok: true, archived: true }; }
   }
-  if (name === 'agents' && method === 'POST') {
-    const b = body;
-    if (!str(b.name) || !str(b.team)) bad('نام و تیم الزامی است');
-    if (db.agents.some((a) => a.name === str(b.name))) bad('کارشناسی با این نام وجود دارد');
-    let ext = b.ext != null && b.ext !== '' ? b.ext : undefined;
-    if (ext != null && db.agents.some((a) => a.ext === ext)) bad('این داخلی تکراری است');
-    if (ext == null) { do { ext = 9000 + Math.floor(Math.random() * 999); } while (db.agents.some((a) => a.ext === ext)); }
-    const a = { id: db.seq.agent++, name: str(b.name), team: str(b.team), ext, subgroup: str(b.subgroup) || undefined, active: true };
-    db.agents.push(a); saveDb(); return clone(a);
-  }
-  if (name === 'agents' && id != null) {
-    const a = db.agents.find((x) => x.id === +id); if (!a) bad('یافت نشد', 404);
-    if (method === 'PUT') {
-      if (body.name != null) { const nm = str(body.name); if (!nm) bad('نام نمی‌تواند خالی باشد'); if (db.agents.some(x => x.name === nm && x.id !== a.id)) bad('این نام تکراری است'); a.name = nm; }
-      if (body.team != null) { const tm = str(body.team); if (!tm) bad('تیم نمی‌تواند خالی باشد'); a.team = tm; }
-      if (body.ext !== undefined) { const ex = body.ext === '' || body.ext == null ? null : +body.ext; if (ex != null && db.agents.some(x => x.ext === ex && x.id !== a.id)) bad('این داخلی تکراری است'); a.ext = ex; }
-      if (body.subgroup !== undefined) a.subgroup = str(body.subgroup);
-      if (typeof body.active === 'boolean') a.active = body.active; saveDb(); return clone(a);
-    }
-    if (method === 'DELETE') { a.active = false; saveDb(); return { ok: true, archived: true }; }
+  if (name === 'criteria') {
+    if (method === 'GET') return clone({ config: db.settings.callCriteria || { version: 0, forms: {}, teams: {} }, teams: [...new Set(db.agents.map(a => a.team))] });
+    if (method === 'PUT') { const config = window.QCParse.saveTeamConfig(db.settings.callCriteria, body); db.settings.callCriteria = config; saveDb(); return clone({ config }); }
   }
 
   if (name === 'qc-agents' && method === 'GET' && id == null) return clone(db.qcAgents);
@@ -570,7 +525,7 @@ window.LocalApi = {
   get(url) { return Promise.resolve().then(() => route('GET', url)); },
   post(url, b) { return Promise.resolve().then(() => route('POST', url, b)); },
   put(url, b) { return Promise.resolve().then(() => route('PUT', url, b)); },
-  del(url) { return Promise.resolve().then(() => route('DELETE', url)); },
+  del(url, body) { return Promise.resolve().then(() => route('DELETE', url, body)); },
   backup() { return clone(db); },
   backupSize() { try { return (localStorage.getItem(KEY) || '').length; } catch (e) { return 0; } },
   importBackup(b) {

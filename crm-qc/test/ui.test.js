@@ -54,11 +54,11 @@ for (const build of ['public', 'offline']) {
       assert.equal($('#callDetailCard tbody tr').lastElementChild.textContent, '-');
       $('#tblWrap [data-call-group]').click();
       assert.ok(text('.modal-body').includes('گفتار نامناسب')); assert.equal($('.modal-body script'), null);
-      $('.modal-head .x').click();
+      $('.modal-back:last-child .modal-head .x').click();
       $('#levelTabs [data-l="team"]').click(); await settle();
       $('#tblWrap [data-call-group]').click();
       assert.equal($$('.modal-body tbody tr').length, 1); assert.ok(text('.modal-body').includes('کارشناس الف'));
-      $('.modal-head .x').click();
+      $('.modal-back:last-child .modal-head .x').click();
       $('#levelTabs [data-l="agent"]').click(); await settle();
       assert.ok($$('#callDetailCard .tri-value').some((node) => node.textContent === '1'));
       assert.ok($$('#callDetailCard .tri-value').some((node) => node.textContent === '0'));
@@ -67,7 +67,7 @@ for (const build of ['public', 'offline']) {
       assert.ok(text('.modal-body').includes('علت ردلاین'));
       assert.ok(text('.modal-body').includes('"گفتار نامناسب"'));
       assert.equal($('.modal-body script'), null);
-      $('.modal-head .x').click();
+      $('.modal-back:last-child .modal-head .x').click();
       await w.App.setDateRange({ from: '1405/06/21', to: '1405/06/21' });
       assert.equal($('#typeTabs button.active').dataset.t, 'call');
       assert.equal($$('#callDetailCard tbody > tr').length, 1); // selected expert persists
@@ -75,10 +75,10 @@ for (const build of ['public', 'offline']) {
       $('#btnXls').click(); await settle();
       const workbook = workbooks.at(-1).wb;
       assert.ok(workbook.SheetNames.includes('المان‌های کلی'));
-      assert.ok(workbook.SheetNames.includes('جزئیات تلفنی'));
+      assert.ok(workbook.SheetNames.includes('جزئیات Telesales'));
       const rows = X.utils.sheet_to_json(workbook.Sheets['المان‌های کلی'], { header: 1 });
       assert.equal(rows[0][3], 'موضوعیت نداشته');
-      assert.equal(X.utils.sheet_to_json(workbook.Sheets['جزئیات تلفنی'], { header: 1 }).length, 5);
+      assert.equal(X.utils.sheet_to_json(workbook.Sheets['جزئیات Telesales'], { header: 1 }).length, 5);
     });
 
     await t.test('expert roster includes unrated experts; requested columns and expandable history are exact', async () => {
@@ -87,7 +87,7 @@ for (const build of ['public', 'offline']) {
       assert.equal($$('#pAll tbody tr').length, fixture().agents.length);
       assert.deepEqual($$('#pAll thead th').map((node) => node.textContent), ['کارشناس', 'تیم', 'تعداد ریت تیکت', 'میانگین نمره تیکت',
         'تعداد ریت سوشال', 'میانگین نمره سوشال', 'تعداد ریت تماس', 'میانگین نمره تماس', 'ردلاین', 'میانگین کل نمرات کارشناس']);
-      assert.ok(text('#pBody').includes('نرخ موفقیت معیار‌ها — رفتار تلفنی'));
+      assert.ok(text('#pBody').includes('نرخ موفقیت معیار‌ها — Telesales'));
       assert.ok(text('#pBody').includes('ردلاین‌ها'));
       assert.equal(text('#pBody').includes('تفکیک به‌ازای هر تاریخ'), false);
       assert.equal(text('#pBody').includes('تفکیک به‌ازای هر فایل'), false);
@@ -102,7 +102,7 @@ for (const build of ['public', 'offline']) {
       $('#pCallHistory [data-call-detail="1"]').click();
       assert.ok(text('#pCallDetails-1').includes('زمان شنود: ۴۰ ثانیه'));
       $('#pCallDetails-1 [data-call-redline]').click();
-      assert.ok(text('.modal-body').includes('گفتار نامناسب')); $('.modal-head .x').click();
+      assert.ok(text('.modal-body').includes('گفتار نامناسب')); $('.modal-back:last-child .modal-head .x').click();
       $('#pCallHistory [data-call-detail="0"]').click(); assert.equal($('#pCallDetails-0').hidden, true);
       const alpha = $$('#pAll tbody tr').find((node) => node.dataset.name === 'کارشناس الف');
       assert.ok(alpha.children[8].textContent.includes('تماس: ۱'));

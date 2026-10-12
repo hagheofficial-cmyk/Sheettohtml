@@ -13,6 +13,9 @@ const C = require('./shared/calc.js');
 const QCReports = require('./shared/reports.js');
 const P = require('./shared/parseQc.js');
 const CallWatcher = require('./callWatcher.js');
+const Registry = require('./shared/registry.js');
+const ImportData = require('./shared/importData.js');
+const crypto = require('crypto');
 
 const ROOT = __dirname;
 const REPO_ROOT = path.resolve(ROOT, '..');
@@ -44,6 +47,7 @@ function loadStore() {
     saveStore(true);
     console.log('[store] seeded از data/seed.json —', db.agents.length, 'کارشناس');
   }
+  if (!db.datasetId) db.datasetId = crypto.randomUUID();
   /* میگریشن‌های ساختاری بدون ریسک */
   if (!db.agentActions) db.agentActions = {};
   if (!db.settings.scoreBands) db.settings.scoreBands = [90, 75, 50];
@@ -210,8 +214,8 @@ const filterRows = (rows, q) => QCReports.filterRows(rows, q, db);
 /* ------------------------------------------------------------- فایل HTML اصلی */
 function findFeedbackHtml() {
   const files = fs.readdirSync(REPO_ROOT).filter((f) => f.toLowerCase().endsWith('.html'));
-  // فایل اصلی پروژه (دستیار فیدبک) — بدون هیچ تغییری سرو می‌شود
-  const main = files.find((f) => f.includes('فیدبک')) || files[0];
+  // فایل اصلی پروژه (دستیار ریت) — بدون هیچ تغییری سرو می‌شود
+  const main = files.find((f) => f.includes('دستیار')) || files[0];
   return main ? path.join(REPO_ROOT, main) : null;
 }
 
@@ -240,8 +244,8 @@ function serveStatic(res, base, rel) {
 async function handleApi(req, res, pathname, query) {
   const parts = pathname.split('/').filter(Boolean); // ['api', ...]
   const method = req.method;
-  const body = method === 'POST' || method === 'PUT'
-    ? await readBody(req, pathname === '/api/calls/files' ? 64e6 : 5e6)
+  const body = method === 'POST' || method === 'PUT' || method === 'DELETE'
+    ? await readBody(req, ['/api/calls/files', '/api/backup'].includes(pathname) ? 64e6 : 5e6)
     : {};
 
   // تاریخ اشتباه نباید به‌صورت بی‌صدا گزارش خالی یا پاک‌سازی/بک‌اپ کامل بسازد.
@@ -274,7 +278,7 @@ async function handleApi(req, res, pathname, query) {
     const from = str(query.from), to = str(query.to);
     const inRange = (d) => QCReports.inRange(d, from, to);
     const out = {
-      schema: 'crm-qc-backup', version: 2, exportedAt: new Date().toISOString(),
+      schema: 'crm-qc-backup', version: 3, datasetId: db.datasetId, exportedAt: new Date().toISOString(),
       range: { from: from || null, to: to || null },
       settings: db.settings,
       agents: db.agents,
@@ -288,23 +292,8 @@ async function handleApi(req, res, pathname, query) {
     return ok(res, out);
   }
   if (pathname === '/api/backup' && method === 'POST') {
-    const b = body.backup || body;
-    if (!b || b.schema !== 'crm-qc-backup') return bad(res, 'ساختار فایل بک‌اپ شناسایی نشد');
-    if (b.settings) db.settings = Object.assign(db.settings, b.settings);
-    if (Array.isArray(b.agents)) db.agents = b.agents;
-    if (Array.isArray(b.qcAgents)) db.qcAgents = b.qcAgents;
-    if (b.agentActions) db.agentActions = b.agentActions;
-    if (Array.isArray(b.tickets)) db.tickets = b.tickets;
-    if (Array.isArray(b.socials)) db.socials = b.socials;
-    if (Array.isArray(b.callFeedbacks)) { db.callFeedbacks = b.callFeedbacks; db.callRaw = null; }
-    if (b.callImport) db.callImport = b.callImport;
-    db.seq = {
-      ticket: Math.max(0, ...db.tickets.map((t) => t.id || 0)) + 1,
-      social: Math.max(0, ...db.socials.map((s) => s.id || 0)) + 1,
-      agent: Math.max(0, ...db.agents.map((a) => a.id || 0)) + 1
-    };
-    saveStore();
-    return ok(res, { ok: true, restored: { agents: db.agents.length, tickets: db.tickets.length, socials: db.socials.length, calls: (db.callFeedbacks || []).length } });
+    const result = ImportData.restore(db, body.backup || body, body.mode);
+    saveStore(); return ok(res, result);
   }
 
   /* دیتای نمونه — برای تست سریع UI */
@@ -375,7 +364,7 @@ async function handleApi(req, res, pathname, query) {
       if (!n.error) { n.value.demo = true; db.socials.push(n.value); addedS++; }
     }
 
-    // ---- فیدبک تماس (۱۰ رکورد ترکیبی) ----
+    // ---- ریت تماس (۱۰ رکورد ترکیبی) ----
     const calls = [];
     const forms = ['tele', 'account', 'mlm'];
     for (let i = 0; i < 10; i++) {
@@ -536,7 +525,7 @@ async function handleApi(req, res, pathname, query) {
     const elements = QCReports.elementRates(db, q);
     if (type === 'combined') return ok(res, { type, level, rows: QCReports.combinedAgentReport(db, q), elements });
     if (type === 'call') {
-      const rep = QCReports.callReport(db, level, q, { criteriaFor: P.criteriaFor, labelOf: P.labelOf });
+      const rep = QCReports.callReport(db, level, q, P.resolver(db.settings.callCriteria));
       return ok(res, { type: 'call', level, rows: rep.rows, calls: rep.calls, redlineRows: rep.redlineRows, elements: Object.assign({}, elements, { call: rep.elements }) });
     }
     const tt = type === 'ticket' ? 'ticket' : 'social';
@@ -551,7 +540,7 @@ async function handleApi(req, res, pathname, query) {
     return ok(res, prof);
   }
 
-  /* دیتای فیدبک تماس (ایمپورت از qc_recovery.json پنل) */
+  /* دیتای ریت تماس (ایمپورت از qc_recovery.json پنل) */
   if (parts[1] === 'calls') {
     if (parts.length === 2 && method === 'POST') {
       const obj = body.recovery || body;
@@ -574,12 +563,7 @@ async function handleApi(req, res, pathname, query) {
       };
       const all = [...tele.map((r) => norm(r, 'tele')), ...acc.map((r) => norm(r, 'account')), ...mlm.map((r) => norm(r, 'mlm'))].filter((r) => r.expertName);
       if (!db.callFeedbacks) db.callFeedbacks = [];
-      /* چرخه‌ی recovery فقط ردیف‌های خودش را جایگزین می‌کند — ردیف‌هایی که از
-       * فرم‌های اکسل پوشه آمده‌اند (sourceFile دیگری دارند) یا ردیف‌های دمو،
-       * دست‌نخورده می‌مانند و گزارش‌های ترکیبی همه‌ی منابع را با هم محاسبه می‌کنند. */
-      db.callFeedbacks = db.callFeedbacks.filter((r) =>
-        r.demo || (r.sourceFile && r.sourceFile !== 'qc_recovery.json')
-      ).concat(all);
+      const changes = ImportData.calls(db, all, body.mode || 'append', 'qc_recovery.json');
       db.callRaw = obj; // اسناد خام برای بازگردانی به پنل
       db.callImport = {
         importedAt: new Date().toISOString(),
@@ -588,7 +572,7 @@ async function handleApi(req, res, pathname, query) {
         voiceMeta: Object.fromEntries(Object.entries(obj.voiceMeta || {}).map(([k, v]) => [k, Array.isArray(v) ? { count: v.length } : v]))
       };
       saveStore();
-      return ok(res, { ok: true, counts: db.callImport.counts });
+      return ok(res, { ok: true, counts: db.callImport.counts, changes });
     }
     if (parts.length === 2 && method === 'GET') {
       const freshRaw = db.callRaw || null;
@@ -611,7 +595,7 @@ async function handleApi(req, res, pathname, query) {
     if (parts[2] === 'analysis' && method === 'GET') {
       return ok(res, QCReports.callAnalysis(db, {
         from: query.from, to: query.to, team: query.team, agent: query.agent, form: query.form
-      }, { criteriaFor: P.criteriaFor, labelOf: P.labelOf }));
+      }, P.resolver(db.settings.callCriteria)));
     }
     /* کارت «وضعیت پوشه»: فایل‌های داخل data/calls + ردیف‌های تزریق‌شده از هر کدام */
     if (parts[2] === 'dirstatus' && method === 'GET') {
@@ -634,13 +618,12 @@ async function handleApi(req, res, pathname, query) {
       for (const f of files.slice(0, 200)) {
         const name = str(f.name) || 'unnamed.xlsx';
         const rows = Array.isArray(f.rows) ? f.rows : [];
-        const ftype = P.formTypeOfFileName(name) || P.sniffFormType(rows);
+        const ftype = P.formTypeOfFileName(name) || P.teamForm(str(body.team)) || P.sniffFormType(rows, db.settings.callCriteria);
         if (!ftype) { results.push({ name, ok: false, reason: 'نوع فرم تشخیص داده نشد' }); continue; }
-        const parsed = P.parseRows(rows, ftype);
+        const parsed = P.parseRows(rows, ftype, { agents: db.agents, criteria: db.settings.callCriteria, team: str(body.team) });
         if (!parsed.length) { results.push({ name, ok: false, reason: 'ردیفی یافت نشد', type: ftype }); continue; }
-        db.callFeedbacks = db.callFeedbacks.filter((r) => r.sourceFile !== name);
-        for (const r of parsed) db.callFeedbacks.push(Object.assign({ sourceFile: name }, r));
-        results.push({ name, ok: true, type: ftype, count: parsed.length });
+        const changes = ImportData.calls(db, parsed.map(r => Object.assign({ sourceFile: name }, r)), body.mode || 'append', name);
+        results.push({ name, ok: true, type: ftype, count: parsed.length, changes, diagnostics: P.importDiagnostics(parsed, db.agents) });
       }
       /* فقط هویت واقعی ردیف فایل تکراری است؛ تماس‌های یک روز با یک شماره مستقل‌اند. */
       const seen = new Map(); const out = [];
@@ -717,79 +700,20 @@ async function handleApi(req, res, pathname, query) {
   }
   if (parts[1] === 'agents') {
     if (parts.length === 2 && method === 'GET') return ok(res, db.agents);
-    /* ایمپورت انبوه از اکسل زیرمجموعه/کارشناس/تیم/CallerID — به‌روزرسانی + افزودن */
-    if (parts.length === 3 && parts[2] === 'bulk' && method === 'POST') {
-      const rows = Array.isArray(body.rows) ? body.rows : [];
-      let added = 0, updated = 0, skipped = 0;
-      const errs = [];
-      rows.forEach((r, i) => {
-        const name = str(r.name);
-        let team = str(r.team);
-        const sub = str(r.subgroup || r.sub || '');
-        const ext = r.ext === '' || r.ext == null ? null : (String(r.ext).match(/^\d+$/) ? +r.ext : null);
-        if (!name) { skipped++; errs.push('ردیف ' + (i + 1) + ': نام خالی است'); return; }
-        /* نرمال‌سازی نام تیم: به‌جای ساخت تیم جدید با املای متفاوت، نام موجود را برگردان */
-        if (team) {
-          const canon = db.agents.find((x) => x.team && x.team.toLowerCase() === team.toLowerCase());
-          if (canon) team = canon.team;
-        }
-        /* کارشناس موجود را بر اساس نام یا داخلی پیدا کن */
-        let a = db.agents.find((x) => x.name === name);
-        if (!a && ext != null) a = db.agents.find((x) => x.ext === ext);
-        if (a) {
-          if (team) a.team = team;
-          if (ext != null) a.ext = ext;
-          if (sub) a.subgroup = sub;
-          a.active = true;
-          updated++;
-        } else {
-          db.agents.push({ id: db.seq.agent++, ext, name, team: team || str(r.team) || '', subgroup: sub, active: true });
-          added++;
-        }
-      });
-      saveStore();
-      return ok(res, { added, updated, skipped, errs: errs.slice(0, 10), total: db.agents.length });
-    }
-    if (parts.length === 2 && method === 'POST') {
-      const name = str(body.name), team = str(body.team), ext = body.ext === '' || body.ext == null ? null : +body.ext;
-      if (!name || !team) return bad(res, 'نام و تیم الزامی است');
-      if (db.agents.some((a) => a.name === name)) return bad(res, 'کارشناسی با این نام وجود دارد');
-      if (ext != null && db.agents.some((a) => a.ext === ext)) return bad(res, 'این شماره داخلی تکراری است');
-      const a = { id: db.seq.agent++, ext, name, team, subgroup: str(body.subgroup) || undefined, active: true };
-      db.agents.push(a);
-      saveStore();
-      return ok(res, a);
-    }
-    if (parts.length === 3 && method === 'PUT') {
-      const a = db.agents.find((x) => x.id === +parts[2]);
-      if (!a) return notFound(res);
-      if (body.name != null) {
-        const newName = str(body.name);
-        if (!newName) return bad(res, 'نام نمی‌تواند خالی باشد');
-        if (db.agents.some((x) => x.name === newName && x.id !== a.id)) return bad(res, 'کارشناسی با این نام وجود دارد');
-        a.name = newName;
-      }
-      if (body.team != null) {
-        const newTeam = str(body.team);
-        if (!newTeam) return bad(res, 'تیم نمی‌تواند خالی باشد');
-        a.team = newTeam;
-      }
-      if (body.ext !== undefined) {
-        const newExt = body.ext === '' || body.ext == null ? null : +body.ext;
-        if (newExt != null && db.agents.some((x) => x.ext === newExt && x.id !== a.id)) return bad(res, 'این شماره داخلی تکراری است');
-        a.ext = newExt;
-      }
-      if (body.subgroup !== undefined) a.subgroup = str(body.subgroup);
-      if (body.active !== undefined) a.active = !!body.active;
-      saveStore();
-      return ok(res, a);
-    }
+    if (parts.length === 2 && method === 'DELETE') { const result = Registry.removeAll(db, body); saveStore(); return ok(res, result); }
+    if (parts[2] === 'bulk' && method === 'POST') { const result = Registry.bulk(db, body.rows); saveStore(); return ok(res, result); }
+    if (parts.length === 2 && method === 'POST') { const row = Registry.save(db, body); saveStore(); return ok(res, row); }
+    if (parts.length === 3 && method === 'PUT') { const row = Registry.save(db, body, +parts[2]); saveStore(); return ok(res, row); }
     if (parts.length === 3 && method === 'DELETE') {
-      const a = db.agents.find((x) => x.id === +parts[2]);
-      if (!a) return notFound(res);
-      a.active = false; // حذف نرم تا سوابق حفظ شود
-      saveStore();
-      return ok(res, { archived: true });
+      const a = db.agents.find(a => a.id === +parts[2]); if (!a) return notFound(res);
+      a.active = false; saveStore(); return ok(res, { ok: true, archived: true });
+    }
+  }
+  if (pathname === '/api/criteria') {
+    if (method === 'GET') return ok(res, { config: db.settings.callCriteria || { version: 0, forms: {}, teams: {} }, teams: [...new Set(db.agents.map(a => a.team))] });
+    if (method === 'PUT') {
+      const config = P.saveTeamConfig(db.settings.callCriteria, body);
+      db.settings.callCriteria = config; saveStore(); return ok(res, { config });
     }
   }
 
@@ -848,7 +772,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'OPTIONS') return send(res, 204, {});
     if (pathname.startsWith('/api/')) return await handleApi(req, res, pathname, parsed.query);
 
-    // پنل اصلی فیدبک — فایل HTML موجود در ریشه ریپو، بدون هیچ تغییری
+    // پنل اصلی ریت — فایل HTML موجود در ریشه ریپو، بدون هیچ تغییری
     if (pathname === '/feedback-panel') {
       const f = findFeedbackHtml();
       if (!f) return notFound(res);
@@ -861,7 +785,7 @@ const server = http.createServer(async (req, res) => {
     return serveStatic(res, PUBLIC, pathname.replace(/^\/+/, ''));
   } catch (e) {
     console.error(e);
-    return bad(res, 'خطای داخلی سرور: ' + e.message, 500);
+    return bad(res, e.status ? e.message : 'خطای داخلی سرور: ' + e.message, e.status || 500);
   }
 });
 

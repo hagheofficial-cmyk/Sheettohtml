@@ -1,5 +1,5 @@
 /* callAnalysis.js — تحلیل ریت تماس (بومی: جایگزین قابلیت‌های داشبورد پنل)
- *   همه‌ی خروجی‌های پنل دستیار فیدبک، روی دیتای ادغام‌شده‌ی سامانه:
+ *   همه‌ی خروجی‌های پنل دستیار ریت، روی دیتای ادغام‌شده‌ی سامانه:
  *   KPI، نرخ موفقیت معیارها، هیت‌مپ خطا، رتبه‌بندی، ردلاین‌ها، کامنت‌های QC، روند ماهانه.
  *   + فیلتر تاریخ جلالی (از/تا) مشترک با بقیه صفحات و خروجی اکسل چندشیتی.
  */
@@ -9,11 +9,11 @@ const { C, $, $$, api, fa, esc, toast, scorePill, rateCell, emptyState, scoreCol
 
 const FORM_TABS = [
   { key: '', label: 'همه تیم‌ها', icon: 'fa-layer-group' },
-  { key: 'tele', label: 'تلفنی', icon: 'fa-phone' },
+  { key: 'tele', label: 'Telesales', icon: 'fa-phone' },
   { key: 'account', label: 'اکانت', icon: 'fa-building-columns' },
   { key: 'mlm', label: 'MLM / BNPL', icon: 'fa-cart-shopping' }
 ];
-const FORM_FA = { tele: 'تلفنی', account: 'اکانت', mlm: 'MLM' };
+const FORM_FA = { tele: 'Telesales', account: 'اکانت', mlm: 'MLM' };
 
 function heatColor(rate) {
   if (rate == null) return 'background:rgba(30,41,59,.5);color:var(--muted)';
@@ -32,16 +32,16 @@ async function render(root) {
   const st = App.state;
   /* تیم‌های سازمانی → نوع QC اکسل که باید خوانده شود */
   const teamFormMap = { 'tele sales': 'tele', 'account': 'account', 'mlm': 'mlm', 'bnpl': 'mlm' };
-  const FORM_LABEL = { tele: 'تلفنی', account: 'اکانت', mlm: 'MLM / BNPL' };
+  const FORM_LABEL = { tele: 'Telesales', account: 'اکانت', mlm: 'MLM / BNPL' };
   const teamList = (st.teams || []).slice().sort();
   const F = { team: '', form: '' };
 
   function buildTeamTabs() {
     const tabs = [{ key: '', label: 'همه تیم‌ها', icon: 'fa-layer-group' }];
     for (const t of teamList) {
-      const f = teamFormMap[String(t).toLowerCase()];
+      const f = QCParse.teamForm(t);
       const icon = f === 'tele' ? 'fa-phone' : f === 'account' ? 'fa-building-columns' : 'fa-cart-shopping';
-      tabs.push({ key: String(t), label: String(t), icon });
+      tabs.push({ key: String(t), label: QCParse.displayTeam(t), icon });
     }
     return tabs;
   }
@@ -89,7 +89,7 @@ async function render(root) {
     $$('#formTabs button').forEach((x) => x.classList.toggle('active', x === b));
     F.team = b.dataset.t;
     /* تیم → فرم مرتبط (برای بدست آوردن معیارهای تحلیل) */
-    if (F.team === '') F.form = ''; else F.form = teamFormMap[F.team.toLowerCase()] || '';
+    if (F.team === '') F.form = ''; else F.form = QCParse.teamForm(F.team) || '';
     /* آیتم‌های کارشناس را با تیم هماهنگ کن */
     const keep = msAgents.getValues();
     const items = agentItemsFor(F.team || null);
@@ -130,19 +130,14 @@ async function render(root) {
     }
   }
 
-  function kpi(icon, label, value, color) {
-    return `<div class="card" style="padding:14px 16px;display:flex;align-items:center;gap:12px;margin:0">
-      <div class="head-icon" style="background:${color}18;color:${color};font-size:18px;width:44px;height:44px"><i class="fa-solid ${icon}"></i></div>
-      <div><div style="font-size:12px;color:var(--muted)">${label}</div><div style="font-size:22px;font-weight:700">${value}</div></div>
-    </div>`;
-  }
+  function kpi(icon,label,value,color){return `<div class="card analysis-stat"><div class="stat-icon" style="background:${color}18;color:${color}"><i class="fa-solid ${icon}"></i></div><div><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div></div>`;}
 
   function renderAnalysis(an) {
     const k = an.kpis || {};
     const form = F.form || null;
 
     const kpiRow = `
-    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:16px">
+    <div class="analysis-kpis">
       ${kpi('fa-phone-volume', 'تعداد ریت تماس', fa(k.totalCalls || 0), '#38bdf8')}
       ${kpi('fa-star-half-stroke', 'میانگین نمره', k.avgScore === '' ? '—' : fa(k.avgScore), '#34d399')}
       ${kpi('fa-ban', 'ردلاین', fa(k.redlineCount || 0), '#f87171')}
@@ -154,7 +149,7 @@ async function render(root) {
     /* نمودارها */
     const chartsRow = F.team ? `
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(360px,1fr));margin-bottom:16px">
-      <div class="card"><div class="card-head"><div class="head-icon"><i class="fa-solid fa-chart-area"></i></div><div><h3>روند ماهانه</h3><div class="sub">میانگین نمره و تعداد فیدبک در هر ماه</div></div></div>
+      <div class="card"><div class="card-head"><div class="head-icon"><i class="fa-solid fa-chart-area"></i></div><div><h3>روند ماهانه</h3><div class="sub">میانگین نمره و تعداد ریت در هر ماه</div></div></div>
         <div class="ch-box" style="height:240px"><canvas id="chMonthly"></canvas></div></div>
       <div class="card"><div class="card-head"><div class="head-icon"><i class="fa-solid fa-chart-column"></i></div><div><h3 id="chElTitle">نرخ موفقیت معیارها</h3><div class="sub">درصد رعایت هر معیار در تماس‌های ارزیابی‌شده</div></div></div>
         <div class="ch-box" style="height:240px"><canvas id="chElements"></canvas></div></div>
@@ -200,7 +195,7 @@ async function render(root) {
           <thead><tr><th style="min-width:140px">کارشناس</th><th>میانگین</th>${h.labels.map((l) => `<th style="min-width:70px;writing-mode:vertical-rl;text-align:center;font-size:9px">${esc(l)}</th>`).join('')}</tr></thead>
           <tbody>${h.agents.map((a) => `
             <tr class="agent-row" data-agent="${esc(a.name)}" style="cursor:pointer" title="باز کردن پرونده ${esc(a.name)}">
-              <td><span class="cell-main">${esc(a.name)}</span>${a.team ? ` <span class="tag-team">${esc(a.team)}</span>` : ''}<div style="font-size:10px;color:var(--muted)">${fa(a.count)} فیدبک</div></td>
+              <td><span class="cell-main">${esc(a.name)}</span>${a.team ? ` <span class="tag-team">${esc(QCParse.displayTeam(a.team))}</span>` : ''}<div style="font-size:10px;color:var(--muted)">${fa(a.count)} ریت</div></td>
               <td>${a.avg === '' ? '—' : scorePill(a.avg)}</td>
               ${a.cells.map((c) => `<td style="${heatColor(c ? c.errorRate : null)};text-align:center;border-radius:4px">${heatVal(c)}</td>`).join('')}
             </tr>`).join('')}
@@ -220,11 +215,11 @@ async function render(root) {
             <tr class="agent-row" data-agent="${esc(x.name)}" style="cursor:pointer">
               <td>${fa(i + 1)}</td>
               <td><span class="cell-main">${esc(x.name)}</span></td>
-              <td><span class="tag-team">${esc(x.team || '—')}</span></td>
+              <td><span class="tag-team">${esc(QCParse.displayTeam(x.team || '—'))}</span></td>
               <td><b>${fa(x.count)}</b></td>
               <td>${x.avgScore === '' ? '—' : scorePill(x.avgScore)}</td>
               <td>${x.redlines ? `<span class="badge bad">${fa(x.redlines)}</span>` : '<span class="badge gray">۰</span>'}</td>
-            </tr>`).join('')}</tbody></table>` : emptyState('fa-phone-slash', 'دیتای تماس در این بازه نیست', 'فایل اکسل QC را در پوشه data/calls بگذارید یا از صفحه فیدبک سامانه آپلود کنید')}
+            </tr>`).join('')}</tbody></table>` : emptyState('fa-phone-slash', 'دیتای تماس در این بازه نیست', 'فایل اکسل QC را در پوشه data/calls بگذارید یا از صفحه ریت سامانه آپلود کنید')}
         </div>
       </div>`;
 
@@ -298,7 +293,7 @@ async function render(root) {
           labels: monthly.map((m) => m.month),
           datasets: [
             { label: 'میانگین نمره', data: monthly.map((m) => m.avgScore === '' ? null : m.avgScore), borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,.12)', fill: true, tension: 0.35, yAxisID: 'y' },
-            { label: 'تعداد فیدبک', data: monthly.map((m) => m.count), borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,.1)', fill: true, tension: 0.35, yAxisID: 'y1' }
+            { label: 'تعداد ریت', data: monthly.map((m) => m.count), borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,.1)', fill: true, tension: 0.35, yAxisID: 'y1' }
           ]
         },
         options: {
@@ -345,7 +340,7 @@ async function render(root) {
     if (!an) return toast.info('ابتدا تحلیل بارگذاری شود');
     const sheets = [];
     sheets.push({ name: 'رتبه‌بندی', rows: [
-      ['کارشناس', 'تیم', 'تعداد فیدبک', 'میانگین نمره', 'ردلاین'],
+      ['کارشناس', 'تیم', 'تعداد ریت', 'میانگین نمره', 'ردلاین'],
       ...(an.leaderboard || []).map((x) => [x.name, x.team, x.count, x.avgScore === '' ? '' : x.avgScore, x.redlines])
     ]});
     for (const ft of ['tele', 'account', 'mlm']) {
@@ -366,7 +361,7 @@ async function render(root) {
       ...(an.comments || []).map((r) => [r.expertName, r.formType, r.score, r.comment, r.leadName, r.leadPhone, r.date])
     ]});
     sheets.push({ name: 'ماهانه', rows: [
-      ['ماه', 'تعداد فیدبک', 'میانگین', 'ردلاین'],
+      ['ماه', 'تعداد ریت', 'میانگین', 'ردلاین'],
       ...(an.monthly || []).map((m) => [m.month, m.count, m.avgScore === '' ? '' : m.avgScore, m.redlines])
     ]});
     window.QCExport.sheets('تحلیل ریت تماس', sheets);

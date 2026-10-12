@@ -39,7 +39,7 @@ function renderMonth(el, onPick) {
   const first = weekdayFirst(jy, jm);
   const today = C.todayJalali();
   const target = openFor && (openFor._jcalInput || openFor);
-  const curVal = target ? C.parseJalali(target.value || target.dataset.value) : null;
+  const curVal = target ? (C.parseDate(target.value) || C.parseDate(target.dataset.value)) : null;
 
   let html = `
     <div class="jcal-head">
@@ -113,7 +113,7 @@ function attach(el, opts) {
     if (openFor === el) { closePopup(); return; }
     openFor = el;
     const target = el._jcalInput || el;
-    const cur = C.parseJalali(target.value || target.dataset.value);
+    const cur = (C.parseDate(target.value) || C.parseDate(target.dataset.value));
     const today = C.todayJalali();
     viewJ = cur ? { jy: cur.jy, jm: cur.jm } : { jy: today.jy, jm: today.jm };
     ensurePopup();

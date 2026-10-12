@@ -10,7 +10,7 @@ const $ = (sel, root) => (root || document).querySelector(sel);
 const $$ = (sel, root) => [...(root || document).querySelectorAll(sel)];
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
-function fa(x, def) { if (x == null || x === '') return def != null ? def : '—'; return C.toFaDigits(x); }
+function fa(x, def) { if (x == null || x === '') return def != null ? def : '—'; return esc(C.toFaDigits(x)); }
 function el(html) { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; }
 function debounce(fn, ms) { let t; return function (...a) { clearTimeout(t); t = setTimeout(() => fn.apply(this, a), ms); }; }
 
@@ -66,7 +66,7 @@ const api = {
   get: (url) => api.req('GET', url),
   post: (url, b) => api.req('POST', url, b || {}),
   put: (url, b) => api.req('PUT', url, b || {}),
-  del: (url) => api.req('DELETE', url),
+  del: (url, body) => api.req('DELETE', url, body),
   _showOfflineTag() {
     if (document.getElementById('offlineBadge')) return;
     document.body.appendChild(el(`<div id="offlineBadge"><i class="fa-solid fa-plug-circle-xmark"></i> حالت آفلاین — داده‌های این دستگاه ذخیره می‌شوند</div>`));
@@ -89,12 +89,52 @@ toast.info = (m, ms) => toast(m, 'info', ms);
 /* ----------------------------------------------------------------- مودال */
 function modal(html, opts) {
   opts = opts || {};
-  const back = el(`<div class="modal-back"><div class="modal ${opts.lg ? 'lg' : ''}">${html}</div></div>`);
-  $('#modalRoot').appendChild(back);
-  back.addEventListener('mousedown', (e) => { if (e.target === back && !opts.sticky) back.remove(); });
-  $$('.x,[data-close]', back).forEach((b) => b.addEventListener('click', () => back.remove()));
+  const focused = document.activeElement;
+  const back = el(`<div class="modal-back"><div class="modal ${opts.lg ? 'lg' : ''} ${opts.className || ''}" role="dialog" aria-modal="true" tabindex="-1">${html}</div></div>`);
+  $('#modalRoot').appendChild(back); document.body.classList.add('modal-open');
+  let closed = false; const removeNode = back.remove.bind(back);
+  const close = () => {
+    if (closed) return; closed = true; removeNode(); document.removeEventListener('keydown', keyboard);
+    if (!$('#modalRoot .modal-back')) document.body.classList.remove('modal-open');
+    if (opts.onClose) opts.onClose();
+    if (focused && focused.isConnected) focused.focus();
+  };
+  const keyboard = e => {
+    if ($('#modalRoot').lastElementChild !== back) return;
+    if (e.key === 'Escape' && !opts.sticky) { e.preventDefault(); close(); }
+    if (e.key === 'Tab') {
+      const controls = $$('button:not([disabled]),input:not([disabled]),select:not([disabled]),a[href]',back).filter(n => !n.hidden && n.getAttribute('type') !== 'hidden');
+      if (!controls.length) return;
+      const first = controls[0], last = controls[controls.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  };
+  document.addEventListener('keydown', keyboard);
+  back.close = close; back.remove = close;
+  back.addEventListener('mousedown', e => { if (e.target === back && !opts.sticky) close(); });
+  $$('.x,[data-close]', back).forEach(b => b.addEventListener('click', close));
+  const focusable = $('input:not([type="file"]),button,.modal',back); if (focusable) focusable.focus();
   return back;
 }
+
+function confirmImport(title, summary, replacementScope) {
+  return new Promise(resolve => {
+    let settled = false;
+    const m = modal(`${modalHead(title,'fa-file-import')}<div class="modal-body">
+      <div class="import-preview">${esc(summary)}</div>
+      <div class="import-choice">
+        <label class="import-option"><input type="radio" name="importMode" value="append" checked><strong><i class="fa-solid fa-layer-group"></i> افزودن به دیتای موجود</strong><small>دیتای قبلی و تنظیمات فعلی حفظ می‌شوند. ریت‌های تکراری دوباره شمرده نمی‌شوند؛ مناسب آرشیو ماهانه.</small></label>
+        <label class="import-option"><input type="radio" name="importMode" value="replace"><strong><i class="fa-solid fa-arrows-rotate"></i> جایگزینی</strong><small>${esc(replacementScope)}</small></label>
+      </div><label id="importReplaceWarning" class="import-warning" hidden><input type="checkbox" id="importReplaceAcknowledge"> می‌دانم داده‌های فعلیِ شرح‌داده‌شده جایگزین می‌شوند و بک‌اپ لازم را گرفته‌ام.</label>
+      <div class="note">هیچ داده‌ای قبل از زدن دکمه‌ی تأیید تغییر نمی‌کند.</div>
+      </div><div class="modal-foot"><button class="btn ghost" data-close>انصراف</button><button class="btn primary" id="importConfirm"><i class="fa-solid fa-check"></i> تأیید افزودن داده</button></div>`, { lg:true, onClose(){ if(!settled) resolve(null); } });
+    const change=()=>{const replacing=$('input[name="importMode"]:checked',m).value==='replace';$('#importReplaceWarning',m).hidden=!replacing;$('#importConfirm',m).disabled=replacing&&!$('#importReplaceAcknowledge',m).checked;$('#importConfirm',m).textContent=replacing?'تأیید جایگزینی داده':'تأیید افزودن داده';};
+    $$('input',m).forEach(input=>input.addEventListener('change',change));
+    $('#importConfirm',m).addEventListener('click',()=>{const mode=$('input[name="importMode"]:checked',m).value;if(mode==='replace'&&!$('#importReplaceAcknowledge',m).checked)return;settled=true;m.close();resolve(mode);});
+  });
+}
+
 function modalHead(title, icon) {
   return `<div class="modal-head"><i class="fa-solid ${icon}" style="color:var(--brand)"></i><h3>${esc(title)}</h3><button class="x"><i class="fa-solid fa-xmark"></i></button></div>`;
 }
@@ -461,6 +501,9 @@ const App = {
   _rangeReady: false,
   _dateRefresh: null,
   _countsRequest: 0,
+  _rangeRequest: 0,
+  _routeRequest: 0,
+  _dateTimer: null,
 
   withDateRange(url, method) {
     if (method !== 'GET') return url; // ثبت، حذف و بک‌اپ کامل به‌صورت پنهان محدود نشوند.
@@ -505,19 +548,29 @@ const App = {
     $('#gFrom').classList.remove('invalid'); $('#gTo').classList.remove('invalid');
     $('#gPreset').value = r.preset || 'custom';
     $('#gRangeNote').className = 'range-note';
+    $('#globalRange').classList.remove('draft');
+    $('#gRangeState').textContent = 'اعمال‌شده';
     $('#gRangeNote').textContent = this.dateRangeLabel() + ' · مبنا: تاریخ بررسی فرم؛ اطلاعات کارشناسان و عملیات بک‌اپ/پاک‌سازی مستقل‌اند.';
   },
   async setDateRange(range) {
     const error = window.QCReports.validateRange(range);
     if (error) { toast.error(error); return false; }
+    clearTimeout(this._dateTimer);
+    const request = ++this._rangeRequest;
     this.dateRange = { from: range.from ? C.formatJalali(C.parseDate(range.from)) : '',
       to: range.to ? C.formatJalali(C.parseDate(range.to)) : '', preset: range.preset || 'custom' };
-    try { localStorage.setItem('crmqc.dateRange.v1', JSON.stringify(this.dateRange)); } catch (e) {}
+    try { localStorage.setItem('crmqc.dateRange.v1', JSON.stringify(this.dateRange)); } catch(e) {}
     this.syncDateRangeUI();
+    $('#globalRange').classList.add('updating'); $('#gRangeState').textContent = 'در حال بروزرسانی گزارش‌ها…';
     const refresh = this._dateRefresh;
-    await Promise.all([this.refreshCounts(), refresh ? refresh() : Promise.resolve()]);
+    try { await Promise.all([this.refreshCounts(), refresh ? refresh() : Promise.resolve()]); }
+    finally { if (request === this._rangeRequest) {
+      $('#globalRange').classList.remove('updating');
+      if (!$('#globalRange').classList.contains('draft')) $('#gRangeState').textContent = 'روی همه گزارش‌ها اعمال شد';
+    } }
     return true;
   },
+
   async refreshCounts() {
     const request = ++this._countsRequest;
     try {
@@ -527,26 +580,53 @@ const App = {
     } catch (e) { /* خطای صفحه‌ی فعلی جداگانه نمایش داده می‌شود. */ }
   },
   bindDateRangeUI() {
-    const apply = () => {
+    const apply = (showError = true) => {
+      clearTimeout(this._dateTimer);
       const range = { from: $('#gFrom').value.trim(), to: $('#gTo').value.trim(), preset: 'custom' };
       const error = window.QCReports.validateRange(range);
       if (error) {
-        $('#gFrom').classList.toggle('invalid', !!range.from && !C.parseDate(range.from));
-        $('#gTo').classList.toggle('invalid', !!range.to && !C.parseDate(range.to));
+        const reversed = C.parseDate(range.from) && C.parseDate(range.to) && C.jalaliCmp(C.parseDate(range.from),C.parseDate(range.to)) > 0;
+        $('#gFrom').classList.toggle('invalid', !!reversed || !!range.from && !C.parseDate(range.from));
+        $('#gTo').classList.toggle('invalid', !!reversed || !!range.to && !C.parseDate(range.to));
+        $('#gRangeState').textContent = 'هنوز اعمال نشده';
         $('#gRangeNote').className = 'range-note bad'; $('#gRangeNote').textContent = error;
-        toast.error(error); return;
+        if (showError) toast.error(error); return;
       }
+      $('#globalRange').classList.remove('draft');
       return this.setDateRange(range);
     };
-    $('#globalRange').addEventListener('submit', (e) => { e.preventDefault(); apply(); });
-    ['gFrom', 'gTo'].forEach((id) => $('#' + id).addEventListener('change', apply));
-    JCal.attach($('#gFromBtn'), { input: $('#gFrom'), onPick: apply });
-    JCal.attach($('#gToBtn'), { input: $('#gTo'), onPick: apply });
-    $('#gPreset').addEventListener('change', () => {
-      const p = $('#gPreset').value;
-      if (p !== 'custom') this.setDateRange(this.presetRange(p));
+    $('#globalRange').addEventListener('submit', e => { e.preventDefault(); apply(); });
+    ['gFrom','gTo'].forEach(id => {
+      const input = $('#' + id);
+      input.addEventListener('input', () => {
+        $('#globalRange').classList.add('draft'); $('#gPreset').value = 'custom';
+        $('#gRangeState').textContent = 'در انتظار تاریخ معتبر…';
+        clearTimeout(this._dateTimer); this._dateTimer = setTimeout(() => apply(false), 550);
+      });
+      input.addEventListener('change', () => apply(false));
     });
-    $('#gReset').addEventListener('click', () => this.setDateRange(this.presetRange('all')));
+    JCal.attach($('#gFromBtn'), { input: $('#gFrom'), onPick: () => apply() });
+    JCal.attach($('#gToBtn'), { input: $('#gTo'), onPick: () => apply() });
+    $('#gPreset').addEventListener('change', () => {
+      clearTimeout(this._dateTimer); $('#globalRange').classList.remove('draft');
+      if ($('#gPreset').value !== 'custom') this.setDateRange(this.presetRange($('#gPreset').value));
+    });
+    $('#gReset').addEventListener('click', () => { $('#globalRange').classList.remove('draft'); this.setDateRange(this.presetRange('all')); });
+  },
+  theme: 'dark',
+  applyTheme(theme) {
+    this.theme = theme === 'light' ? 'light' : 'dark'; document.documentElement.dataset.theme = this.theme;
+    try { localStorage.setItem('crmqc.theme.v1', this.theme); } catch(e) {}
+    const button = $('#themeToggle');
+    if (button) { button.innerHTML = `<i class="fa-solid ${this.theme === 'dark' ? 'fa-sun' : 'fa-moon'}"></i><span>${this.theme === 'dark' ? 'حالت روشن' : 'حالت تاریک'}</span>`; button.setAttribute('aria-pressed',String(this.theme === 'light')); }
+    this.charts.forEach(chart => { if (!chart.config || !chart.config.options) return; this.styleChart(chart.config.options); if (chart.update) chart.update('none'); });
+    const frame = $('#crFrame'); if (frame && frame.contentWindow) frame.contentWindow.postMessage({ type:'crmqc:theme', theme:this.theme }, location.origin === 'null' ? '*' : location.origin);
+  },
+  styleChart(options) {
+    const css = getComputedStyle(document.documentElement), color = css.getPropertyValue('--muted').trim(), grid = css.getPropertyValue('--line-soft').trim();
+    if (options.scales) Object.values(options.scales).forEach(scale => { scale.ticks = Object.assign({},scale.ticks,{ color }); scale.grid = Object.assign({},scale.grid,{ color:grid }); });
+    options.plugins = options.plugins || {}; options.plugins.legend = options.plugins.legend || {};
+    options.plugins.legend.labels = Object.assign({}, options.plugins.legend.labels, { color });
   },
 
   register(name, spec) { this.routes[name] = spec; },
@@ -557,6 +637,8 @@ const App = {
     $('#orgName').textContent = st.settings.orgName || 'سامانه کنترل کیفیت';
     const t = C.todayJalali();
     $('#todayChip span').textContent = `${C.weekdayFa(t)} ${C.toFaDigits(t.jd)} ${['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'][t.jm - 1]} ${C.toFaDigits(t.jy)}`;
+    if (window.QCParse) window.QCParse.setConfig(st.settings.callCriteria);
+    this.applyTheme(document.documentElement.dataset.theme || 'dark');
     this.initDateRange();
     await this.refreshCounts();
   },
@@ -575,6 +657,9 @@ const App = {
   },
 
   async route() {
+    const routeRequest = ++this._routeRequest;
+    $$('#modalRoot .modal-back').forEach(m => m.close ? m.close() : m.remove());
+    clearTimeout(this._dateTimer);
     const { name, arg, arg2 } = this.parseHash();
     // ناوبری فعال
     $$('.nav-item, .nav-subitem').forEach((a) => {
@@ -597,21 +682,23 @@ const App = {
     const content = $('#content');
     let spec = this.routes[name] || this.routes.dashboard;
     if (spec.title) this.setTitle(typeof spec.title === 'function' ? spec.title(arg, arg2) : spec.title);
-    content.innerHTML = '';
+    const view = document.createElement('section'); view.className = 'route-view'; content.replaceChildren(view);
     window.scrollTo(0, 0);
     try {
-      await spec.render(content, arg, arg2);
+      await spec.render(view, arg, arg2);
     } catch (e) {
+      if (routeRequest !== this._routeRequest) return;
       console.error(e);
-      content.innerHTML = `<div class="card">${emptyState('fa-triangle-exclamation', 'خطا در بارگذاری بخش', e.message, `<button class="btn ghost" onclick="App.route()">تلاش دوباره</button>`)}</div>`;
+      view.innerHTML = `<div class="card">${emptyState('fa-triangle-exclamation', 'خطا در بارگذاری بخش', e.message, `<button class="btn ghost" onclick="App.route()">تلاش دوباره</button>`)}</div>`;
     }
-    this.closeSidebar();
+    if (routeRequest === this._routeRequest) this.closeSidebar();
   },
 
   chart(canvas, cfg) {
     if (!canvas) { console.warn('[chart] canvas موجود نیست — رندر این نمودار رد شد', cfg && cfg.type); return null; }
     Chart.defaults.font.family = 'Vazirmatn';
-    Chart.defaults.color = '#8ea0bd';
+    Chart.defaults.color = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim();
+    cfg.options = cfg.options || {}; this.styleChart(cfg.options);
     const ch = new Chart(canvas, cfg);
     this.charts.push(ch);
     return ch;
@@ -626,6 +713,7 @@ const App = {
     catch (e) { $('#content').innerHTML = `<div class="card">${emptyState('fa-plug-circle-xmark', 'عدم اتصال به سرور', e.message)}</div>`; return; }
 
     this.bindDateRangeUI();
+    $('#themeToggle').addEventListener('click', () => this.applyTheme(this.theme === 'dark' ? 'light' : 'dark'));
     $('#hamburger').addEventListener('click', () => { $('#sidebar').classList.add('open'); $('#sidebarBackdrop').classList.add('show'); });
     $('#sidebarClose').addEventListener('click', () => this.closeSidebar());
     $('#sidebarBackdrop').addEventListener('click', () => this.closeSidebar());
@@ -644,5 +732,5 @@ const App = {
 
 // اکسپورت سراسری
 window.App = App;
-window.UI = { C, $, $$, esc, fa, el, api, toast, modal, modalHead, confirmDlg, dateField, combo, multiSelect, triSwitch, redlineSwitch, selectField, scorePill, markBadge, triValue, callRedlineBadge, bindCallRedlines, callTimeCell, slaBadge, durText, rateCell, errorRateCell, pager, emptyState, debounce, scoreBands, scoreColorHex, scoreColorRgba };
+window.UI = { C, $, $$, esc, fa, el, api, toast, modal, modalHead, confirmDlg, confirmImport, dateField, combo, multiSelect, triSwitch, redlineSwitch, selectField, scorePill, markBadge, triValue, callRedlineBadge, bindCallRedlines, callTimeCell, slaBadge, durText, rateCell, errorRateCell, pager, emptyState, debounce, scoreBands, scoreColorHex, scoreColorRgba };
 })();

@@ -47,8 +47,8 @@ test('real HTTP API and LocalApi agree on review dates, counts, scores and indep
   }
   async function local(method, url, data) { return clone(await w.LocalApi[method === 'GET' ? 'get' : method === 'POST' ? 'post' : method === 'PUT' ? 'put' : 'del'](url, clone(data == null ? {} : data))); }
   async function restore(data = fixture()) {
-    assert.equal((await http('POST', '/api/backup', { backup: data })).status, 200);
-    await local('POST', '/api/backup', { backup: data });
+    assert.equal((await http('POST', '/api/backup', { backup: data, mode: 'replace' })).status, 200);
+    await local('POST', '/api/backup', { backup: data, mode: 'replace' });
   }
   await restore();
   const day = 'from=1405%2F06%2F20&to=1405%2F06%2F20';
@@ -167,6 +167,42 @@ test('real HTTP API and LocalApi agree on review dates, counts, scores and indep
     assert.deepEqual(selected(online), selected(offline));
     assert.equal(online.callDuration, '0'); assert.equal(online.qcAgent, 'QC اول');
     assert.equal(online.reviewDate, '1405/06/20'); assert.equal(online.redlineReason, 'گفتار "نامناسب"');
+  });
+
+  await t.test('new backup append/replace contract is identical online/offline and preserves other months', async subt => {
+    subt.after(() => restore());
+    assert.equal((await http('POST','/api/backup',{backup:fixture()})).status,400);
+    await assert.rejects(local('POST','/api/backup',{backup:fixture()}),e=>e.status===400);
+    const archive=fixture();archive.tickets=[];archive.socials=[];archive.callFeedbacks=[{...fixture().callFeedbacks[0],sourceFile:'new-month.xlsx',sourceRow:2,reviewDate:'1405/07/02'}];
+    const payload={backup:archive,mode:'append'};
+    for(let i=0;i<2;i++){
+      const online=await http('POST','/api/backup',payload);assert.equal(online.status,200);assert.deepEqual(online.data,await local('POST','/api/backup',payload));
+      assert.equal((await http('GET','/api/calls')).data.count,8);
+      assert.equal((await http('GET','/api/dashboard?'+day)).data.callCount,5);
+    }
+  });
+  await t.test('criteria edits affect real file parsing/reports; stale and invalid updates are rejected atomically', async subt=>{
+    subt.after(()=>restore());
+    const definitions=require('../shared/parseQc').defaults('tele');definitions[0].label='شروع سفارشی';definitions[0].excelKey='custom_opening';
+    const payload={form:'tele',team:'Tele Sales',elements:definitions,version:0};
+    const saved=await http('PUT','/api/criteria',payload);assert.equal(saved.status,200);assert.deepEqual(saved.data,await local('PUT','/api/criteria',payload));
+    assert.equal((await http('PUT','/api/criteria',payload)).status,409);await assert.rejects(local('PUT','/api/criteria',payload),e=>e.status===409);
+    const upload={files:[{name:'tele-configured.xlsx',rows:[{tele_expert_name:'کارشناس الف',score:87,review_date:'1405/06/20',custom_opening:0,lead_name:'شریک معیار'}]}],mode:'append'};
+    const result=await http('POST','/api/calls/files',upload);assert.equal(result.status,200);assert.deepEqual(result.data,await local('POST','/api/calls/files',upload));
+    const endpoint='/api/reports?type=call&agent='+encodeURIComponent('کارشناس الف')+'&'+day;
+    const report=(await http('GET',endpoint)).data;assert.deepEqual(report,await local('GET',endpoint));
+    assert.ok(report.elements.call.some(e=>e.label==='شروع سفارشی'&&e.bad===2));assert.equal(report.calls.find(c=>c.sourceFile==='tele-configured.xlsx').score,87);
+  });
+  await t.test('full-registry removal and Persian/invalid extensions have real HTTP/LocalApi parity',async subt=>{
+    subt.after(()=>restore());
+    assert.equal((await http('DELETE','/api/agents',{})).status,400);await assert.rejects(local('DELETE','/api/agents',{}),e=>e.status===400);
+    const edit={ext:'۳۰۱۰',team:'MLM'};const edited=await http('PUT','/api/agents/1',edit);assert.equal(edited.status,200);assert.deepEqual(edited.data,await local('PUT','/api/agents/1',edit));
+    assert.equal(edited.data.ext,3010);
+    const invalid={name:'نام نباید تغییر کند',ext:'۱۲x'};assert.equal((await http('PUT','/api/agents/1',invalid)).status,400);await assert.rejects(local('PUT','/api/agents/1',invalid),e=>e.status===400);
+    assert.equal((await http('GET','/api/agents')).data[0].name,'کارشناس الف');
+    const confirmed={confirmation:'DELETE_ALL_AGENTS'};const removed=await http('DELETE','/api/agents',confirmed);assert.equal(removed.status,200);assert.deepEqual(removed.data,await local('DELETE','/api/agents',confirmed));
+    assert.equal((await http('GET','/api/agents')).data.length,0);assert.equal((await http('GET','/api/calls')).data.count,7);
+    assert.equal((await http('GET','/api/portfolio?ident='+encodeURIComponent('کارشناس الف')+'&'+day)).status,200);
   });
 
   await t.test('folder scanner and browser upload read the real workbook identically (81, not 80)', async () => {

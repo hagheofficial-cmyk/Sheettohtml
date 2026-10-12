@@ -12,6 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const P = require('./shared/parseQc.js');
 const C = require('./shared/calc.js');
+const ImportData = require('./shared/importData.js');
 
 const DIR = path.join(__dirname, 'data', 'calls');
 const INTERVAL_MS = 15000;
@@ -36,7 +37,7 @@ function mergeCallRows(db, rows) {
   // ردیف‌های برخاسته از هر فایل که این مرتبه خوانده‌ایم را بر اساس نام‌فایل جایگزین می‌کنیم؟
   // دانین‌گ: مرجع db.callFeedbacks جامدتر است — ردیف‌های هم‌اسم را حذف و دوباره اضافه کنیم
   // تا مسیرهای تکراری فایل دیگر مشکلی پیش نیاید. همچنین تگ sourceFile بگذاریم.
-  db.callFeedbacks = db.callFeedbacks.concat(rows);
+  db.callFeedbacks = ImportData.mergeRows(db.callFeedbacks, rows, 'call').rows;
 }
 
 function dedupeCallRows(db) {
@@ -89,7 +90,7 @@ function readRecoveryFile(recPath) {
 /* ---------- خواندن یک فرم QC اکسل ---------- */
 /* ابتدا از نام فایل، سپس از محتوای ستون‌ها نوع را تشخیص می‌دهد تا هر فایلی که
  * کاربر در پوشه می‌گذارد (حتی با نام دلخواه) به تیم درست برسد. */
-function readFormFile(filePath) {
+function readFormFile(filePath, db) {
   const x = lazyXLSX();
   if (!x) return null;
   const base = path.basename(filePath);
@@ -97,9 +98,9 @@ function readFormFile(filePath) {
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows = x.utils.sheet_to_json(sheet);
   if (!rows.length) return null;
-  let type = P.formTypeOfFileName(base) || P.sniffFormType(rows);
+  let type = P.formTypeOfFileName(base) || P.sniffFormType(rows, db && db.settings.callCriteria);
   if (!type) return null;
-  const parsed = P.parseRows(rows, type);
+  const parsed = P.parseRows(rows, type, { agents: db && db.agents, criteria: db && db.settings.callCriteria });
   if (!parsed.length) return null;
   return { rows: parsed.map((r) => Object.assign({ sourceFile: base }, r)), type, count: parsed.length };
 }
@@ -124,7 +125,6 @@ function scanOnce(db, saveCallback, log) {
         try {
           const rec = readRecoveryFile(path.join(DIR, recFile));
           // حذف همه‌ی ردیف‌هایی که از همین فایل آمده‌اند
-          db.callFeedbacks = (db.callFeedbacks || []).filter((r) => r.sourceFile !== recFile);
           mergeCallRows(db, rec.rows);
           db.callRaw = {
             teleRawData: rec.rows.filter((r) => r.formType === 'tele'),
@@ -153,9 +153,8 @@ function scanOnce(db, saveCallback, log) {
       const sig = 'v' + P.PARSER_VERSION + ':' + st.mtimeMs + ':' + st.size;
       if (clicks[f] !== sig) {
         try {
-          const fx = readFormFile(path.join(DIR, f));
+          const fx = readFormFile(path.join(DIR, f), db);
           if (fx && fx.rows) {
-            db.callFeedbacks = (db.callFeedbacks || []).filter((r) => r.sourceFile !== f);
             mergeCallRows(db, fx.rows);
             // به‌روزرسانی callRaw هم (تلاش برای همگام‌سازی اسناد خام)
             if (db.callRaw) {
@@ -214,7 +213,7 @@ function stop() { if (timer) clearInterval(timer); timer = null; }
 
 /* ---------- وضعیت پوشه برای نمایش در UI ---------- */
 /* فهرست فایل‌های داخل data/calls + تعداد ردیفِ تزریق‌شده از هر کدام، وضعیت پارس،
- * و برچسب زمانی آخرین جارو — برای کارت «وضعیت پوشه» در صفحه فیدبک. */
+ * و برچسب زمانی آخرین جارو — برای کارت «وضعیت پوشه» در صفحه ریت. */
 function dirStatus(db) {
   let files = [];
   try {

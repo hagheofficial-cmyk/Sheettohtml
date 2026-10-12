@@ -25,12 +25,12 @@ const TICKET_COLS_TEAM = [
 ];
 const CALL_COLS_AGENT = [
   ['name', 'کارشناس'], ['team', 'تیم'], ['count', 'تعداد نمره‌دار'], ['avgScore', 'میانگین نمره'],
-  ['redlines', 'ردلاین'], ['teleCount', 'تلفنی (ت)'], ['teleAvg', 'میانگین تلفنی'],
+  ['redlines', 'ردلاین'], ['teleCount', 'Telesales (ت)'], ['teleAvg', 'میانگین Telesales'],
   ['accCount', 'اکانت (ت)'], ['accAvg', 'میانگین اکانت'], ['mlmCount', 'MLM (ت)'], ['mlmAvg', 'میانگین MLM'], ['total', 'مجموع ریت']
 ];
 const CALL_COLS_TEAM = [
   ['name', 'تیم'], ['count', 'تعداد نمره‌دار'], ['avgScore', 'میانگین نمره'], ['redlines', 'ردلاین'],
-  ['teleCount', 'تلفنی (ت)'], ['teleAvg', 'میانگین تلفنی'],
+  ['teleCount', 'Telesales (ت)'], ['teleAvg', 'میانگین Telesales'],
   ['accCount', 'اکانت (ت)'], ['accAvg', 'میانگین اکانت'], ['mlmCount', 'MLM (ت)'], ['mlmAvg', 'میانگین MLM'], ['total', 'مجموع ریت']
 ];
 const COMBINED_COLS = [
@@ -41,10 +41,10 @@ const COMBINED_COLS = [
   ['totalCount', 'مجموع'], ['avgScore', 'میانگین کل']
 ];
 
-function cellVal(row, key) {
+function cellVal(row, key, isTeam) {
   const v = row[key];
-  if (key === 'name') return `<span class="cell-main">${esc(v)}</span>`;
-  if (key === 'team') return `<span class="tag-team">${esc(v)}</span>`;
+  if (key === 'name') return `<span class="cell-main">${esc(isTeam ? QCParse.displayTeam(v) : v)}</span>`;
+  if (key === 'team') return `<span class="tag-team">${esc(QCParse.displayTeam(v))}</span>`;
   if (key === 'avgScore') return scorePill(v === '' ? null : v);
   if (key === 'ticketAvg' || key === 'socialAvg' || key === 'callAvg' || key === 'teleAvg' || key === 'accAvg' || key === 'mlmAvg') return v === '' ? '<span style="color:var(--muted)">—</span>' : scorePill(v);
   if (key === 'redlines') return +v ? `<button type="button" class="badge bad redline-link" data-call-group="${esc(row.name)}" title="نمایش توضیحات ردلاین‌ها">${fa(v)}</button>` : '-';
@@ -60,7 +60,7 @@ function cellVal(row, key) {
 }
 
 function callDetailsHTML(calls) {
-  const FORM_FA = { tele: 'تلفنی', account: 'اکانت', mlm: 'MLM / BNPL' };
+  const FORM_FA = { tele: 'Telesales', account: 'اکانت', mlm: 'MLM / BNPL' };
   const tables = ['tele', 'account', 'mlm'].map((type) => {
     const rows = calls.filter((r) => r.formType === type);
     if (!rows.length) return '';
@@ -68,10 +68,10 @@ function callDetailsHTML(calls) {
     return `<div class="card-pad" style="padding-bottom:8px"><b>${esc(FORM_FA[type])}</b> · ${fa(rows.length)} ریت تماس</div>
       <div class="table-wrap"><table class="tbl call-detail-table"><thead><tr>
         <th>نام کارشناس</th><th>نمره کلی تماس</th><th>نام شریک</th>
-        ${keys.map((key) => `<th>${esc(QCParse.labelOf(type, key))}</th>`).join('')}<th>ردلاین ها</th>
+        ${keys.map((key) => `<th>${esc(QCParse.labelOf(type,key,rows[0]&&rows[0].team))}</th>`).join('')}<th>ردلاین ها</th>
       </tr></thead><tbody>${rows.map((r) => `<tr>
         <td class="cell-main">${esc(r.expertName)}</td><td>${scorePill(r.score)}</td><td class="cell-main">${esc(r.leadName || '—')}</td>
-        ${keys.map((key) => `<td>${triValue((r.elements || {})[key])}</td>`).join('')}
+        ${keys.map((key) => `<td>${triValue(QCParse.elementValue(r,key))}</td>`).join('')}
         <td>${callRedlineBadge(r, calls.indexOf(r))}</td></tr>`).join('')}</tbody></table></div>`;
   }).join('');
   return `<div class="card" id="callDetailCard" style="margin-bottom:16px">
@@ -126,7 +126,7 @@ async function render(root) {
   function agentItemsFor(teams) {
     const list = teams && teams.length ? allAgents.filter((a) => teams.indexOf(a.team) !== -1) : allAgents;
     return list.slice().sort((a, b) => a.name.localeCompare(b.name, 'fa'))
-      .map((a) => ({ value: a.name, label: a.name, sub: a.team || '' }));
+      .map((a) => ({ value: a.name, label: a.name, sub: QCParse.displayTeam(a.team || '') }));
   }
   const msAgents = UI.multiSelect({
     label: 'کارشناس', allLabel: 'همه کارشناسان', placeholder: 'جستجوی کارشناس…',
@@ -134,7 +134,7 @@ async function render(root) {
   });
   const msTeams = UI.multiSelect({
     label: 'تیم', allLabel: 'همه تیم‌ها', placeholder: 'جستجوی تیم…',
-    items: (st.teams || []).map((t) => ({ value: t, label: t })),
+    items: (st.teams || []).map((t) => ({ value: t, label: QCParse.displayTeam(t) })),
     onChange: (vals) => {
       const keep = msAgents.getValues();
       const items = agentItemsFor(vals);
@@ -289,7 +289,7 @@ ${elementsCardHTML('teal')}`;
         data: {
           labels,
           datasets: [
-            { label: 'تلفنی', data: rows.map((r) => r.teleCount || 0), backgroundColor: 'rgba(56,189,248,.8)', stack: 's1', borderRadius: 4, borderSkipped: false },
+            { label: 'Telesales', data: rows.map((r) => r.teleCount || 0), backgroundColor: 'rgba(56,189,248,.8)', stack: 's1', borderRadius: 4, borderSkipped: false },
             { label: 'اکانت', data: rows.map((r) => r.accCount || 0), backgroundColor: 'rgba(167,139,250,.8)', stack: 's1', borderRadius: 4, borderSkipped: false },
             { label: 'MLM', data: rows.map((r) => r.mlmCount || 0), backgroundColor: 'rgba(52,211,153,.8)', stack: 's1', borderRadius: 4, borderSkipped: false }
           ]
@@ -301,7 +301,7 @@ ${elementsCardHTML('teal')}`;
         }
       });
       /* کارت نمره‌ی اقلام کلی — «کلا روی کدام المان چه نمره‌ای گرفته‌شده» */
-      const FORM_FA = { tele: 'تلفنی', account: 'اکانت', mlm: 'MLM' };
+      const FORM_FA = { tele: 'Telesales', account: 'اکانت', mlm: 'MLM' };
             const els = (data.elements && data.elements.call) || [];
       $('#elemCardWrap').innerHTML = els.length ? `
         <div class="card" style="margin-bottom:16px">
@@ -335,7 +335,7 @@ ${elementsCardHTML('teal')}`;
     }
 
     wrap.innerHTML = `<table class="tbl"><thead><tr>${cols.map((c) => `<th>${c[1]}</th>`).join('')}</tr></thead>
-      <tbody>${rows.map((r) => `<tr>${cols.map((c) => `<td>${cellVal(r, c[0])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+      <tbody>${rows.map((r) => `<tr>${cols.map((c) => `<td>${cellVal(r, c[0], F.level === 'team')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
     if (F.type === 'call') {
       const isTeam = F.level === 'team';
       $$('[data-call-group]', wrap).forEach((button) => button.addEventListener('click', () => {
@@ -357,7 +357,7 @@ ${elementsCardHTML('teal')}`;
     $$('#levelTabs button').forEach((x) => x.classList.remove('active')); b.classList.add('active'); F.level = b.dataset.l; load();
   }));
   $('#fReset').addEventListener('click', () => {
-    msTeams.setValues([]); msTeams.setItems((st.teams || []).map((t) => ({ value: t, label: t })), false);
+    msTeams.setValues([]); msTeams.setItems((st.teams || []).map((t) => ({ value: t, label: QCParse.displayTeam(t) })), false);
     msAgents.setValues([]); msAgents.setItems(agentItemsFor(), false);
     load();
   });

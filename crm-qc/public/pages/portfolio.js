@@ -3,7 +3,7 @@
 'use strict';
 const { C, $, $$, api, fa, esc, el, toast, scorePill, rateCell, emptyState, debounce, scoreColorHex, triValue, callRedlineBadge, bindCallRedlines, callTimeCell } = UI;
 
-const FORM_TYPE_FA = { tele: 'رفتار تلفنی', account: 'تیم اکانت', mlm: 'MLM/BNPL' };
+const FORM_TYPE_FA = { tele: 'Telesales', account: 'تیم اکانت', mlm: 'MLM/BNPL' };
 
 async function render(root, arg) {
   root.innerHTML = `
@@ -23,16 +23,17 @@ async function render(root, arg) {
         </div>
         <div id="pTeamSlot"></div>
         <div class="field grow-0"><label>&nbsp;</label><button class="btn ghost" id="pReset"><i class="fa-solid fa-rotate-right"></i> بازنشانی</button></div>
-        <div class="field grow-0"><label>&nbsp;</label><button class="btn success-soft" id="pXls" disabled><i class="fa-solid fa-file-excel"></i> خروجی اکسل</button></div>
+
       </div>
     </div>
 
     <div class="card" id="pAll" style="margin-bottom:16px"><div class="loading-page"><div class="spinner"></div><p>در حال بارگذاری فهرست کارشناسان…</p></div></div>
 
-    <div id="pBody"></div>`;
+`;
 
   const agents = await api.get('/api/agents');
-  const master = $('#pAll', root), profileBody = $('#pBody', root), sugg = $('#pSugg', root);
+  const master = $('#pAll', root), sugg = $('#pSugg', root);
+  let profileBody = null, profileModal = null;
   if (!master) return;
   let curAgent = null, curData = null, lastCombined = [], historyCalls = [];
   let masterId = 0, profileId = 0;
@@ -80,7 +81,7 @@ async function render(root, arg) {
             </tr></thead>
             <tbody>${rows.map(r => `<tr style="cursor:pointer" data-name="${esc(r.name)}" title="جزئیات ${esc(r.name)}">
               <td class="cell-main">${esc(r.name)}${r.active === false ? ' <span class="badge gray">بایگانی</span>' : ''}${!r.registered ? '<div class="cell-sub">در فایل‌های واردشده؛ در مدیریت کارشناسان ثبت نشده</div>' : ''}</td>
-              <td><span class="tag-team">${esc(r.team || '—')}</span></td>
+              <td><span class="tag-team">${esc(QCParse.displayTeam(r.team || '—'))}</span></td>
               <td>${fa(r.ticketCount || 0)}</td><td>${r.ticketAvg === '' ? '—' : scorePill(r.ticketAvg)}</td>
               <td>${fa(r.socialCount || 0)}</td><td>${r.socialAvg === '' ? '—' : scorePill(r.socialAvg)}</td>
               <td>${fa(r.callCount || 0)}</td><td>${r.callAvg === '' ? '—' : scorePill(r.callAvg)}</td>
@@ -102,7 +103,8 @@ async function render(root, arg) {
   }
   function clearProfile() {
     profileId++; curAgent = null; curData = null; $('#pSearch').value = '';
-    profileBody.innerHTML = ''; $('#pXls').disabled = true; App.clearCharts();
+    if(profileModal && profileModal.isConnected) profileModal.close();
+    profileModal=null;profileBody=null;historyCalls=[];App.clearCharts();
   }
   async function refresh() {
     const name = curAgent;
@@ -131,7 +133,7 @@ async function render(root, arg) {
     sugg.innerHTML = list.map(a => `
       <button class="btn ghost" style="display:flex;justify-content:space-between;width:100%;border-radius:0;border-bottom:1px solid var(--border)" data-name="${esc(a.name)}">
         <span>${esc(a.name)}</span>
-        <span style="color:var(--muted);font-size:11px">${a.ext != null ? 'داخلی ' + fa(a.ext) : ''} · ${esc(a.team)}</span>
+        <span style="color:var(--muted);font-size:11px">${a.ext != null ? 'داخلی ' + fa(a.ext) : ''} · ${esc(QCParse.displayTeam(a.team))}</span>
       </button>`).join('');
     sugg.style.display = 'block';
     $$('button', sugg).forEach(b => b.addEventListener('mousedown', (e) => {
@@ -151,14 +153,33 @@ async function render(root, arg) {
     }
   });
 
+  function ensurePopup() {
+    if(profileModal && profileModal.isConnected)return;
+    profileModal=UI.modal(`${UI.modalHead('پروفایل عملکرد کارشناس','fa-id-card')}<div class="profile-toolbar">
+      <div class="field"><label>از تاریخ بررسی</label><div class="date-f"><input class="input" id="pFrom" dir="ltr" value="${esc(App.dateRange.from)}"><button class="cal-btn" id="pFromCal" type="button" aria-label="تقویم شروع"><i class="fa-regular fa-calendar"></i></button></div></div>
+      <div class="field"><label>تا تاریخ بررسی</label><div class="date-f"><input class="input" id="pTo" dir="ltr" value="${esc(App.dateRange.to)}"><button class="cal-btn" id="pToCal" type="button" aria-label="تقویم پایان"><i class="fa-regular fa-calendar"></i></button></div></div>
+      <button class="btn soft" id="pRangeApply">اعمال بازه</button><span class="profile-period" id="pLoadedPeriod"></span>
+      <div class="toolbar-actions"><button class="btn success-soft" id="pXls" disabled><i class="fa-solid fa-file-excel"></i> اکسل</button><button class="btn primary" id="pImage" disabled><i class="fa-solid fa-image"></i> دانلود عکس کامل</button></div></div>
+      <div class="profile-content" id="pBody"></div>`,{className:'profile-modal',lg:true,onClose(){profileId++;curAgent=null;curData=null;profileBody=null;profileModal=null;historyCalls=[];App.clearCharts();}});
+    profileBody=$('#pBody',profileModal);
+    const apply=()=>App.setDateRange({from:$('#pFrom').value.trim(),to:$('#pTo').value.trim()});
+    $('#pRangeApply').addEventListener('click',apply);
+    JCal.attach($('#pFromCal'),{input:$('#pFrom'),onPick:apply});JCal.attach($('#pToCal'),{input:$('#pTo'),onPick:apply});
+    $('#pXls').addEventListener('click',exportExcel);
+    $('#pImage').addEventListener('click',async()=>{
+      if(!curData || !profileBody)return;
+      const button=$('#pImage'),data=curData,frozenCalls=historyCalls.slice();button.disabled=true;
+      try{
+        App.charts.forEach(chart=>{if(chart.update)chart.update('none');});
+        await QCCapture.download(profileBody,`${data.agent.name} — ${data.scope.from||'ابتدا'} تا ${data.scope.to||'انتها'}`,copy=>{
+          frozenCalls.forEach((row,index)=>{const detail=copy.querySelector('#pCallDetails-'+index);if(detail){detail.hidden=false;detail.firstElementChild.innerHTML=callDetail(row,index);}});
+          copy.querySelectorAll('.rating-detail-row').forEach(row=>{row.hidden=false;});
+        });toast.success('عکس کامل پرونده در بازه‌ی نمایش‌داده‌شده آماده شد');
+      }catch(e){toast.error(e.message);}finally{if(button.isConnected)button.disabled=!curData;}
+    });
+  }
   async function pickAgent(name) {
-    $('#pSearch').value = name;
-    curAgent = name;
-    await load(name);
-    if (!profileBody.isConnected) return;
-    $('#pXls').disabled = !curData;
-    // اسکرول به پرونده
-    try { $('#pBody').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+    $('#pSearch').value=name;ensurePopup();curAgent=name;await load(name);
   }
 
   $('#pReset').addEventListener('click', () => {
@@ -167,16 +188,19 @@ async function render(root, arg) {
 
   async function load(name) {
     const body = profileBody, request = ++profileId;
-    if (!body.isConnected) return;
-    curData = null; $('#pXls').disabled = true;
+    if (!body || !body.isConnected) return;
+    curData = null; $('#pXls').disabled = true; $('#pImage').disabled=true;
     body.innerHTML = `<div class="loading-page"><div class="spinner"></div></div>`;
     const q = periodQ(); q.set('ident', name);
     try {
       const data = await api.get('/api/portfolio?' + q.toString());
       if (request !== profileId || !body.isConnected) return;
       App.clearCharts();
-      curAgent = name; curData = data; $('#pXls').disabled = false;
-      const periodOr = App.dateRangeLabel();
+      curAgent = name; curData = data; $('.modal-head h3',profileModal).textContent='پروفایل عملکرد — '+data.agent.name; $('#pXls').disabled = false;$('#pImage').disabled=false;
+      const scope=data.scope || {from:App.dateRange.from,to:App.dateRange.to};data.scope=scope;
+      $('#pFrom').value=scope.from;$('#pTo').value=scope.to;
+      const periodOr=scope.from||scope.to?'از '+fa(scope.from||'ابتدا')+' تا '+fa(scope.to||'انتها'):'همه تاریخ‌ها';
+      $('#pLoadedPeriod').textContent='بازه‌ی داده‌ی نمایش‌داده‌شده: '+periodOr;
       renderProfile(body, data, periodOr);
     } catch (e) {
       if (request !== profileId || !body.isConnected) return;
@@ -194,17 +218,22 @@ async function render(root, arg) {
 
   function ticketTable(rows) {
     if (!rows.length) return emptyState('fa-ticket', 'بدون سوابق تیکت', '');
-    return `<table class="tbl"><thead><tr><th>کد تیکت</th><th>تاریخ بررسی</th><th>نمره</th></tr></thead>
+    return `<table class="tbl"><thead><tr><th>کد تیکت</th><th>تاریخ بررسی</th><th>نمره</th><th class="no-capture">جزئیات</th></tr></thead>
       <tbody>${rows.slice().sort((a, b) => (b.id - a.id)).map(r => `<tr>
-        <td>${esc(r.ticketCode)}</td><td dir="ltr">${fa(r.reviewDate)}</td><td>${scorePill(r.score)}</td></tr>`).join('')}</tbody></table>`;
+        <td>${esc(r.ticketCode)}</td><td dir="ltr">${fa(r.reviewDate)}</td><td>${scorePill(r.score)}</td><td class="no-capture"><button class="btn ghost sm" data-rating-toggle>جزئیات</button></td></tr><tr class="rating-detail-row" hidden><td colspan="4">${ticketDetail(r)}</td></tr>`).join('')}</tbody></table>`;
   }
   function socialTable(rows) {
     if (!rows.length) return emptyState('fa-comments', 'بدون سوابق سوشال', '');
     const slaTxt = (s) => s.slaStatus === 'رعایت شده' ? '<span class="badge ok">رعایت</span>' : s.slaStatus === 'رعایت نشده' ? '<span class="badge bad">رد شده</span>' : '—';
-    return `<table class="tbl"><thead><tr><th>تاریخ بررسی</th><th>SLA</th><th>نمره</th></tr></thead>
+    return `<table class="tbl"><thead><tr><th>تاریخ بررسی</th><th>SLA</th><th>نمره</th><th class="no-capture">جزئیات</th></tr></thead>
       <tbody>${rows.slice().sort((a, b) => (b.id - a.id)).map(r => `<tr>
-        <td dir="ltr">${fa(r.reviewDate)}</td><td>${slaTxt(r)}</td><td>${scorePill(r.score)}</td></tr>`).join('')}</tbody></table>`;
+        <td dir="ltr">${fa(r.reviewDate)}</td><td>${slaTxt(r)}</td><td>${scorePill(r.score)}</td><td class="no-capture"><button class="btn ghost sm" data-rating-toggle>جزئیات</button></td></tr><tr class="rating-detail-row" hidden><td colspan="4">${socialDetail(r)}</td></tr>`).join('')}</tbody></table>`;
   }
+  function ticketDetail(r){return `<div class="detail-row">QC: ${esc(r.qcAgent||'—')} · تاریخ ایجاد: ${fa(r.ticketDate)} · ردلاین: ${QCReports.hasRedline(r,'ticket')?'۱':'-'}<br>
+      پیگیری: ${triValue(r.q1)} · یادداشت: ${triValue(r.q2)} · دلیل بستن: ${triValue(r.q3)} · اکشن CRM: ${triValue(r.q4)}<div style="white-space:pre-wrap">${esc(r.comment||'')}</div></div>`;}
+  function socialDetail(r){return `<div class="detail-row">QC: ${esc(r.qcAgent||'—')} · پیام‌رسان: ${esc(r.messenger||'—')} · وضعیت: ${esc(r.responseStatus||'—')}<br>
+      دریافت: ${fa(r.receiveDate)} ${fa(r.receiveTime)} · پاسخ: ${fa(r.replyDate)} ${fa(r.replyTime)} · دقیقه کاری: ${fa(r.durationMin)}<br>
+      SLA: ${triValue(r.qSla)} · پیگیری: ${triValue(r.qFollow)} · پایان‌بندی: ${triValue(r.qClosing)} · لحن: ${triValue(r.qTone)}<div style="white-space:pre-wrap">${esc(r.delayReason||'')} ${esc(r.reasonVerdict||'')} ${esc(r.comment||'')}</div></div>`;}
   function callTable(rows) {
     if (!rows.length) return emptyState('fa-headset', 'بدون دیتای ریت تماس', 'بازه‌ی تاریخ را تغییر دهید یا از مرکز داده فایل QC وارد کنید.');
     historyCalls = rows.slice().sort((a, b) => {
@@ -220,26 +249,26 @@ async function render(root, arg) {
         <tr class="call-detail-row" id="pCallDetails-${index}" hidden><td colspan="4"></td></tr>`).join('')}</tbody></table>`;
   }
   function callDetail(row, index) {
-    const keys = QCReports.criteriaKeys([row], row.formType, QCParse);
+    const keys = [...new Set(QCReports.criteriaKeys([row], row.formType, QCParse).concat(Object.keys(row.elements||{})))];
     return `<div class="cell-sub" style="margin-bottom:8px">فرم: ${esc(FORM_TYPE_FA[row.formType] || row.formType)} · نمره‌ها عین فرم: 1 / 0 / -</div>
       <div class="table-wrap"><table class="tbl call-detail-table"><thead><tr><th>لید</th><th>شماره تماس</th>
-        ${keys.map((key) => `<th>${esc(QCParse.labelOf(row.formType, key))}</th>`).join('')}
+        ${keys.map((key) => `<th>${esc((QCParse.definitionsFor(row.formType,row.team || curData && curData.agent.team).find(d=>d.key===key)||{}).label || (row.criteriaSnapshot||[]).find(d=>d.key===key)?.label || QCParse.labelOf(row.formType,key))}</th>`).join('')}
         <th>ردلاین</th><th>تایم مکالمه</th><th>تاریخ بررسی</th></tr></thead><tbody><tr>
           <td class="cell-main">${esc(row.leadName || '—')}</td><td dir="ltr">${esc(row.leadPhone || '—')}</td>
-          ${keys.map((key) => `<td>${triValue((row.elements || {})[key])}</td>`).join('')}
+          ${keys.map((key) => `<td>${triValue(QCParse.elementValue(row,key))}</td>`).join('')}
           <td>${callRedlineBadge(row, index)}</td><td>${callTimeCell(row)}</td><td dir="ltr">${esc(fa(row.reviewDate))}</td>
-        </tr></tbody></table></div>`;
+        </tr></tbody></table></div>${row.qcComment||row.redlineReason?`<div class="detail-row" style="margin-top:8px;white-space:pre-wrap">${row.redlineReason?'علت ردلاین: '+esc(row.redlineReason):''}${row.qcComment?'<br>نظر QC: '+esc(row.qcComment):''}</div>`:''}`;
   }
 
   /* ---------- کارت نرخ موفقیت معیارهای تماس (پرتفوی) ---------- */
   function criteriaCard(byTypeRates) {
     if (!Array.isArray(byTypeRates) || !byTypeRates.length) return '';
-    const FORM__LABEL = { tele: 'رفتار تلفنی', account: 'تیم اکانت', mlm: 'MLM/BNPL' };
+    const FORM__LABEL = { tele: 'Telesales', account: 'تیم اکانت', mlm: 'MLM/BNPL' };
     const ids = [];
     const cards = byTypeRates.map((bt, bi) => {
       if (!bt.rates || !bt.rates.length) return '';
       const rows = bt.rates.map((r, ri) => {
-        const lbl = (window.QCParse && window.QCParse.labelOf) ? window.QCParse.labelOf(bt.form, r.key) : r.key;
+        const lbl = r.label || window.QCParse.labelOf(bt.form,r.key,curData && curData.agent.team);
         const cid = 'cr-' + bi + '-' + ri;
         ids.push(cid);
         const st = r.successRate === '' ? null : r.successRate;
@@ -305,6 +334,7 @@ async function render(root, arg) {
       : '<span class="tag-team" style="opacity:.5">دیتای ریت تماس برای این کارشناس یافت نشد</span>';
 
     body.innerHTML = `
+      <div class="capture-title no-capture"></div>
       <!-- شناسنامه -->
       <div class="card" style="margin-bottom:16px">
         <div class="card-pad" style="display:flex;flex-wrap:wrap;gap:14px;align-items:center">
@@ -314,7 +344,7 @@ async function render(root, arg) {
           <div style="flex:1;min-width:180px">
             <div style="font-size:19px;font-weight:800">${esc(a.name)}</div>
             <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:7px">
-              <span class="tag-team">${esc(a.team)}</span>
+              <span class="tag-team">${esc(QCParse.displayTeam(a.team))}</span>
               ${a.id === 0 ? '<span class="badge warn">در فایل‌های واردشده؛ در مدیریت کارشناسان ثبت نشده</span>' : ''}
               ${a.ext != null ? `<span class="badge gray"><i class="fa-solid fa-hashtag"></i> داخلی ${fa(a.ext)}</span>` : ''}
               <span class="badge ${a.active ? 'ok' : 'bad'}">${a.active ? 'فعال' : 'بایگانی'}</span>
@@ -324,6 +354,9 @@ async function render(root, arg) {
         </div>
       </div>
 
+      <div class="profile-summary"><div class="summary-block"><small>میانگین کل نمرات معتبر</small><strong>${QCReports.avgScore(T.rows.concat(S.rows,Ph.rows))===''?'—':fa(QCReports.avgScore(T.rows.concat(S.rows,Ph.rows)))}</strong></div>
+        <div class="summary-block"><small>تعداد کل ریت‌ها</small><strong>${fa(T.count+S.count+Ph.count)}</strong></div><div class="summary-block"><small>ریت‌های نمره‌دار</small><strong>${fa(T.scoredCount+S.scoredCount+Ph.scoredCount)}</strong></div>
+        <div class="summary-block"><small>ردلاین‌ها؛ تیکت / سوشال / تماس</small><strong>${fa(T.redlineZero)} / ${fa(S.rows.filter(r=>QCReports.hasRedline(r,'social')).length)} / ${fa(Ph.redlineCount)}</strong></div></div>
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:16px">
         ${kpi('fa-ticket', 'ارزیابی تیکت', `${fa(T.count)}`,
           T.avgScore === '' ? '' : `میانگین ${scorePill(T.avgScore)}`, T.redlineZero > 0 ? 'warn' : '')}
@@ -364,7 +397,7 @@ async function render(root, arg) {
       ${(d.actions.length || true) ? `
       <div class="card" style="margin-top:16px">
         <div class="card-head"><div class="head-icon"><i class="fa-solid fa-clipboard-list"></i></div>
-          <div><h3>اقدامات اصلاحی و توافقات فیدبک (${fa(d.actions.length)})</h3>
+          <div><h3>اقدامات اصلاحی و توافقات؛ همه تاریخ‌ها (${fa(d.actions.length)})</h3>
           <div class="sub">${d.voiceCount ? `فایل‌های ویس: ${fa(d.voiceCount)} · ` : ''}فقط اقدامات ثبت‌شده در همین سامانه قابل تغییر وضعیت‌اند</div>
           </div>
           <div class="spacer"></div>
@@ -378,10 +411,11 @@ async function render(root, arg) {
               ${x.source === 'system' ? `<button class="btn ghost pDel" style="padding:4px 8px" title="حذف"><i class="fa-solid fa-trash"></i></button>` : `<span class="badge gray" style="font-size:10px">پنل</span>`}
               <span style="color:var(--muted);font-size:11px">${esc(x.date)}</span>
             </div>`).join('')
-          : '<div style="color:var(--muted);text-align:center;padding:16px;font-size:12px">هنوز اقدامی ثبت نشده — تیکت‌گذر یا فیدبک اول را با «ثبت اقدام جدید» یادداشت کنید</div>'}
+          : '<div style="color:var(--muted);text-align:center;padding:16px;font-size:12px">هنوز اقدامی ثبت نشده — تیکت‌گذر یا ریت اول را با «ثبت اقدام جدید» یادداشت کنید</div>'}
         </div>
       </div>` : ''}`;
 
+    body.insertAdjacentHTML('beforeend', `<div class="profile-image-note">گزارش عملکرد ${esc(a.name)} · ${esc(periodLabel)}<br>مبنا: تاریخ بررسی هر ریت. نمره‌ی خالی صفر نیست؛ میانگین بر نمره‌های معتبر وزن‌دار است. 1 = رعایت، 0 = عدم رعایت، - = موضوعیت نداشته و خارج از مخرج نرخ؛ — = ثبت‌نشده. اقدام‌ها جدا از بازه‌ی ارزیابی‌اند.</div>`);
     bindCallRedlines($('#pCallHistory', body) || body, historyCalls);
     $$('[data-call-detail]', body).forEach((button) => button.addEventListener('click', () => {
       const index = Number(button.dataset.callDetail), detail = $('#pCallDetails-' + index, body);
@@ -393,6 +427,7 @@ async function render(root, arg) {
       }
     }));
 
+    $$('[data-rating-toggle]',body).forEach(button=>button.addEventListener('click',()=>{const row=button.closest('tr').nextElementSibling;row.hidden=!row.hidden;}));
     if (d.actions.length || true) {
       const wrap = $('#pActionsWrap');
       $('#pAddAction').addEventListener('click', () => {
@@ -464,7 +499,7 @@ async function render(root, arg) {
   }
 
   /* ------------------------------ اکسل ------------------------------ */
-  $('#pXls').addEventListener('click', () => {
+  function exportExcel() {
     if (!curData) return;
     const a = curData.agent;
     const rowsT = [['کد تیکت', 'تاریخ بررسی', 'تاریخ تیکت', 'q1', 'q2', 'q3', 'q4', 'ردلاین', 'نمره'], ...curData.tickets.rows.map(r => [r.ticketCode, r.reviewDate, r.ticketDate, r.q1, r.q2, r.q3, r.q4, r.redline, r.score])];
@@ -481,7 +516,7 @@ async function render(root, arg) {
     window.QCExport.sheets(`${a.name} — پرونده`, [
       { name: 'تیکت', rows: rowsT }, { name: 'سوشال', rows: rowsS }, ...callSheets
     ]);
-  });
+  }
 
   App.onDateRangeChange(refresh);
   await renderMaster();

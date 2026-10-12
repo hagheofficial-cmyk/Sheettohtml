@@ -12,6 +12,7 @@ function rangeSource() {
   const params = new URLSearchParams();
   if (App.dateRange.from) params.set('qcFrom', App.dateRange.from);
   if (App.dateRange.to) params.set('qcTo', App.dateRange.to);
+  params.set('qcTheme',App.theme);
   const qs = params.toString();
   return SRC + (qs ? '?' + qs : '');
 }
@@ -38,6 +39,7 @@ function render(root) {
   const syncRange = () => {
     if (!frame.isConnected || !frame.contentWindow) return;
     $('#crNewTab', root).href = rangeSource();
+    frame.contentWindow.postMessage({ type:'crmqc:theme', theme:App.theme }, location.origin === 'null' ? '*' : location.origin);
     frame.contentWindow.postMessage({ type: 'crmqc:date-range', range: App.dateRange }, location.origin === 'null' ? '*' : location.origin);
   };
   frame.addEventListener('load', syncRange);

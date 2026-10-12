@@ -1,6 +1,6 @@
 /* =========================================================================
  * parseQc.js — پارسر مشترک فرم‌های QC تماس (tele/account/mlm)
- * منطق دقیقاً منطبق بر parseRows پنل دستیار فیدبک QC است؛
+ * منطق دقیقاً منطبق بر parseRows پنل دستیار ریت QC است؛
  * کوتیشن‌های اضافی پاک می‌شوند، تاریخ‌های Excel/ISO/شمسی همه به شمسی تبدیل می‌شوند.
  * UMD: مرورگر (window.QCParse) و Node (require) هر دو.
  * ========================================================================= */
@@ -10,7 +10,7 @@
 })(typeof self !== 'undefined' ? self : this, function (C) {
 'use strict';
 
-/* ---------- دیکشنری مفصل (هم‌نام پنل — استخراج مستقیم از پنل دستیار فیدبک QC) ---------- */
+/* ---------- دیکشنری مفصل (هم‌نام پنل — استخراج مستقیم از پنل دستیار ریت QC) ---------- */
 /* معیارها + برچسب فارسی دقیقاً همان‌هایی است که پنل در گزارش‌اش نمایش می‌دهد.
  * ترتیب = ترتیب نمایش. در صورت تغییر پنل، این جدول هم باید به‌روز شود. */
 const TELE_CRITERIA = [
@@ -95,13 +95,16 @@ function findKey(row, candidates) {
  * type: 'tele' | 'account' | 'mlm'
  * خروجی: [{expertName, score, redline, redlineReason, leadName, leadPhone,
  *          listeningTime, qcComment, reviewDate, formType, elements}] */
-function parseRows(rows, type) {
+function parseRows(rows, type, options) {
+  options = options || {};
   const mappingRef = type === 'tele' ? TELE_CRITERIA : (type === 'mlm' ? MLM_CRITERIA : ACCOUNT_CRITERIA);
   const dt = ['review_date', 'reviewdate', 'تاریخ بررسی', 'form_created_date', 'form created date', 'action_date', 'action date'];
   const list = [];
   for (const [index, r] of (rows || []).entries()) {
     const nameKey = findKey(r, ['tele_expert_name', 'expert_name', 'expertname']);
-    const expertName = nameKey ? normName(cleanText(r[nameKey])) : '';
+    const rawName = nameKey ? normName(String(r[nameKey] == null ? '' : r[nameKey]).trim().replace(/^(["'])(.*)\1$/, '$2')) : '';
+    const resolved = resolveExpert(options.agents || [], rawName);
+    const expertName = resolved.agent ? resolved.agent.name : rawName;
     if (!expertName) continue;
 
     const scoreKey = findKey(r, ['score']);
@@ -123,15 +126,23 @@ function parseRows(rows, type) {
     const redline = isRedline(redlineKey ? r[redlineKey] : null) ? 1 : 0;
     const redlineReason = redlineReasonKey ? cleanText(r[redlineReasonKey]) : '';
 
+    const teamColumn = findKey(r, ['team', 'team_name', 'تیم']);
+    const team = resolved.agent ? resolved.agent.team : (teamColumn ? cleanText(r[teamColumn]) : options.team || '');
+    const defs = definitionsFor(type, team, options.criteria);
+    const configured = hasConfiguration(type, team, options.criteria);
     const elements = {};
-    for (const elKey of mappingRef) {
+    for (const definition of defs) {
+      const elKey = definition.key;
       let cell = undefined;
-      for (const k of Object.keys(r)) if (k.trim().toLowerCase() === elKey.toLowerCase()) { cell = r[k]; break; }
+      for (const column of [definition.excelKey].concat(definition.aliases || [])) {
+        const actual = Object.keys(r).find(k => columnKey(k) === columnKey(column));
+        if (actual != null) { cell = r[actual]; break; }
+      }
       // ستون غایب را به فرم اضافه نکن؛ سلول خالی با «-» صریح فرق دارد.
       if (cell !== undefined) elements[elKey] = C.normalizeTri(cell);
     }
 
-    list.push({
+    const parsed = {
       expertName,
       score,
       redline: (redline === 1 || redline === 0) ? redline : 0,
@@ -148,7 +159,11 @@ function parseRows(rows, type) {
       evaluationId: idKey ? cleanText(r[idKey]) : '',
       formType: type,
       elements
-    });
+    };
+    if (team) parsed.team = team;
+    if (rawName !== expertName) parsed.sourceExpertName = rawName;
+    if (configured) { parsed.criteriaVersion = Number((options.criteria || {}).version) || 1; parsed.criteriaSnapshot = defs.map(d => ({ key: d.key, label: d.label, excelKey: d.excelKey, active: d.active !== false })); }
+    list.push(parsed);
   }
   return list;
 }
@@ -158,7 +173,7 @@ function parseRows(rows, type) {
 function callRowKey(row) {
   if (!row.sourceFile) return null;
   const identity = row.sourceRow != null ? 'row:' + row.sourceRow : (row.evaluationId ? 'id:' + row.evaluationId : '');
-  return identity ? JSON.stringify([row.sourceFile, row.formType, identity]) : null;
+  return identity ? JSON.stringify([row.sourceFile, row.formType, identity, cleanQcDate(row.reviewDate) || String(row.reviewDate || ''), nameKeyOf(row.expertName), String(row.leadPhone || ''), cleanQcDate(row.callDate) || String(row.callDate || '')]) : null;
 }
 
 /* ---------- تشخیص نوع فایل اکسل از روی نام ---------- */
@@ -173,39 +188,158 @@ function formTypeOfFileName(name) {
 /* ---------- تشخیص نوع فرم از روی محتوای ستون‌ها (وقتی نام فایل گویا نیست) ---------- */
 /* rows: خروجی sheet_to_json. با شمردن تطابق ستون‌های معیار هر تیم، بهترین نوع برگردانده می‌شود.
  * حداقل ۲ تطابق لازم است تا نتیجه معتبر باشد. */
-function sniffFormType(rows) {
+function sniffFormType(rows, config) {
   if (!Array.isArray(rows) || !rows.length) return null;
   const keys = new Set();
   for (const r of rows.slice(0, 12)) {
     if (r && typeof r === 'object') Object.keys(r).forEach((k) => keys.add(String(k).trim().toLowerCase()));
   }
-  const cnt = (list) => list.filter((k) => keys.has(String(k).toLowerCase())).length;
+  function columns(type) {
+    let definitions = defaults(type);
+    if (config && config.forms && config.forms[type]) definitions = definitions.concat(config.forms[type]);
+    Object.values(config && config.teams || {}).filter(e => e.form === type).forEach(e => { definitions = definitions.concat(e.elements); });
+    return [...new Set(definitions.flatMap(d => [d.excelKey].concat(d.aliases || [])).map(k => columnKey(k)))];
+  }
+  const cnt = list => list.filter(k => keys.has(columnKey(k))).length;
   const scores = [
-    ['tele', cnt(TELE_CRITERIA)],
-    ['account', cnt(ACCOUNT_CRITERIA)],
-    ['mlm', cnt(MLM_CRITERIA)]
+    ['tele', cnt(columns('tele'))],
+    ['account', cnt(columns('account'))],
+    ['mlm', cnt(columns('mlm'))]
   ].sort((a, b) => b[1] - a[1]);
-  return scores[0][1] >= 2 ? scores[0][0] : null;
+  return scores[0][1] >= 2 && scores[0][1] > scores[1][1] ? scores[0][0] : null;
 }
 
 /* ---------- نرمال‌سازی نام برای تطبیق کارشناس (فاصله‌ها یکدست) ---------- */
-function normName(s) { return String(s || '').replace(/[\s‌]+/g, ' ').trim(); }
+function normName(s) { return String(s == null ? '' : s).normalize('NFKC').replace(/[يى]/g, 'ی').replace(/ك/g, 'ک').replace(/[\u064B-\u065F\u0670]/g, '').replace(/[\s‌‍]+/g, ' ').trim(); }
 
-/* دیکشنری برحسب نوع — منبع واحد برای تحلیل‌ها */
-function criteriaFor(type) {
-  return type === 'tele' ? TELE_CRITERIA : (type === 'mlm' ? MLM_CRITERIA : ACCOUNT_CRITERIA);
+/* تعریف المان‌ها با شناسه‌ی پایدار: تغییر نام/ستون هیچ نمره‌ی تاریخی را بازنویسی نمی‌کند. */
+let browserConfig = null;
+function nameKeyOf(s) { return normName(s).toLowerCase().replace(/\s/g, ''); }
+function teamKey(s) { return normName(s).toLowerCase().replace(/[\s_/-]/g, ''); }
+function columnKey(s) { return normName(s).toLowerCase(); }
+function teamForm(s) {
+  const t = teamKey(s);
+  if (/^tele(?:sales)?$|تلهسلز|تلفن|تلفنی/.test(t)) return 'tele';
+  if (/^(?:account|acc|اکانت)$/.test(t)) return 'account';
+  if (/^(?:mlm|امالام|bnpl|mlmbnpl)$/.test(t)) return 'mlm';
+  return null;
 }
-function criteriaLabelsFor(type) {
-  return type === 'tele' ? CRITERIA_LABELS.tele : (type === 'mlm' ? CRITERIA_LABELS.mlm : CRITERIA_LABELS.account);
+function displayTeam(s) { return teamForm(s) === 'tele' ? 'Telesales' : String(s || ''); }
+function resolveExpert(agents, rawName) {
+  const name = normName(rawName);
+  if (!name) return { agent: null, ambiguous: false };
+  const exact = (agents || []).filter(a => a.name === String(rawName).trim());
+  if (exact.length === 1) return { agent: exact[0], ambiguous: false };
+  const matches = (agents || []).filter(a => [a.name].concat(a.aliases || []).some(n => nameKeyOf(n) === nameKeyOf(name)));
+  return { agent: matches.length === 1 ? matches[0] : null, ambiguous: matches.length > 1 };
 }
-/* برچسب فارسی معیار با fallback به خود کلید */
-function labelOf(type, key) {
-  return (CRITERIA_LABELS[type] && CRITERIA_LABELS[type][key]) || key;
+function defaults(type) {
+  const keys = type === 'tele' ? TELE_CRITERIA : type === 'mlm' ? MLM_CRITERIA : ACCOUNT_CRITERIA;
+  return keys.map(key => ({ key, label: (CRITERIA_LABELS[type] || {})[key] || key, excelKey: key, active: true }));
+}
+function hasConfiguration(type, team, cfg) {
+  cfg = cfg === undefined ? browserConfig : cfg;
+  const entry = cfg && cfg.teams && cfg.teams[teamKey(team)];
+  return !!(entry && entry.form === type || cfg && cfg.forms && Array.isArray(cfg.forms[type]));
+}
+function definitionsFor(type, team, cfg) {
+  cfg = cfg === undefined ? browserConfig : cfg;
+  const entry = cfg && cfg.teams && cfg.teams[teamKey(team)];
+  if (entry && entry.form === type && Array.isArray(entry.elements)) return entry.elements;
+  if (cfg && cfg.forms && Array.isArray(cfg.forms[type])) return cfg.forms[type];
+  return defaults(type);
+}
+function criteriaFor(type, team, cfg) { return definitionsFor(type, team, cfg).filter(d => d.active !== false).map(d => d.key); }
+function criteriaLabelsFor(type, team, cfg) { return Object.fromEntries(definitionsFor(type, team, cfg).map(d => [d.key, d.label])); }
+function labelOf(type, key, team, cfg) { const def = definitionsFor(type, team, cfg).find(d => d.key === key); return def ? def.label : (CRITERIA_LABELS[type] || {})[key] || key; }
+function validateConfig(cfg) {
+  function invalid(m) { const e = new Error(m); e.status = 400; throw e; }
+  if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) invalid('تنظیمات المان‌ها نامعتبر است');
+  function check(defs) {
+    if (!Array.isArray(defs) || defs.length > 100) invalid('هر تیم حداکثر ۱۰۰ المان دارد');
+    const ids = new Set(), columns = new Set();
+    defs.forEach(d => {
+      if (!d || !/^[A-Za-z0-9_-]{1,96}$/.test(d.key || '') || ['__proto__','constructor','prototype'].includes(d.key)) invalid('شناسه‌ی المان نامعتبر است');
+      if (ids.has(d.key)) invalid('شناسه‌ی المان تکراری است'); ids.add(d.key);
+      if (!String(d.label || '').trim() || !String(d.excelKey || '').trim() || String(d.label).length > 180 || String(d.excelKey).length > 180) invalid('نام المان و ستون اکسل را کامل وارد کنید');
+      if (d.active !== false) {
+        const field = columnKey(d.excelKey);
+        if (columns.has(field)) invalid('نام ستون اکسل تکراری است'); columns.add(field);
+      }
+      if (d.aliases && (!Array.isArray(d.aliases) || d.aliases.some(a => typeof a !== 'string'))) invalid('نام قبلی ستون نامعتبر است');
+    });
+
+  }
+  Object.keys(cfg.forms || {}).forEach(form => { if (!['tele','account','mlm'].includes(form)) invalid('نوع فرم نامعتبر است'); check(cfg.forms[form]); });
+  if (Object.keys(cfg.teams || {}).length > 200) invalid('تعداد تیم‌ها بیش از حد است');
+  Object.keys(cfg.teams || {}).forEach(key => {
+    if (['__proto__','constructor','prototype'].includes(key)) invalid('کلید تیم نامعتبر است');
+    const entry = cfg.teams[key];
+    if (!entry || !['tele','account','mlm'].includes(entry.form)) invalid('نوع فرم تیم را مشخص کنید'); check(entry.elements);
+  });
+  return cfg;
+}
+function saveTeamConfig(current, body) {
+  const cfg = JSON.parse(JSON.stringify(current || { version: 0, forms: {}, teams: {} }));
+  if (body.version !== undefined && Number(body.version) !== Number(cfg.version || 0)) { const e = new Error('تنظیمات هم‌زمان تغییر کرده است؛ تازه‌سازی کنید'); e.status = 409; throw e; }
+  const isForm = !body.team;
+  const old = definitionsFor(body.form, body.team, cfg);
+  if(!Array.isArray(body.elements)){const e=new Error('لیست المان‌ها نامعتبر است');e.status=400;throw e;}
+  const incoming = body.elements.map(d => {
+    const previous = old.find(x => x.key === d.key);
+    const aliases = new Set((previous && previous.aliases || []).concat(d.aliases || []));
+    if (previous && previous.excelKey !== d.excelKey) aliases.add(previous.excelKey);
+    aliases.delete(d.excelKey);
+    return { key: String(d.key || ''), label: String(d.label || '').trim(), excelKey: String(d.excelKey || '').trim(), active: d.active !== false, aliases: Array.from(aliases) };
+  });
+  const nextIds = new Set(incoming.map(d => d.key));
+  old.filter(d => !nextIds.has(d.key)).forEach(d => incoming.push(Object.assign({}, d, { active: false })));
+  cfg.forms = cfg.forms || {}; cfg.teams = cfg.teams || {};
+  if (isForm) cfg.forms[body.form] = incoming;
+  else cfg.teams[teamKey(body.team)] = { team: String(body.team).trim(), form: body.form, elements: incoming };
+  validateConfig(cfg); cfg.version = Number(cfg.version || 0) + 1;
+  return cfg;
+}
+function resolver(config) {
+  return { config: config || null,
+    criteriaFor: (type, team) => criteriaFor(type, team, config || null),
+    definitionsFor: (type, team) => definitionsFor(type, team, config || null),
+    configured: (type, team) => hasConfiguration(type, team, config || null),
+    elementValue: (row,key) => elementValue(row,key,config || null),
+    labelOf: (type, key, team) => labelOf(type, key, team, config || null) };
+}
+function elementValue(row, key, cfg) {
+  const elements = row.elements || {};
+  if (Object.prototype.hasOwnProperty.call(elements, key)) return C.normalizeTri(elements[key]);
+  const def = definitionsFor(row.formType, row.criteriaTeam || row.team, cfg).find(d => d.key === key);
+  if (!def) return '';
+  for (const column of [def.excelKey].concat(def.aliases || [])) {
+    const found = Object.keys(elements).find(k => columnKey(k) === columnKey(column));
+    if (found != null) return C.normalizeTri(elements[found]);
+  }
+  return '';
+}
+function importDiagnostics(rows, agents) {
+  const missing = new Map(), conflicts = new Map(); let ambiguous = 0;
+  (rows || []).forEach(row => {
+    const found = resolveExpert(agents, row.expertName);
+    if (found.ambiguous) ambiguous++;
+    if (!found.agent) {
+      const entry = missing.get(row.expertName) || { name: row.expertName, count: 0, forms: [] };
+      entry.count++; if (!entry.forms.includes(row.formType)) entry.forms.push(row.formType); missing.set(row.expertName, entry);
+    } else if (teamForm(found.agent.team) && teamForm(found.agent.team) !== row.formType) {
+      const key = found.agent.name + ':' + row.formType;
+      const entry = conflicts.get(key) || { name: found.agent.name, team: found.agent.team, form: row.formType, count: 0 };
+      entry.count++; conflicts.set(key, entry);
+    }
+  });
+  return { unknownExperts: Array.from(missing.values()), teamConflicts: Array.from(conflicts.values()), ambiguous };
 }
 
 return {
-  PARSER_VERSION: 2, anyToJalali, parseRows, formTypeOfFileName, sniffFormType, normName, isRedline, callRowKey,
-  criteriaFor, criteriaLabelsFor, labelOf,
+  PARSER_VERSION: 3, anyToJalali, parseRows, formTypeOfFileName, sniffFormType, normName, isRedline, callRowKey,
+  criteriaFor, criteriaLabelsFor, labelOf, definitionsFor, defaults, resolver, validateConfig, saveTeamConfig, hasConfiguration,
+  elementValue, teamKey, teamForm, displayTeam, nameKey: nameKeyOf, resolveExpert, importDiagnostics, setConfig: cfg => { browserConfig = cfg || null; },
   TELE_CRITERIA, ACCOUNT_CRITERIA, MLM_CRITERIA, CRITERIA_LABELS
 };
 });
