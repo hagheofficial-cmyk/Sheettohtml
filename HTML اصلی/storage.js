@@ -19,7 +19,7 @@ function loadDb() {
     if (db.callImport === undefined) db.callImport = null;
     db.seq = { ticket: Math.max(0, ...db.tickets.map((t) => t.id || 0)) + 1,
                social: Math.max(0, ...db.socials.map((x) => x.id || 0)) + 1,
-               agent: (db.agents[db.agents.length - 1].id || 0) + 1 };
+               agent: Math.max(0,...db.agents.map(a=>Number(a.id)||0)) + 1 };
     db.createdAt = new Date().toISOString();
     saveDb(true);
   }
@@ -141,6 +141,8 @@ function route(method, url, body) {
   }
   if (name === 'data' && id === 'status' && method === 'GET') return clone(R.dataStatus(db, q));
   if (name === 'portfolio' && id === 'agents' && method === 'GET') return clone({ rows: R.portfolioAgents(db, q) });
+
+  if(name === 'session-snapshot' && method === 'GET')return clone(db);
 
   if (name === 'bootstrap' && method === 'GET') {
     return {
@@ -527,6 +529,12 @@ window.LocalApi = {
   put(url, b) { return Promise.resolve().then(() => route('PUT', url, b)); },
   del(url, body) { return Promise.resolve().then(() => route('DELETE', url, body)); },
   backup() { return clone(db); },
+  flush() { clearTimeout(saveTimer); saveTimer=null;localStorage.setItem(KEY,JSON.stringify(db)); },
+  replaceSnapshot(value) {
+    const next=clone(value);
+    if(!next||!Array.isArray(next.agents)||!Array.isArray(next.tickets)||!Array.isArray(next.socials)||!Array.isArray(next.callFeedbacks)||!next.settings||!next.seq||!next.lists)bad('نسخه مرورگر ناقص است');
+    clearTimeout(saveTimer);saveTimer=null;db=next;
+  },
   backupSize() { try { return (localStorage.getItem(KEY) || '').length; } catch (e) { return 0; } },
   importBackup(b) {
     if (!b || !b.agents || !b.settings) bad('فایل بک‌اپ نامعتبر است');

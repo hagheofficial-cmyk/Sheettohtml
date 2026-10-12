@@ -115,3 +115,30 @@
 @media print { .theme-toggle,.profile-toolbar { display:none; }.modal.profile-modal { max-height:none;width:100%; }.modal-back { position:static;padding:0;background:none; }.profile-content { background:white; } }
 
 .capture-host .grid:has(> .card:only-child) { grid-template-columns:1fr !important; }
+
+/* برند واحد و تأیید اطلاعات */
+.topbar-logo { width:36px;height:36px;flex:0 0 36px;display:block;border-radius:10px;overflow:hidden; }
+.topbar-logo img { display:block;width:100%;height:100%;object-fit:contain; }
+.confirm-control { display:flex;flex-direction:column;gap:2px;align-items:center; }
+.confirm-control .btn { padding:7px 11px;white-space:nowrap;font-size:11px; }
+#confirmedInfo { max-width:185px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:8px;color:var(--muted); }
+#confirmData.saved { border-color:var(--good); }
+.data-source-badge { font-size:9px;padding:3px 6px;color:var(--muted);background:var(--panel-soft);border-radius:7px;white-space:nowrap; }
+@media(max-width:1000px) { .topbar-title { font-size:13px; }.topbar-left { gap:6px; }.today-chip { font-size:10px; } }
+@media(max-width:700px) {
+ .topbar { height:auto;min-height:62px;flex-wrap:wrap;padding:8px 12px;gap:7px; }
+ .topbar-logo { width:30px;height:30px;flex-basis:30px; }
+ .topbar-left { width:100%;justify-content:space-between;margin:0;gap:5px; }
+ .confirm-control { align-items:flex-start; }.confirm-control .btn { font-size:10px;padding:6px 9px; }
+ #confirmedInfo { font-size:7px;max-width:147px; }.data-source-badge { display:none; }
+ #useServerData { padding:5px; }#useServerData span { display:none; }
+}
+
+.profile-system-brand { display:flex;gap:8px;align-items:center;color:var(--muted);font-size:10px;padding:0 3px 10px; }
+.profile-system-brand img { border-radius:8px; }
+@media(max-width:700px) {
+ .filters .field:has(.tabs) { min-width:0;max-width:100%; }
+ .filters .tabs { flex-wrap:wrap;max-width:100%; }
+}
+
+#useServerData[hidden] { display:none !important; }

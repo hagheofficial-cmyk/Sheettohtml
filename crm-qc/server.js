@@ -259,6 +259,9 @@ async function handleApi(req, res, pathname, query) {
   if (pathname === '/api/data/status' && method === 'GET') return ok(res, QCReports.dataStatus(db, query));
   if (pathname === '/api/portfolio/agents' && method === 'GET') return ok(res, { rows: QCReports.portfolioAgents(db, query) });
 
+  // نسخه کامل تأیید مرورگر مستقل از هر فیلتر؛ شامل seq، لیست‌ها و داده خام.
+  if(pathname === '/api/session-snapshot' && method === 'GET')return ok(res, clone(db));
+
   /* bootstrap: همه داده‌های مرجع */
   if (pathname === '/api/bootstrap' && method === 'GET') {
     return ok(res, {

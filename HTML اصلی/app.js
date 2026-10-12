@@ -22,8 +22,17 @@ const api = {
    * به‌صورت خودکار آنلاین برمی‌گردیم. */
   offline: false,
   _lastProbe: 0,
-  async req(method, url, body) {
+  browserPinned: false,
+  _writes: new Set(),
+  async waitForWrites(){ await Promise.all([...this._writes]); },
+  async req(method,url,body){
+    if(method!=='GET'&&window.BrowserSession&&BrowserSession.saving){const error=new Error('تأیید اطلاعات در حال انجام است؛ پس از آن ذخیره کنید');error.status=409;throw error;}
+    const work=this._request(method,url,body);if(method!=='GET')this._writes.add(work);
+    try{const result=await work;if(method!=='GET'&&window.BrowserSession)BrowserSession.markChanged();return result;}finally{this._writes.delete(work);}
+  },
+  async _request(method, url, body) {
     url = App.withDateRange(url, method);
+    if(api.browserPinned){ const methodName=method==='GET'?'get':method==='POST'?'post':method==='PUT'?'put':'del';return window.LocalApi[methodName](url,body); }
     if (!api.offline) {
       try {
         const res = await fetch(url, {
@@ -302,6 +311,7 @@ function multiSelect(opts) {
   wrap.addEventListener('destroy', () => {});
 
   wrap.getValues = getValues;
+  wrap.notifyChange = () => { if(opts.onChange)opts.onChange(getValues()); };
   wrap.setValues = (vals) => {
     const set = new Set(vals || []);
     items.forEach((it) => { it._sel = set.has(it.value); });
@@ -567,6 +577,7 @@ const App = {
     finally { if (request === this._rangeRequest) {
       $('#globalRange').classList.remove('updating');
       if (!$('#globalRange').classList.contains('draft')) $('#gRangeState').textContent = 'روی همه گزارش‌ها اعمال شد';
+      if(window.BrowserSession)BrowserSession.markChanged();
     } }
     return true;
   },
@@ -641,6 +652,9 @@ const App = {
     this.applyTheme(document.documentElement.dataset.theme || 'dark');
     this.initDateRange();
     await this.refreshCounts();
+    $('#dataSourceBadge').textContent=api.browserPinned?'نسخه مرورگر':api.offline?'آفلاین':'سرور';
+    if(api.browserPinned){const badge=$('#dataSourceBadge');badge.title='نسخه ذخیره‌شده در این مرورگر؛ تغییرات محلی خودکار به سرور ارسال نمی‌شوند.';}
+    if(window.BrowserSession)BrowserSession.status();
   },
 
   agentComboItems() {
@@ -709,21 +723,23 @@ const App = {
   closeSidebar() { $('#sidebar').classList.remove('open'); $('#sidebarBackdrop').classList.remove('show'); },
 
   async init() {
-    try { await this.boot(); }
+    try { if(window.BrowserSession)await BrowserSession.initialize();await this.boot(); }
     catch (e) { $('#content').innerHTML = `<div class="card">${emptyState('fa-plug-circle-xmark', 'عدم اتصال به سرور', e.message)}</div>`; return; }
 
     this.bindDateRangeUI();
-    $('#themeToggle').addEventListener('click', () => this.applyTheme(this.theme === 'dark' ? 'light' : 'dark'));
+    $('#themeToggle').addEventListener('click', () => {this.applyTheme(this.theme === 'dark' ? 'light' : 'dark');if(window.BrowserSession)BrowserSession.markChanged();});
+    if(window.BrowserSession)BrowserSession.bind();
     $('#hamburger').addEventListener('click', () => { $('#sidebar').classList.add('open'); $('#sidebarBackdrop').classList.add('show'); });
     $('#sidebarClose').addEventListener('click', () => this.closeSidebar());
     $('#sidebarBackdrop').addEventListener('click', () => this.closeSidebar());
     $$('.nav-group-title').forEach((g) => g.addEventListener('click', () => g.parentElement.classList.toggle('open')));
 
-    window.addEventListener('hashchange', () => this.route());
+    window.addEventListener('hashchange', () => {this.route();if(window.BrowserSession)BrowserSession.markChanged();});
     /* fix: قبلاً hash هم از اینجا ست می‌شد (رویداد) و هم await route() — دو رندر هم‌زمان
      * می‌ساخت که چارت‌ها را خراب می‌کرد؛ حالا فقط یک مسیر واحد اجرا می‌شود. */
     if (location.hash && location.hash.length > 1) {
       await this.route();
+      if(window.BrowserSession)await BrowserSession.restorePage();
     } else {
       location.hash = '#/dashboard'; // رویداد hashchange خودش route را اجرا می‌کند
     }

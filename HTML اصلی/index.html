@@ -5,14 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>سامانه یکپارچه کنترل کیفیت CRM</title>
 <link href="vendor/fontawesome/css/all.min.css" rel="stylesheet">
-<link rel="icon" type="image/png" href="favicon.png">
-<link rel="apple-touch-icon" href="logo.png">
+<link rel="icon" type="image/png" sizes="64x64" href="favicon.png?v=2">
+<link rel="shortcut icon" href="favicon.ico?v=2">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#087bbd">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <script src="vendor/chart.umd.min.js"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <script>try{document.documentElement.dataset.theme=localStorage.getItem("crmqc.theme.v1")||"dark"}catch(e){document.documentElement.dataset.theme="dark"}</script>
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="enhancements.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
 </head>
 <body>
 
@@ -20,7 +22,7 @@
   <!-- نوار کناری -->
   <aside class="sidebar" id="sidebar">
     <div class="brand">
-      <div class="brand-logo brand-logo-img"><img src="logo.png" alt="لوگو"></div>
+      <div class="brand-logo brand-logo-img"><img src="logo.png" alt="لوگوی سامانه کنترل کیفیت" width="48" height="48"></div>
       <div class="brand-text">
         <strong id="orgName">سامانه کنترل کیفیت</strong>
         <span>CRM Quality Assurance</span>
@@ -73,8 +75,12 @@
   <div class="main">
     <header class="topbar">
       <button class="hamburger" id="hamburger" aria-label="منو"><i class="fa-solid fa-bars"></i></button>
+      <a class="topbar-logo" href="#/dashboard" aria-label="داشبورد سامانه"><img src="logo.png" alt="لوگوی سامانه" width="36" height="36"></a>
       <div class="topbar-title" id="pageTitle">داشبورد</div>
       <div class="topbar-left">
+        <div class="confirm-control"><button class="btn success-soft" id="confirmData" type="button" title="ذخیره کل اطلاعات ثبت‌شده در همین مرورگر برای بازکردن بعدی"><i class="fa-solid fa-circle-check"></i><span>تأیید اطلاعات</span></button><small id="confirmedInfo" role="status" aria-live="polite">هنوز تأیید نشده</small></div>
+        <span class="data-source-badge" id="dataSourceBadge">سرور</span>
+        <button class="btn ghost sm" id="useServerData" type="button" hidden title="نمایش اطلاعات سرور به جای نسخه این مرورگر"><i class="fa-solid fa-cloud"></i><span>اطلاعات سرور</span></button>
         <button class="theme-toggle" id="themeToggle" type="button" aria-label="تغییر حالت روشن و تاریک" title="تغییر حالت روشن و تاریک"><i class="fa-solid fa-sun"></i><span>حالت روشن</span></button>
         <div class="today-chip" id="todayChip"><i class="fa-regular fa-calendar"></i><span></span></div>
       </div>
@@ -120,6 +126,7 @@
 <script src="export.js"></script>
 <script src="vendor/html2canvas.min.js"></script>
 <script src="app.js"></script>
+<script src="session.js"></script>
 <script src="capture.js"></script>
 <script src="pages/dashboard.js"></script>
 <script src="pages/tickets.js"></script>

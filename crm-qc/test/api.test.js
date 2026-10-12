@@ -67,6 +67,14 @@ test('real HTTP API and LocalApi agree on review dates, counts, scores and indep
     }
   });
 
+  await t.test('session snapshot is complete and date-independent, including lists/raw metadata/next IDs',async()=>{
+    const online=(await http('GET','/api/session-snapshot?'+day)).data;
+    const offline=await local('GET','/api/session-snapshot?'+day);
+    for(const key of ['agents','qcAgents','settings','lists','seq','agentActions','tickets','socials','callFeedbacks'])assert.deepEqual(online[key],offline[key],key);
+    assert.equal(online.tickets.length,3);assert.equal(online.socials.length,3);assert.equal(online.callFeedbacks.length,7);assert.equal(online.agents.length,4);
+    assert.equal(online.callFeedbacks[1].score,0);assert.equal(online.callFeedbacks[2].score,null);
+  });
+
   await t.test('invalid or reversed date ranges return 400 rather than all/empty data', async () => {
     for (const endpoint of ['/api/dashboard', '/api/reports', '/api/portfolio/agents', '/api/portfolio/101', '/api/tickets', '/api/socials', '/api/data/status', '/api/calls/analysis', '/api/backup']) {
       for (const query of ['from=bad', 'from=1405%2F06%2F21&to=1405%2F06%2F20']) {
