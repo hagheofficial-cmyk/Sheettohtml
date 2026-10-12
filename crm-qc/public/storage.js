@@ -109,7 +109,7 @@ function normalizeSocial(b, ex) {
 }
 
 function list(kind, q) {
-  let rows = R.filterRows(db[kind], q);
+  let rows = R.filterRows(db[kind], q, db);
   if (kind === 'socials' && q.sla) rows = rows.filter((r) => r.slaStatus === q.sla);
   if (q.search) {
     const t = str(q.search);
@@ -130,6 +130,15 @@ function route(method, url, body) {
   if (qsAll) new URLSearchParams(qsAll).forEach((v, k) => { q[k] = v; });
   let id = null;
   if (parts[2] != null) id = decodeURIComponent(parts[2]);
+
+  const datedPath = ['dashboard', 'reports', 'portfolio', 'tickets', 'socials', 'backup'].includes(name)
+    || (name === 'data' && id === 'status') || (name === 'calls' && (id == null || id === 'analysis'));
+  if (datedPath && (method === 'GET' || method === 'DELETE')) {
+    const error = R.validateRange(q);
+    if (error) bad(error);
+  }
+  if (name === 'data' && id === 'status' && method === 'GET') return clone(R.dataStatus(db, q));
+  if (name === 'portfolio' && id === 'agents' && method === 'GET') return clone({ rows: R.portfolioAgents(db, q) });
 
   if (name === 'bootstrap' && method === 'GET') {
     return {
@@ -168,7 +177,7 @@ function route(method, url, body) {
     if (type === 'call' && R.callReport) {
       const crit = window.QCParse ? { criteriaFor: (t) => window.QCParse.criteriaFor(t), labelOf: (t, k) => window.QCParse.labelOf(t, k) } : {};
       const rep = R.callReport(db, level, q, crit);
-      return { type: 'call', level, rows: rep.rows, elements: Object.assign({}, elements, { call: rep.elements }) };
+      return { type: 'call', level, rows: rep.rows, calls: rep.calls, redlineRows: rep.redlineRows, elements: Object.assign({}, elements, { call: rep.elements }) };
     }
     const tt = type === 'ticket' ? 'ticket' : 'social';
     return { type: tt, level, rows: tt === 'ticket' ? R.ticketReport(db, level, q) : R.socialReport(db, level, q), elements };
@@ -279,14 +288,14 @@ function route(method, url, body) {
     const acc = Array.isArray(obj.accRawData) ? obj.accRawData : [];
     const mlm = Array.isArray(obj.mlmRawData) ? obj.mlmRawData : [];
     const norm = (r, formType) => {
-      const dj = window.QCParse ? window.QCParse.anyToJalali(r.dateRaw || r.registrationDateRaw || r.reviewDate) : null;
+      const dj = window.QCParse ? window.QCParse.anyToJalali(r.reviewDate || r.registrationDateRaw || r.dateRaw) : null;
       return {
         expertName: window.QCParse ? window.QCParse.normName(r.expertName) : str(r.expertName),
-        score: typeof r.score === 'number' ? r.score : (r.score === '' || r.score == null ? null : +r.score),
+        score: C.normalizeScore(r.score),
         redline: (window.QCParse && window.QCParse.isRedline(r.redline)) ? 1 : 0,
         redlineReason: r.redlineReason || '',
         leadName: r.leadName || '', leadPhone: r.leadPhone || '',
-        listeningTime: r.listeningTime || '', qcComment: r.qcComment || '',
+        listeningTime: str(r.listeningTime), callDuration: str(r.callDuration), qcAgent: str(r.qcAgent), qcComment: str(r.qcComment),
         reviewDate: dj ? (dj.jy + '/' + String(dj.jm).padStart(2, '0') + '/' + String(dj.jd).padStart(2, '0')) : '',
         formType: formType, elements: r.elements || {}, sourceFile: 'qc_recovery.json'
       };
@@ -316,12 +325,7 @@ function route(method, url, body) {
     const to = q.to || '';
     const before = (db.callFeedbacks || []).length;
     if (from || to) {
-      db.callFeedbacks = (db.callFeedbacks || []).filter((r) => {
-        const d = String(r.reviewDate || '');
-        if (!d) return true;
-        if (from && d >= from && (!to || d <= to)) return false;
-        return true;
-      });
+      db.callFeedbacks = (db.callFeedbacks || []).filter((r) => !R.inRange(r.reviewDate, from, to));
     } else {
       db.callFeedbacks = [];
     }
@@ -335,20 +339,14 @@ function route(method, url, body) {
   if (name === 'backup' && method === 'GET') {
     const from = q.from || '';
     const to = q.to || '';
-    const inRange = (d) => {
-      const s = String(d || '');
-      if (!s) return !(from || to);
-      if (from && s < from) return false;
-      if (to && s > to) return false;
-      return true;
-    };
+    const inRange = (d) => R.inRange(d, from, to);
     return clone({
       schema: 'crm-qc-backup', version: 2, exportedAt: new Date().toISOString(),
       range: { from: from || null, to: to || null },
       settings: db.settings, agents: db.agents, qcAgents: db.qcAgents,
       agentActions: db.agentActions || {},
-      tickets: db.tickets.filter((r) => inRange(r.reviewDate) || inRange(r.ticketDate)),
-      socials: db.socials.filter((r) => inRange(r.reviewDate) || inRange(r.socialDate)),
+      tickets: db.tickets.filter((r) => inRange(r.reviewDate)),
+      socials: db.socials.filter((r) => inRange(r.reviewDate)),
       callFeedbacks: (db.callFeedbacks || []).filter((r) => inRange(r.reviewDate)),
       callImport: db.callImport || null
     });
@@ -394,12 +392,12 @@ function route(method, url, body) {
         const parsed = QP.parseRows(rows, ftype);
         if (!parsed.length) { results.push({ name: fname, ok: false, reason: 'ردیفی یافت نشد', type: ftype }); continue; }
         db.callFeedbacks = db.callFeedbacks.filter((r) => r.sourceFile !== fname);
-        for (const r of parsed) db.callFeedbacks.push(Object.assign({ sourceFile: fname, actions: '' }, r));
+        for (const r of parsed) db.callFeedbacks.push(Object.assign({ sourceFile: fname }, r));
         results.push({ name: fname, ok: true, type: ftype, count: parsed.length });
       }
       const seen = new Map(); const out = [];
       for (const r of db.callFeedbacks) {
-        const key = r.sourceFile ? (r.sourceFile + '|' + (r.expertName || '') + '|' + (r.leadPhone || '') + '|' + (r.reviewDate || '')) : null;
+        const key = QP.callRowKey(r);
         if (key && seen.has(key)) continue;
         if (key) seen.set(key, 1);
         out.push(r);

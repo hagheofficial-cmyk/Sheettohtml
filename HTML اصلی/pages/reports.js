@@ -1,7 +1,7 @@
 /* reports.js — گزارش‌های تجمیعی کارشناس/تیم برای تیکت و سوشال + گزارش تجمیعی + ماه مالی */
 (function () {
 'use strict';
-const { C, $, $$, api, fa, esc, el, toast, scorePill, rateCell, emptyState, debounce, scoreColorRgba } = UI;
+const { C, $, $$, api, fa, esc, el, toast, scorePill, rateCell, emptyState, debounce, scoreColorRgba, triValue, callRedlineBadge, bindCallRedlines, errorRateCell } = UI;
 
 const SOCIAL_COLS_AGENT = [
   ['name', 'کارشناس'], ['team', 'تیم'], ['count', 'تعداد نمره‌دار'], ['avgScore', 'میانگین نمره'],
@@ -47,7 +47,7 @@ function cellVal(row, key) {
   if (key === 'team') return `<span class="tag-team">${esc(v)}</span>`;
   if (key === 'avgScore') return scorePill(v === '' ? null : v);
   if (key === 'ticketAvg' || key === 'socialAvg' || key === 'callAvg' || key === 'teleAvg' || key === 'accAvg' || key === 'mlmAvg') return v === '' ? '<span style="color:var(--muted)">—</span>' : scorePill(v);
-  if (key === 'redlines') return `<span class="badge ${+v ? 'bad' : 'good'}">${fa(v)}</span>`;
+  if (key === 'redlines') return +v ? `<button type="button" class="badge bad redline-link" data-call-group="${esc(row.name)}" title="نمایش توضیحات ردلاین‌ها">${fa(v)}</button>` : '-';
   if (key === 'teleCount' || key === 'accCount' || key === 'mlmCount' || key === 'total') return v === 0 ? '<span style="color:var(--muted)">۰</span>' : `<b>${fa(v)}</b>`;
   if (key === 'slaReal' || key === 'socialSlaReal') return v === '' ? '<span style="color:var(--muted)">—</span>' : rateCell(v);
   if (key.endsWith('Rate')) return rateCell(v);
@@ -57,6 +57,27 @@ function cellVal(row, key) {
   if (key === 'ticketCount' || key === 'socialCount' || key === 'callCount') return v === 0 ? '<span style="color:var(--muted)">۰</span>' : `<b>${fa(v)}</b>`;
   if (key === 'totalCount') return `<b>${fa(v)}</b>`;
   return v == null || v === '' ? '—' : esc(v);
+}
+
+function callDetailsHTML(calls) {
+  const FORM_FA = { tele: 'تلفنی', account: 'اکانت', mlm: 'MLM / BNPL' };
+  const tables = ['tele', 'account', 'mlm'].map((type) => {
+    const rows = calls.filter((r) => r.formType === type);
+    if (!rows.length) return '';
+    const keys = QCReports.criteriaKeys(rows, type, QCParse);
+    return `<div class="card-pad" style="padding-bottom:8px"><b>${esc(FORM_FA[type])}</b> · ${fa(rows.length)} ریت تماس</div>
+      <div class="table-wrap"><table class="tbl call-detail-table"><thead><tr>
+        <th>نام کارشناس</th><th>نمره کلی تماس</th><th>نام شریک</th>
+        ${keys.map((key) => `<th>${esc(QCParse.labelOf(type, key))}</th>`).join('')}<th>ردلاین ها</th>
+      </tr></thead><tbody>${rows.map((r) => `<tr>
+        <td class="cell-main">${esc(r.expertName)}</td><td>${scorePill(r.score)}</td><td class="cell-main">${esc(r.leadName || '—')}</td>
+        ${keys.map((key) => `<td>${triValue((r.elements || {})[key])}</td>`).join('')}
+        <td>${callRedlineBadge(r, calls.indexOf(r))}</td></tr>`).join('')}</tbody></table></div>`;
+  }).join('');
+  return `<div class="card" id="callDetailCard" style="margin-bottom:16px">
+    <div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-phone"></i></div>
+      <div><h3>جزئیات ریت‌های تماس کارشناس</h3><div class="sub">هر سطر یک تماس در بازه‌ی انتخاب‌شده؛ نمره‌ها عین فرم (1 / 0 / -). کلیک روی تعداد ردلاین = توضیحات.</div></div></div>
+    ${tables || emptyState('fa-phone', 'ریت تماسی در این بازه نیست', '')}</div>`;
 }
 
 async function render(root) {
@@ -89,14 +110,6 @@ async function render(root) {
         </div>
         <div id="fTeamSlot"></div>
         <div id="fAgentSlot"></div>
-        <div class="field grow-0"><label>از تاریخ بررسی</label>
-          <div class="date-f"><input class="input" id="fFrom" dir="ltr" style="text-align:right;padding-left:34px" placeholder="۱۴۰۵/۰۶/۰۱" inputmode="numeric">
-            <button type="button" class="cal-btn" id="fFromBtn" title="انتخاب از تقویم"><i class="fa-regular fa-calendar"></i></button></div>
-        </div>
-        <div class="field grow-0"><label>تا تاریخ بررسی</label>
-          <div class="date-f"><input class="input" id="fTo" dir="ltr" style="text-align:right;padding-left:34px" placeholder="۱۴۰۵/۰۶/۳۱" inputmode="numeric">
-            <button type="button" class="cal-btn" id="fToBtn" title="انتخاب از تقویم"><i class="fa-regular fa-calendar"></i></button></div>
-        </div>
         <div class="field grow-0"><label>&nbsp;</label><button class="btn ghost" id="fReset"><i class="fa-solid fa-rotate-right"></i> پاک‌سازی</button></div>
       </div>
     </div>
@@ -107,11 +120,6 @@ async function render(root) {
       <div class="card-head"><div class="head-icon"><i class="fa-solid fa-table"></i></div><div><h3 id="tblTitle">گزارش کارشناسان — سوشال</h3><div class="sub" id="tblSub"></div></div></div>
       <div class="table-wrap" id="tblWrap"><div class="loading-page"><div class="spinner"></div></div></div>
     </div>`;
-
-  /* اتصال تقویم جلالی */
-  JCal.attach($('#fFromBtn'), { onPick(j) { $('#fFrom').value = j ? C.formatJalali(j) : ''; load(); } });
-  JCal.attach($('#fToBtn'), { onPick(j) { $('#fTo').value = j ? C.formatJalali(j) : ''; load(); } });
-  /* بستن فیلد از تایپ دستی (readonly) — فقط همین دو تا، دخالت blur/load تغییری نمی‌کند */
 
   /* فیلتر چندانتخابی تیم + کارشناس */
   const allAgents = (st.agents || []).filter((a) => a.active !== false);
@@ -143,9 +151,6 @@ async function render(root) {
     const p = new URLSearchParams({ type: F.type, level: level || F.level });
     const tv = msTeams.getValues(); if (tv.length) p.set('team', tv.join(','));
     const av = msAgents.getValues(); if (av.length) p.set('agent', av.join(','));
-    const jf = C.parseJalali($('#fFrom').value), jt = C.parseJalali($('#fTo').value);
-    if (jf) p.set('from', C.formatJalali(jf));
-    if (jt) p.set('to', C.formatJalali(jt));
     return p.toString();
   }
 
@@ -201,13 +206,17 @@ async function render(root) {
     });
   }
 
+  const wrap = $('#tblWrap', root), charts = $('#chartsRow', root);
+  let loadId = 0;
   async function load() {
-    App.clearCharts();
-    const wrap = $('#tblWrap'), charts = $('#chartsRow');
+    const request = ++loadId;
+    if (!wrap.isConnected) return;
     wrap.innerHTML = `<div class="loading-page"><div class="spinner"></div></div>`;
     let data;
     try { data = await api.get('/api/reports?' + query()); }
-    catch (e) { wrap.innerHTML = emptyState('fa-triangle-exclamation', 'خطا', e.message); return; }
+    catch (e) { if (request === loadId && wrap.isConnected) wrap.innerHTML = emptyState('fa-triangle-exclamation', 'خطا', e.message); return; }
+    if (request !== loadId || !wrap.isConnected) return;
+    App.clearCharts();
 
     const typeFa = F.type === 'combined' ? 'تجمیعی (تیکت + سوشال + تماس)' : (F.type === 'social' ? 'سوشال' : (F.type === 'ticket' ? 'تیکت' : 'تماس (ریت تماس)'));
     $('#tblTitle').textContent = (F.level === 'agent' ? 'گزارش کارشناسان' : 'گزارش تیم‌ها') + ' — ' + typeFa;
@@ -250,7 +259,7 @@ async function render(root) {
         <div class="card"><div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-chart-column"></i></div><h3>توزیع تعداد ارزیابی (تیکت / سوشال / تماس)</h3></div>
           <div class="chart-box"><canvas id="ch2"></canvas></div></div>
 ${elementsCardHTML('teal')}`;
-      drawBar($('#ch1'), labels, rows.map((r) => r.avgScore === '' ? 0 : r.avgScore), 'میانگین کل');
+      drawBar($('#ch1'), labels, rows.map((r) => r.avgScore === '' ? null : r.avgScore), 'میانگین کل');
       drawElementsBar($('#chEls'), data);
       App.chart($('#ch2'), {
         type: 'bar',
@@ -272,9 +281,9 @@ ${elementsCardHTML('teal')}`;
       charts.innerHTML = `
         <div class="card"><div class="card-head"><div class="head-icon"><i class="fa-solid fa-chart-column"></i></div><h3>میانگین نمره ${F.level === 'agent' ? 'کارشناسان' : 'تیم‌ها'} — تماس</h3></div>
           <div class="chart-box"><canvas id="ch1"></canvas></div></div>
-        <div class="card"><div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-phone-volume"></i></div><h3>توزیع ریت بر اساس فرم (تلفنی / اکانت / MLM)</h3></div>
+        <div class="card"><div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-phone-volume"></i></div><h3>تعداد ریت بر اساس فرم ها</h3></div>
           <div class="chart-box"><canvas id="ch2"></canvas></div></div>`;
-      drawBar($('#ch1'), labels, rows.map((r) => r.avgScore === '' ? 0 : r.avgScore), 'میانگین');
+      drawBar($('#ch1'), labels, rows.map((r) => r.avgScore === '' ? null : r.avgScore), 'میانگین');
       App.chart($('#ch2'), {
         type: 'bar',
         data: {
@@ -293,36 +302,52 @@ ${elementsCardHTML('teal')}`;
       });
       /* کارت نمره‌ی اقلام کلی — «کلا روی کدام المان چه نمره‌ای گرفته‌شده» */
       const FORM_FA = { tele: 'تلفنی', account: 'اکانت', mlm: 'MLM' };
-      const FORM_COLOR = { tele: '#38bdf8', account: '#a78bfa', mlm: '#34d399' };
-      const els = (data.elements && data.elements.call) || [];
+            const els = (data.elements && data.elements.call) || [];
       $('#elemCardWrap').innerHTML = els.length ? `
         <div class="card" style="margin-bottom:16px">
           <div class="card-head"><div class="head-icon"><i class="fa-solid fa-list-check"></i></div>
-            <div><h3>نمره‌ی اقلام کلی — تماس</h3><div class="sub">تجمیع همه‌ی فرم‌ها؛ ${fa(els.length)} المان با گزارش نرخ رعایت/عدم رعایت</div></div></div>
+            <div><h3>نمره‌ی اقلام کلی — تماس</h3><div class="sub">۱ = رعایت شده · ۰ = عدم رعایت · - = موضوعیت نداشته؛ نرخ‌ها فقط بر مبنای ۱ و ۰ محاسبه می‌شوند.</div></div></div>
           <div class="table-wrap" style="max-height:340px;overflow-y:auto"><table class="tbl" style="font-size:12.5px">
-            <thead><tr><th>المان</th><th>فرم</th><th>رعایت‌شده</th><th>عدم رعایت</th><th>مجموع</th><th>نرخ رعایت</th><th>نرخ عدم رعایت</th></tr></thead>
+            <thead><tr><th>المان</th><th>رعایت شده</th><th>عدم رعایت</th><th>موضوعیت نداشته</th><th>مجموع</th><th>نرخ رعایت</th><th>نرخ عدم رعایت</th></tr></thead>
             <tbody>${els.map((x) => `<tr>
-              <td class="cell-main">${esc(x.label)}</td>
-              <td><span class="tag-team" style="background:${FORM_COLOR[x.form]}18;color:${FORM_COLOR[x.form]};border-color:${FORM_COLOR[x.form]}44">${esc(FORM_FA[x.form] || x.form)}</span></td>
+              <td class="cell-main">${esc(x.label)}<div class="cell-sub">${esc(FORM_FA[x.form] || x.form)}</div></td>
               <td><b>${fa(x.ok)}</b></td>
               <td><span class="badge ${x.bad ? 'bad' : 'gray'}">${fa(x.bad)}</span></td>
+              <td>${fa(x.na)}</td>
               <td>${fa(x.total)}</td>
               <td>${rateCell(x.successRate)}</td>
-              <td>${rateCell(x.errorRate === '' ? '' : x.errorRate)}</td>
+              <td>${errorRateCell(x.errorRate)}</td>
             </tr>`).join('')}</tbody></table></div>
         </div>` : '';
+      if (msAgents.getValues().length === 1) {
+        const calls = data.calls || [];
+        $('#elemCardWrap').insertAdjacentHTML('beforeend', callDetailsHTML(calls));
+        bindCallRedlines($('#callDetailCard'), calls);
+      }
     } else {
       $('#elemCardWrap').innerHTML = '';
       charts.innerHTML = `
         <div class="card"><div class="card-head"><div class="head-icon"><i class="fa-solid fa-chart-column"></i></div><h3>میانگین نمره ${F.level === 'agent' ? 'کارشناسان' : 'تیم‌ها'} — ${F.type === 'social' ? 'سوشال' : 'تیکت'}</h3></div>
           <div class="chart-box"><canvas id="ch1"></canvas></div></div>
 ${elementsCardHTML('teal')}`;
-      drawBar($('#ch1'), labels, rows.map((r) => r.avgScore === '' ? 0 : r.avgScore), 'میانگین');
+      drawBar($('#ch1'), labels, rows.map((r) => r.avgScore === '' ? null : r.avgScore), 'میانگین');
       drawElementsBar($('#chEls'), data);
     }
 
     wrap.innerHTML = `<table class="tbl"><thead><tr>${cols.map((c) => `<th>${c[1]}</th>`).join('')}</tr></thead>
       <tbody>${rows.map((r) => `<tr>${cols.map((c) => `<td>${cellVal(r, c[0])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    if (F.type === 'call') {
+      const isTeam = F.level === 'team';
+      $$('[data-call-group]', wrap).forEach((button) => button.addEventListener('click', () => {
+        const group = button.dataset.callGroup;
+        const flagged = (data.redlineRows || []).filter((r) => QCReports.hasRedline(r, 'call') && (isTeam ? r.currentTeam : r.expertName) === group);
+        UI.modal(`${UI.modalHead('توضیحات ردلاین‌ها — ' + group, 'fa-ban')}<div class="modal-body"><div class="table-wrap">
+          <table class="tbl"><thead><tr><th>نام کارشناس</th><th>نام شریک</th><th>تاریخ بررسی</th><th>علت ردلاین</th></tr></thead>
+          <tbody>${flagged.map((r) => `<tr><td>${esc(r.expertName)}</td><td>${esc(r.leadName || '—')}</td><td>${fa(r.reviewDate)}</td>
+            <td style="white-space:pre-wrap">${esc(r.redlineReason || 'علت ردلاین در فرم ثبت نشده است')}</td></tr>`).join('')}</tbody></table>
+          </div></div><div class="modal-foot"><button class="btn ghost" data-close>بستن</button></div>`, { lg: true });
+      }));
+    }
   }
 
   $$('#typeTabs button').forEach((b) => b.addEventListener('click', () => {
@@ -331,12 +356,10 @@ ${elementsCardHTML('teal')}`;
   $$('#levelTabs button').forEach((b) => b.addEventListener('click', () => {
     $$('#levelTabs button').forEach((x) => x.classList.remove('active')); b.classList.add('active'); F.level = b.dataset.l; load();
   }));
-  $('#fFrom').addEventListener('change', load);
-  $('#fTo').addEventListener('change', load);
   $('#fReset').addEventListener('click', () => {
     msTeams.setValues([]); msTeams.setItems((st.teams || []).map((t) => ({ value: t, label: t })), false);
     msAgents.setValues([]); msAgents.setItems(agentItemsFor(), false);
-    $('#fFrom').value = ''; $('#fTo').value = ''; load();
+    load();
   });
 
   $('#btnXls').addEventListener('click', async () => {
@@ -345,14 +368,15 @@ ${elementsCardHTML('teal')}`;
       const agent = await api.get('/api/reports?' + query('agent'));
       const team = await api.get('/api/reports?' + query('team'));
       if (F.type === 'combined') QCExport.combined(agent.rows);
-      else if (F.type === 'call') QCExport.calls(agent.rows, team.rows, agent.elements || []);
+      else if (F.type === 'call') QCExport.calls(agent.rows, team.rows, (agent.elements && agent.elements.call) || [], agent.calls || []);
       else QCExport.reports(F.type, agent.rows, team.rows);
       toast('گزارش اکسل دانلود شد', 'success');
     } catch (e) { toast(e.message, 'error'); }
     btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-file-excel"></i> خروجی اکسل گزارش';
   });
 
-  load();
+  App.onDateRangeChange(load);
+  await load();
 }
 
 App.register('reports', { title: 'گزارش‌های کنترل کیفیت', render });

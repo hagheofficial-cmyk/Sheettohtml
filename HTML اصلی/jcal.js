@@ -38,7 +38,8 @@ function renderMonth(el, onPick) {
   const ml = C.jalaaliMonthLength(jy, jm);
   const first = weekdayFirst(jy, jm);
   const today = C.todayJalali();
-  const curVal = openFor && openFor.dataset.value ? C.parseJalali(openFor.dataset.value) : null;
+  const target = openFor && (openFor._jcalInput || openFor);
+  const curVal = target ? C.parseJalali(target.value || target.dataset.value) : null;
 
   let html = `
     <div class="jcal-head">
@@ -79,24 +80,24 @@ function renderMonth(el, onPick) {
       const vj = mOff === 0 ? { jy, jm } : C.jalaliMonthAdd(jy, jm, mOff);
       const picked = { jy: vj.jy, jm: vj.jm, jd: day };
       const val = C.formatJalali(picked);
-      openFor.dataset.value = val;
-      if (openFor.tagName === 'INPUT') openFor.value = val;
-      else openFor.textContent = C.toFaDigits(val);
+      target.dataset.value = val;
+      if (target.tagName === 'INPUT') target.value = val;
+      else target.textContent = C.toFaDigits(val);
       closePopup();
       onPick && onPick(picked);
     };
   });
   el.querySelector('.jcal-today').onclick = () => {
     const val = C.formatJalali(today);
-    openFor.dataset.value = val;
-    if (openFor.tagName === 'INPUT') openFor.value = val;
-    else openFor.textContent = C.toFaDigits(val);
+    target.dataset.value = val;
+    if (target.tagName === 'INPUT') target.value = val;
+    else target.textContent = C.toFaDigits(val);
     closePopup();
     onPick && onPick(today);
   };
   el.querySelector('.jcal-clear').onclick = () => {
-    openFor.dataset.value = '';
-    if (openFor.tagName === 'INPUT') openFor.value = '';
+    target.dataset.value = '';
+    if (target.tagName === 'INPUT') target.value = '';
     closePopup();
     onPick && onPick(null);
   };
@@ -106,11 +107,13 @@ function renderMonth(el, onPick) {
 function attach(el, opts) {
   if (!el) return;
   opts = opts || {};
+  el._jcalInput = opts.input || null;
   el.addEventListener('click', (e) => {
     e.preventDefault();
     if (openFor === el) { closePopup(); return; }
     openFor = el;
-    const cur = C.parseJalali(el.dataset.value || el.value);
+    const target = el._jcalInput || el;
+    const cur = C.parseJalali(target.value || target.dataset.value);
     const today = C.todayJalali();
     viewJ = cur ? { jy: cur.jy, jm: cur.jm } : { jy: today.jy, jm: today.jm };
     ensurePopup();
@@ -120,7 +123,9 @@ function attach(el, opts) {
     const rect = el.getBoundingClientRect();
     popup.style.position = 'absolute';
     popup.style.top = (rect.bottom + window.scrollY + 6) + 'px';
-    popup.style.left = (rect.left + window.scrollX) + 'px';
+    const width = popup.offsetWidth || 300;
+  const left = Math.max(window.scrollX + 8, Math.min(rect.left + window.scrollX, window.scrollX + window.innerWidth - width - 8));
+  popup.style.left = left + 'px';
     popup.classList.add('show');
     e.stopPropagation();
   });

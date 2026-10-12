@@ -138,6 +138,47 @@
     return { jy: jy, jm: jm, jd: jd };
   }
 
+  /** تاریخ داده‌ی QC: شمسی، میلادی/ISO، Date یا سریال اکسل → روز شمسی.
+   * سال‌های میلادی نباید با parseJalali به‌اشتباه سال شمسی تلقی شوند.
+   * برای رشته‌ی دارای ساعت، روزِ نوشته‌شده در فرم مبناست (مستقل از timezone مرورگر). */
+  function parseDate(input) {
+    if (input == null || input === '') return null;
+    function gregorian(gy, gm, gd) {
+      if (gm < 1 || gm > 12 || gd < 1 || gd > 31) return null;
+      var d = new Date(Date.UTC(gy, gm - 1, gd));
+      if (d.getUTCFullYear() !== gy || d.getUTCMonth() + 1 !== gm || d.getUTCDate() !== gd) return null;
+      try { return toJalaali(gy, gm, gd); } catch (e) { return null; }
+    }
+    if (input instanceof Date) {
+      return isNaN(input.getTime()) ? null : gregorian(input.getUTCFullYear(), input.getUTCMonth() + 1, input.getUTCDate());
+    }
+    if (typeof input === 'object') return parseJalali(input);
+    var s = faToEn(String(input)).replace(/["']/g, '').trim();
+    if (!s) return null;
+    // سریال اکسل با بخش ساعت؛ Math.floor فقط روز را نگه می‌دارد.
+    if (/^\d{5}(?:\.\d+)?$/.test(s)) {
+      var serial = Number(s);
+      if (serial > 30000 && serial < 100000) {
+        var excel = new Date((Math.floor(serial) - 25569) * 86400000);
+        return gregorian(excel.getUTCFullYear(), excel.getUTCMonth() + 1, excel.getUTCDate());
+      }
+    }
+    var m = s.match(/^(\d{4})[\/._-](\d{1,2})[\/._-](\d{1,2})(?:[T\s].*)?$/);
+    if (!m && /^\d{8}$/.test(s)) m = [s, s.slice(0, 4), s.slice(4, 6), s.slice(6, 8)];
+    if (!m) return null;
+    var y = +m[1], month = +m[2], day = +m[3];
+    if (y >= 1700) return gregorian(y, month, day);
+    return parseJalali({ jy: y, jm: month, jd: day });
+  }
+
+  function normalizeScore(value) {
+    if (value == null || value === '' || typeof value === 'boolean') return null;
+    var s = faToEn(String(value)).replace(/["']/g, '').trim();
+    if (!/^[+-]?\d+(?:\.\d+)?$/.test(s)) return null;
+    var n = Number(s);
+    return Number.isFinite(n) && n >= 0 && n <= 100 ? n : null;
+  }
+
   function formatJalali(j, sep) {
     if (!j) return '';
     sep = sep || '/';
@@ -225,10 +266,14 @@
   }
 
   function normalizeTri(v) {
-    // مقادیر مجاز المان‌ها: ۱ ، ۰ ، «-» و تهی (تکمیل‌نشده)
-    if (v === 1 || v === '1' || v === true) return 1;
-    if (v === 0 || v === '0' || v === false) return 0;
-    if (v === '-' || v === '−' || v === '—') return '-';
+    // تهی/ناشناخته هرگز «عدم رعایت» نیست؛ فقط مقادیر صریح فرم شمرده می‌شوند.
+    if (v === true) return 1;
+    if (v === false) return 0;
+    if (v == null) return '';
+    var s = faToEn(String(v)).replace(/["']/g, '').trim();
+    if (/^1(?:\.0+)?$/.test(s)) return 1;
+    if (/^0(?:\.0+)?$/.test(s)) return 0;
+    if (s === '-' || s === '−' || s === '—' || s === '–') return '-';
     return '';
   }
 
@@ -321,14 +366,14 @@
     // تاریخ
     toGregorian: toGregorian, toJalaali: toJalaali, isLeapJalaaliYear: isLeapJalaaliYear,
     jalaaliMonthLength: jalaaliMonthLength, isValidJalaali: isValidJalaali,
-    parseJalali: parseJalali, formatJalali: formatJalali, jalaliToDate: jalaliToDate,
+    parseJalali: parseJalali, parseDate: parseDate, formatJalali: formatJalali, jalaliToDate: jalaliToDate,
     weekdayFa: weekdayFa, todayJalali: todayJalali, jalaliCmp: jalaliCmp, jalaliInRange: jalaliInRange,
     toFaDigits: toFaDigits, faToEn: faToEn, WEEKDAYS_FA: WEEKDAYS_FA, MONTHS_FA: MONTHS_FA,
     jalaliMonthRange: jalaliMonthRange, jalaliMonthAdd: jalaliMonthAdd, jalaliMonthLabel: jalaliMonthLabel,
     // محاسبات QC
     parseTime: parseTime, combineJalaliTime: combineJalaliTime,
     businessMinutes: businessMinutes, slaStatus: slaStatus,
-    normalizeTri: normalizeTri, weightedScore: weightedScore,
+    normalizeTri: normalizeTri, normalizeScore: normalizeScore, weightedScore: weightedScore,
     ticketScore: ticketScore, socialScore: socialScore,
     elementRate: elementRate, avg: avg, round2: round2
   };

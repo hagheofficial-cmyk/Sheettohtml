@@ -23,6 +23,7 @@ const api = {
   offline: false,
   _lastProbe: 0,
   async req(method, url, body) {
+    url = App.withDateRange(url, method);
     if (!api.offline) {
       try {
         const res = await fetch(url, {
@@ -354,7 +355,8 @@ function scoreColorRgba(v) {
   return v >= B[0] ? 'rgba(52,211,153,.8)' : v >= B[1] ? 'rgba(56,189,248,.8)' : v >= B[2] ? 'rgba(251,191,36,.8)' : 'rgba(248,113,113,.8)';
 }
 function scorePill(score) {
-  if (score == null || score === '') return '<span class="pill-score s-na">—</span>';
+  score = C.normalizeScore(score);
+  if (score == null) return '<span class="pill-score s-na">—</span>';
   const B = scoreBands();
   const cls = score >= B[0] ? 's-good' : score >= B[1] ? 's-mid' : score >= B[2] ? 's-warn' : 's-bad';
   return `<span class="pill-score ${cls}">${fa(C.round2(score))}</span>`;
@@ -365,6 +367,40 @@ function markBadge(v) {
   if (String(v) === '-') return '<span class="mark mna">−</span>';
   return '<span style="color:var(--muted)">؟</span>';
 }
+/** مقدار واقعی سلول فرم؛ «ثبت‌نشده» هرگز صفر یا موضوعیت‌نداشته تلقی نمی‌شود. */
+function triValue(v) {
+  const n = C.normalizeTri(v);
+  if (n === 1) return '<span class="tri-value ok" title="رعایت شده">1</span>';
+  if (n === 0) return '<span class="tri-value bad" title="عدم رعایت">0</span>';
+  if (n === '-') return '<span class="tri-value na" title="موضوعیت نداشته">-</span>';
+  return '<span class="tri-value na" title="نمره این المان ثبت نشده">—</span>';
+}
+function callRedlineBadge(row, index) {
+  return window.QCReports.hasRedline(row, 'call')
+    ? `<button type="button" class="badge bad redline-link" data-call-redline="${index}" title="نمایش توضیحات ردلاین">${fa(1)}</button>` : '-';
+}
+function showCallRedline(row) {
+  modal(`${modalHead('توضیحات ردلاین تماس', 'fa-ban')}<div class="modal-body">
+    <div class="detail-rows"><div class="detail-row"><div class="k">کارشناس</div><div class="v">${esc(row.expertName)}</div></div>
+      <div class="detail-row"><div class="k">نام شریک</div><div class="v">${esc(row.leadName || '—')}</div></div>
+      <div class="detail-row"><div class="k">تاریخ بررسی</div><div class="v">${fa(row.reviewDate)}</div></div>
+      <div class="detail-row wide"><div class="k">علت ردلاین</div><div class="v" style="white-space:pre-wrap">${esc(row.redlineReason || 'علت ردلاین در فرم ثبت نشده است')}</div></div>
+      ${row.qcComment ? `<div class="detail-row wide"><div class="k">کامنت QC</div><div class="v" style="white-space:pre-wrap">${esc(row.qcComment)}</div></div>` : ''}</div>
+    </div><div class="modal-foot"><button class="btn ghost" data-close>بستن</button></div>`);
+}
+function bindCallRedlines(root, rows) {
+  $$('[data-call-redline]', root).forEach((b) => b.addEventListener('click', () => {
+    const row = rows[Number(b.dataset.callRedline)];
+    if (row) showCallRedline(row);
+  }));
+}
+function callTimeCell(row) {
+  const format = (v) => /^\d+(?:\.\d+)?$/.test(C.faToEn(String(v))) ? fa(v) + ' ثانیه' : esc(v);
+  if (row.callDuration != null && row.callDuration !== '' && row.callDuration !== '-') return format(row.callDuration);
+  // فرم فعلی فقط زمان شنود دارد؛ آن را به‌جای مدت واقعی مکالمه جا نزنیم.
+  return '—' + (row.listeningTime && row.listeningTime !== '-' ? `<div class="cell-sub">زمان شنود: ${format(row.listeningTime)}</div>` : '');
+}
+
 function slaBadge(s) {
   const map = {
     'رعایت شده': 'good', 'رعایت نشده': 'bad', 'بدون پاسخ': 'warn', 'اطلاعات ناقص': 'gray'
@@ -385,6 +421,12 @@ function rateCell(rate) {
   const B = scoreBands();
   const c = rate >= B[0] ? 'var(--good)' : rate >= B[1] ? 'var(--brand)' : rate >= B[2] ? 'var(--warn)' : 'var(--bad)';
   return `<span style="font-weight:800;color:${c}">${fa(rate)}٪</span> <span class="mini-bar"><div style="width:${rate}%;background:${c}"></div></span>`;
+}
+
+function errorRateCell(rate) {
+  if (rate === '' || rate == null) return '<span style="color:var(--muted)">—</span>';
+  const color = scoreColorHex(100 - rate);
+  return `<span style="font-weight:800;color:${color}">${fa(rate)}٪</span> <span class="mini-bar"><div style="width:${rate}%;background:${color}"></div></span>`;
 }
 
 function pager(container, info, onGo) {
@@ -415,6 +457,97 @@ const App = {
   state: null, // bootstrap
   routes: {},
   charts: [],
+  dateRange: { from: '', to: '', preset: 'all' },
+  _rangeReady: false,
+  _dateRefresh: null,
+  _countsRequest: 0,
+
+  withDateRange(url, method) {
+    if (method !== 'GET') return url; // ثبت، حذف و بک‌اپ کامل به‌صورت پنهان محدود نشوند.
+    const [pathname, query] = url.split('?');
+    if (!['/api/dashboard', '/api/reports', '/api/portfolio', '/api/portfolio/agents', '/api/tickets',
+      '/api/socials', '/api/data/status', '/api/calls/analysis'].includes(pathname) && !pathname.startsWith('/api/portfolio/')) return url;
+    const p = new URLSearchParams(query || '');
+    p.delete('from'); p.delete('to');
+    if (this.dateRange.from) p.set('from', this.dateRange.from);
+    if (this.dateRange.to) p.set('to', this.dateRange.to);
+    const qs = p.toString();
+    return pathname + (qs ? '?' + qs : '');
+  },
+  onDateRangeChange(refresh) { this._dateRefresh = refresh; },
+  dateRangeLabel() {
+    const r = this.dateRange;
+    return r.from || r.to ? 'از ' + fa(r.from || 'ابتدا') + ' تا ' + fa(r.to || 'انتها') : 'همه تاریخ‌ها';
+  },
+  presetRange(preset) {
+    if (preset === 'all') return { from: '', to: '', preset };
+    const t = C.todayJalali();
+    if (preset === 'today') return { from: C.formatJalali(t), to: C.formatJalali(t), preset };
+    const month = preset === 'prev' ? C.jalaliMonthAdd(t.jy, t.jm, -1) : t;
+    const r = C.jalaliMonthRange(month.jy, month.jm);
+    return { from: C.formatJalali(r.from), to: C.formatJalali(r.to), preset };
+  },
+  initDateRange() {
+    if (this._rangeReady) return;
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem('crmqc.dateRange.v1')); } catch (e) {}
+    if (saved && !window.QCReports.validateRange(saved)) {
+      this.dateRange = { from: saved.from ? C.formatJalali(C.parseDate(saved.from)) : '',
+        to: saved.to ? C.formatJalali(C.parseDate(saved.to)) : '', preset: saved.preset || 'custom' };
+    } else this.dateRange = this.presetRange(this.state.settings.defaultPreset || 'cur');
+    this._rangeReady = true;
+    this.syncDateRangeUI();
+  },
+  syncDateRangeUI() {
+    const r = this.dateRange;
+    $('#gFrom').value = r.from; $('#gTo').value = r.to;
+    $('#gFrom').dataset.value = r.from; $('#gTo').dataset.value = r.to;
+    $('#gFrom').classList.remove('invalid'); $('#gTo').classList.remove('invalid');
+    $('#gPreset').value = r.preset || 'custom';
+    $('#gRangeNote').className = 'range-note';
+    $('#gRangeNote').textContent = this.dateRangeLabel() + ' · مبنا: تاریخ بررسی فرم؛ اطلاعات کارشناسان و عملیات بک‌اپ/پاک‌سازی مستقل‌اند.';
+  },
+  async setDateRange(range) {
+    const error = window.QCReports.validateRange(range);
+    if (error) { toast.error(error); return false; }
+    this.dateRange = { from: range.from ? C.formatJalali(C.parseDate(range.from)) : '',
+      to: range.to ? C.formatJalali(C.parseDate(range.to)) : '', preset: range.preset || 'custom' };
+    try { localStorage.setItem('crmqc.dateRange.v1', JSON.stringify(this.dateRange)); } catch (e) {}
+    this.syncDateRangeUI();
+    const refresh = this._dateRefresh;
+    await Promise.all([this.refreshCounts(), refresh ? refresh() : Promise.resolve()]);
+    return true;
+  },
+  async refreshCounts() {
+    const request = ++this._countsRequest;
+    try {
+      const counts = await api.get('/api/data/status');
+      if (request !== this._countsRequest) return;
+      $('#footCounts').textContent = `${fa(counts.tickets)} تیکت · ${fa(counts.socials)} سوشال · ${fa(counts.calls)} تماس`;
+    } catch (e) { /* خطای صفحه‌ی فعلی جداگانه نمایش داده می‌شود. */ }
+  },
+  bindDateRangeUI() {
+    const apply = () => {
+      const range = { from: $('#gFrom').value.trim(), to: $('#gTo').value.trim(), preset: 'custom' };
+      const error = window.QCReports.validateRange(range);
+      if (error) {
+        $('#gFrom').classList.toggle('invalid', !!range.from && !C.parseDate(range.from));
+        $('#gTo').classList.toggle('invalid', !!range.to && !C.parseDate(range.to));
+        $('#gRangeNote').className = 'range-note bad'; $('#gRangeNote').textContent = error;
+        toast.error(error); return;
+      }
+      return this.setDateRange(range);
+    };
+    $('#globalRange').addEventListener('submit', (e) => { e.preventDefault(); apply(); });
+    ['gFrom', 'gTo'].forEach((id) => $('#' + id).addEventListener('change', apply));
+    JCal.attach($('#gFromBtn'), { input: $('#gFrom'), onPick: apply });
+    JCal.attach($('#gToBtn'), { input: $('#gTo'), onPick: apply });
+    $('#gPreset').addEventListener('change', () => {
+      const p = $('#gPreset').value;
+      if (p !== 'custom') this.setDateRange(this.presetRange(p));
+    });
+    $('#gReset').addEventListener('click', () => this.setDateRange(this.presetRange('all')));
+  },
 
   register(name, spec) { this.routes[name] = spec; },
 
@@ -424,7 +557,8 @@ const App = {
     $('#orgName').textContent = st.settings.orgName || 'سامانه کنترل کیفیت';
     const t = C.todayJalali();
     $('#todayChip span').textContent = `${C.weekdayFa(t)} ${C.toFaDigits(t.jd)} ${['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'][t.jm - 1]} ${C.toFaDigits(t.jy)}`;
-    $('#footCounts').textContent = `${C.toFaDigits(st.counts.tickets)} تیکت · ${C.toFaDigits(st.counts.socials)} سوشال`;
+    this.initDateRange();
+    await this.refreshCounts();
   },
 
   agentComboItems() {
@@ -455,7 +589,9 @@ const App = {
       (name === 'socials' && g.querySelector('[data-toggle="socials"]')) ? true : g.classList.contains('open') && !!g.querySelector('.active')
     ));
 
-    // نابودسازی نمودارهای قبلی
+    // رفرش تاریخ متعلق به روت قبلی است؛ فرم ثبت/ویرایش را دوباره نسازیم.
+    this._dateRefresh = null;
+    JCal.closePopup();
     this.clearCharts();
 
     const content = $('#content');
@@ -489,6 +625,7 @@ const App = {
     try { await this.boot(); }
     catch (e) { $('#content').innerHTML = `<div class="card">${emptyState('fa-plug-circle-xmark', 'عدم اتصال به سرور', e.message)}</div>`; return; }
 
+    this.bindDateRangeUI();
     $('#hamburger').addEventListener('click', () => { $('#sidebar').classList.add('open'); $('#sidebarBackdrop').classList.add('show'); });
     $('#sidebarClose').addEventListener('click', () => this.closeSidebar());
     $('#sidebarBackdrop').addEventListener('click', () => this.closeSidebar());
@@ -507,5 +644,5 @@ const App = {
 
 // اکسپورت سراسری
 window.App = App;
-window.UI = { C, $, $$, esc, fa, el, api, toast, modal, modalHead, confirmDlg, dateField, combo, multiSelect, triSwitch, redlineSwitch, selectField, scorePill, markBadge, slaBadge, durText, rateCell, pager, emptyState, debounce, scoreBands, scoreColorHex, scoreColorRgba };
+window.UI = { C, $, $$, esc, fa, el, api, toast, modal, modalHead, confirmDlg, dateField, combo, multiSelect, triSwitch, redlineSwitch, selectField, scorePill, markBadge, triValue, callRedlineBadge, bindCallRedlines, callTimeCell, slaBadge, durText, rateCell, errorRateCell, pager, emptyState, debounce, scoreBands, scoreColorHex, scoreColorRgba };
 })();

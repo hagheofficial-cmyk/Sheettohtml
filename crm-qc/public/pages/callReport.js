@@ -8,7 +8,15 @@ const { $, esc } = UI;
 
 const SRC = 'call-admin-report.html';
 
+function rangeSource() {
+  const params = new URLSearchParams();
+  if (App.dateRange.from) params.set('qcFrom', App.dateRange.from);
+  if (App.dateRange.to) params.set('qcTo', App.dateRange.to);
+  const qs = params.toString();
+  return SRC + (qs ? '?' + qs : '');
+}
 function render(root) {
+  const src = rangeSource();
   root.innerHTML = `
     <div class="page-head">
       <div class="ph-ic"><i class="fa-solid fa-phone"></i></div>
@@ -18,18 +26,24 @@ function render(root) {
       </div>
       <div class="spacer"></div>
       <button class="btn ghost" id="crReload"><i class="fa-solid fa-rotate"></i> تازه‌سازی</button>
-      <a class="btn soft" href="${esc(SRC)}" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> باز کردن در تب جدید</a>
+      <a id="crNewTab" class="btn soft" href="${esc(src)}" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> باز کردن در تب جدید</a>
     </div>
     <div class="card" style="padding:0;overflow:hidden">
       <div id="crWrap" style="position:relative;background:#0f172a;height:calc(100vh - 178px);min-height:560px">
-        <iframe src="${esc(SRC)}" title="گزارش تماس روزانه تیم‌ها" style="width:100%;height:100%;border:0;display:block"></iframe>
+        <iframe id="crFrame" src="${esc(src)}" title="گزارش تماس روزانه تیم‌ها" style="width:100%;height:100%;border:0;display:block"></iframe>
       </div>
     </div>`;
 
-  $('#crReload').addEventListener('click', () => {
-    const f = $('#crWrap iframe');
-    if (f) { f.src = 'about:blank'; setTimeout(() => { f.src = SRC; }, 60); }
-  });
+  const frame = $('#crFrame', root);
+  const syncRange = () => {
+    if (!frame.isConnected || !frame.contentWindow) return;
+    $('#crNewTab', root).href = rangeSource();
+    frame.contentWindow.postMessage({ type: 'crmqc:date-range', range: App.dateRange }, location.origin === 'null' ? '*' : location.origin);
+  };
+  frame.addEventListener('load', syncRange);
+  App.onDateRangeChange(syncRange);
+  $('#crReload').addEventListener('click', () => { frame.src = rangeSource(); });
+
 }
 
 App.register('callreport', { title: 'گزارش تماس', render });

@@ -4,8 +4,9 @@
   "description": "سیستم کامل QC برای تیم CRM که سه بخش را یکجا جمع می‌کند:",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "test": "node --test test/*.test.js",
+    "start": "node server.js",
+    "test:unit": "node --test test/calculations.test.js"
   },
   "keywords": [],
   "author": "",
@@ -14,5 +15,8 @@
     "@fortawesome/fontawesome-free": "^7.3.1",
     "chart.js": "^4.5.1",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
   }
 }

@@ -424,7 +424,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
 
 /* -------------------------------------------------------------------------------- */
 @media (max-width: 1024px) {
-  .sidebar { position: fixed; inset-inline-end: 0; transform: translateX(100%); transition: transform .25s ease; }
+  .sidebar { position: fixed; inset-inline-start: 0; transform: translateX(100%); transition: transform .25s ease; }
   .sidebar.open { transform: none; box-shadow: -20px 0 60px rgba(0,0,0,.5); }
   .sidebar-close { display: grid; }
   .sidebar-backdrop { position: fixed; inset: 0; background: rgba(2,8,23,.55); z-index: 55; opacity: 0; pointer-events: none; transition: opacity .2s; }
@@ -488,3 +488,29 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
 /* نشان حالت آفلاین */
 #offlineBadge { position: fixed; bottom: 14px; inset-inline-start: 14px; z-index: 1200; background: var(--warn-soft); border: 1px solid var(--warn); color: var(--warn); border-radius: 10px; padding: 7px 13px; font-size: 12.2px; font-weight: 800; box-shadow: var(--shadow); display: flex; align-items: center; gap: 7px; }
 #offlineBadge i { font-size: 13px; }
+
+/* فیلتر یگانه‌ی تاریخ — بیرون از محتوای روت، همیشه در همه‌ی سربرگ‌ها موجود است. */
+.global-range { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px 14px; padding:12px 22px;
+  background:var(--bg-2); border-bottom:1px solid var(--line); position:sticky; top:var(--topbar-h); z-index:45; }
+.global-range .field { margin:0; flex:0 0 auto; }
+.global-range .date-f .input { width:156px; text-align:right; padding-left:34px; }
+.global-range select { min-width:140px; }
+.range-title { display:flex; align-items:center; gap:8px; align-self:center; font-weight:700; font-size:12px; color:var(--ink-2); }
+.range-title i { color:var(--brand); }
+.range-note { flex-basis:100%; color:var(--muted); font-size:11px; }
+.range-note.bad { color:var(--bad); }
+.tri-value { display:inline-flex; justify-content:center; min-width:26px; padding:3px 7px; border-radius:6px; font-weight:800; }
+.tri-value.ok { background:var(--good-soft); color:var(--good); }
+.tri-value.bad { background:var(--bad-soft); color:var(--bad); }
+.tri-value.na { background:var(--soft); color:var(--muted); }
+.call-detail-table th { white-space:normal; min-width:100px; }
+.call-detail-table td { text-align:center; }
+.call-detail-table td.cell-main { text-align:right; }
+.call-detail-row > td { padding:12px; background:var(--bg-2); }
+.redline-link { cursor:pointer; border:1px solid rgba(248,113,113,.35); }
+@media (max-width:700px) {
+  .global-range { position:relative; top:0; padding:12px 14px; gap:10px; }
+  .range-title { flex-basis:100%; }
+  .global-range .date-f .input { width:142px; }
+}
+@media print { .global-range { display:none; } }

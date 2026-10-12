@@ -1,4 +1,4 @@
-/* dashboard.js — نمای کلی سامانه + فیلتر بازه تاریخ با تقویم */
+/* dashboard.js — نمای کلی تیکت/سوشال/تماس در بازه‌ی سراسری تاریخ بررسی */
 (function () {
 'use strict';
 const { C, $, $$, api, fa, esc, scorePill, slaBadge, durText, emptyState, toast } = UI;
@@ -13,78 +13,37 @@ App.register('dashboard', {
         <div class="ph-ic"><i class="fa-solid fa-gauge-high"></i></div>
         <div>
           <h2>داشبورد مدیریتی</h2>
-          <p>تصویر زنده از عملکرد کنترل کیفیت تیکت و سوشال</p>
+          <p>تصویر زنده از عملکرد کنترل کیفیت تیکت، سوشال و ریت تماس</p>
         </div>
         <div class="spacer"></div>
         <div class="stat-strip">
           <span class="ss"><i class="fa-solid fa-ticket" style="color:var(--brand)"></i><b id="cntT">—</b> ارزیابی تیکت</span>
-          <span class="ss"><i class="fa-solid fa-comments" style="color:var(--violet)\"></i><b id="cntS">—</b> ارزیابی سوشال</span>
-        </div>
-      </div>
-
-      <div class="card" style="margin-bottom:16px">
-        <div class="filters" style="border-bottom:none;align-items:flex-end">
-          <div class="field grow-0"><label>از تاریخ بررسی</label>
-            <div class="date-f"><input class="input" id="dFrom" dir="ltr" style="text-align:right;padding-left:34px" placeholder="۱۴۰۵/۰۶/۰۱">
-              <button type="button" class="cal-btn" id="dFromBtn" title="تقویم"><i class="fa-regular fa-calendar"></i></button></div>
-          </div>
-          <div class="field grow-0"><label>تا تاریخ بررسی</label>
-            <div class="date-f"><input class="input" id="dTo" dir="ltr" style="text-align:right;padding-left:34px" placeholder="۱۴۰۵/۰۶/۳۱">
-              <button type="button" class="cal-btn" id="dToBtn" title="تقویم"><i class="fa-regular fa-calendar"></i></button></div>
-          </div>
-          <div class="field grow-0" style="min-width:120px"><label>دید پیش‌فرض</label>
-            <div class="tabs" style="width:100%">
-              <button data-p="cur" class="active">ماه جاری</button>
-              <button data-p="prev">ماه قبل</button>
-              <button data-p="all">همه</button>
-            </div>
-          </div>
-          <div class="field grow-0"><label>&nbsp;</label><button class="btn ghost" id="dReset"><i class="fa-solid fa-rotate-right"></i> حذف بازه</button></div>
+          <span class="ss"><i class="fa-solid fa-comments" style="color:var(--violet)"></i><b id="cntS">—</b> ارزیابی سوشال</span>
+          <span class="ss"><i class="fa-solid fa-phone" style="color:var(--good)"></i><b id="cntC">—</b> ریت تماس</span>
         </div>
       </div>
 
       <div id="dContent"><div class="loading-page"><div class="spinner"></div><p>در حال دریافت آمار…</p></div></div>`;
 
-    const DEFAULT_PRESET = (App.state && App.state.settings && App.state.settings.defaultPreset) || 'cur';
-    let preset = DEFAULT_PRESET;
-
-    function presetRange(p) {
-      if (p === 'all') return { from: null, to: null };
-      const t = C.todayJalali();
-      if (p === 'prev') {
-        const pm = t.jm === 1 ? { jy: t.jy - 1, jm: 12 } : { jy: t.jy, jm: t.jm - 1 };
-        const r = C.jalaliMonthRange(pm.jy, pm.jm);
-        return { from: C.formatJalali(r.from), to: C.formatJalali(r.to) };
-      }
-      const r = C.jalaliMonthRange(t.jy, t.jm);
-      return { from: C.formatJalali(r.from), to: C.formatJalali(r.to) };
-    }
-
-    function currentRange() {
-      if (preset !== 'custom') return presetRange(preset);
-      const jf = C.parseJalali($('#dFrom').value), jt = C.parseJalali($('#dTo').value);
-      return { from: jf ? C.formatJalali(jf) : null, to: jt ? C.formatJalali(jt) : null };
-    }
+    const cont = $('#dContent', root);
+    let loadId = 0;
 
     async function load() {
-      /* هر ری‌رندر: نمودارهای قبلی نابود شوند تا کنواس آزاد شود */
-      App.clearCharts();
-      const cont = $('#dContent');
-      if (!cont.isConnected) return; /* رندر اول قدیمی است — رد شود */
+      const request = ++loadId;
+      if (!cont.isConnected) return;
       cont.innerHTML = `<div class="loading-page"><div class="spinner"></div><p>در حال دریافت آمار…</p></div>`;
-      const rng = currentRange();
-      const q = new URLSearchParams();
-      if (rng.from) q.set('from', rng.from);
-      if (rng.to) q.set('to', rng.to);
-
       let d;
       try {
-        d = await api.get('/api/dashboard?' + q.toString());
+        d = await api.get('/api/dashboard');
+        if (request !== loadId || !cont.isConnected) return;
       } catch (e) {
+        if (request !== loadId || !cont.isConnected) return;
         cont.innerHTML = `<div class="card">${emptyState('fa-triangle-exclamation', 'خطا', e.message)}</div>`;
         return;
       }
 
+      App.clearCharts();
+      $('#cntC').textContent = fa(d.callCount);
       $('#cntT').textContent = fa(d.ticketCount);
       $('#cntS').textContent = fa(d.socialCount);
 
@@ -102,9 +61,11 @@ App.register('dashboard', {
         ${kpi('blue', 'fa-star-half-stroke', avgAllTxt, 'میانگین کل نمرات')}
         ${kpi('violet', 'fa-ticket', d.ticketScored ? fa(d.ticketScored) : '—', 'تیکت نمره‌دار', d.avgTicket === '' ? '' : 'میانگین ' + fa(d.avgTicket))}
         ${kpi('blue', 'fa-comments', d.socialScored ? fa(d.socialScored) : '—', 'سوشال نمره‌دار', d.avgSocial === '' ? '' : 'میانگین ' + fa(d.avgSocial))}
+        ${kpi('green', 'fa-phone', fa(d.callCount), 'ریت تماس', d.avgCall === '' ? '' : 'میانگین ' + fa(d.avgCall))}
         ${kpi(d.slaReal === '' ? 'blue' : d.slaReal >= 80 ? 'green' : 'amber', 'fa-stopwatch', d.slaReal === '' ? '—' : fa(d.slaReal) + '٪', 'رعایت واقعی SLA سوشال')}
         ${kpi(d.unanswered ? 'red' : 'green', 'fa-phone-slash', fa(d.unanswered), 'پیام بدون پاسخ')}
         ${kpi(d.redlineZero ? 'red' : 'green', 'fa-ban', fa(d.redlineZero), 'ردلاین صفر (تیکت)')}
+        ${kpi(d.callRedlines ? 'red' : 'green', 'fa-ban', fa(d.callRedlines), 'ردلاین تماس')}
       </div>
 
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));margin-bottom:16px">
@@ -142,6 +103,14 @@ App.register('dashboard', {
                 <td>${slaBadge(s.slaStatus)}</td>
                 <td>${scorePill(s.score)}</td>
               </tr>`).join('')}</tbody></table>` : emptyState('fa-comments', 'بدون دیتا', '')}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head teal"><div class="head-icon"><i class="fa-solid fa-phone"></i></div><h3>آخرین ریت‌های تماس</h3></div>
+          <div class="table-wrap" style="max-height:280px;overflow-y:auto">
+            ${(d.latestCalls || []).length ? `<table class="tbl"><thead><tr><th>کارشناس</th><th>نام شریک</th><th>تاریخ بررسی</th><th>نمره</th></tr></thead>
+              <tbody>${d.latestCalls.map((r) => `<tr><td class="cell-main">${esc(r.expertName)}</td><td>${esc(r.leadName || '—')}</td>
+                <td dir="ltr">${esc(fa(r.reviewDate))}</td><td>${scorePill(r.score)}</td></tr>`).join('')}</tbody></table>` : emptyState('fa-phone', 'بدون دیتا', '')}
           </div>
         </div>
       </div>`;
@@ -190,52 +159,8 @@ App.register('dashboard', {
       }
     }
 
-    /* ------ تقویم ------ */
-    function refreshInputs(rng) {
-      if (rng.from) { $('#dFrom').value = rng.from; }
-      if (rng.to) { $('#dTo').value = rng.to; }
-    }
-    const todayInit = C.todayJalali();
-    const initRng = C.jalaliMonthRange(todayInit.jy, todayInit.jm);
-    refreshInputs({ from: C.formatJalali(initRng.from), to: C.formatJalali(initRng.to) });
-
-    JCal.attach($('#dFromBtn'), { onPick(j) { $('#dFrom').value = j ? C.formatJalali(j) : ''; preset = 'custom'; load(); } });
-    JCal.attach($('#dToBtn'), { onPick(j) { $('#dTo').value = j ? C.formatJalali(j) : ''; preset = 'custom'; load(); } });
-
-    $('#dFrom').addEventListener('change', () => { preset = 'custom'; load(); });
-    $('#dTo').addEventListener('change', () => { preset = 'custom'; load(); });
-
-    /* هم‌راستاسازی اولیه دکمه‌ها و ورودی‌ها با preset پیش‌فرض تنظیمات */
-    (function initPresetUI() {
-      $$('[data-p]').forEach((x) => x.classList.remove('active'));
-      const btn = $(`[data-p="${preset}"]`) || $('[data-p="cur"]');
-      if (btn) btn.classList.add('active');
-      const r = presetRange(preset);
-      refreshInputs({ from: r.from || '', to: r.to || '' });
-    })();
-
-    $$('[data-p]').forEach((b) => b.addEventListener('click', () => {
-      $$('[data-p]').forEach((x) => x.classList.remove('active'));
-      b.classList.add('active');
-      preset = b.dataset.p;
-      refreshInputs(preset === 'custom' ? {} : Object.assign({ from: '', to: '' }, (() => {
-        const r = presetRange(preset);
-        return { from: r.from || '', to: r.to || '' };
-      })()));
-      load();
-    }));
-
-    $('#dReset').addEventListener('click', () => {
-      preset = DEFAULT_PRESET;
-      $$('[data-p]').forEach((x) => x.classList.remove('active'));
-      const btn = $(`[data-p="${preset}"]`) || $('[data-p="cur"]');
-      if (btn) btn.classList.add('active');
-      const r = presetRange(preset);
-      refreshInputs({ from: r.from || '', to: r.to || '' });
-      load();
-    });
-
-    load();
+    App.onDateRangeChange(load);
+    await load();
   }
 });
 })();

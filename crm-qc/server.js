@@ -205,7 +205,7 @@ function normalizeSocial(b, existing) {
 
 /* -------------------------------------------------------------- گزارش‌ها */
 /* منطق گزارش‌سازی در shared/reports.js مشترک است (سرور و نسخه standalone) */
-const filterRows = QCReports.filterRows;
+const filterRows = (rows, q) => QCReports.filterRows(rows, q, db);
 
 /* ------------------------------------------------------------- فایل HTML اصلی */
 function findFeedbackHtml() {
@@ -244,6 +244,17 @@ async function handleApi(req, res, pathname, query) {
     ? await readBody(req, pathname === '/api/calls/files' ? 64e6 : 5e6)
     : {};
 
+  // تاریخ اشتباه نباید به‌صورت بی‌صدا گزارش خالی یا پاک‌سازی/بک‌اپ کامل بسازد.
+  const datedPath = ['/api/dashboard', '/api/reports', '/api/portfolio', '/api/portfolio/agents',
+    '/api/tickets', '/api/socials', '/api/data/status', '/api/calls/analysis', '/api/backup', '/api/calls'].includes(pathname) || parts[1] === 'portfolio';
+  if (datedPath && (method === 'GET' || method === 'DELETE')) {
+    const error = QCReports.validateRange(query);
+    if (error) return bad(res, error);
+  }
+
+  if (pathname === '/api/data/status' && method === 'GET') return ok(res, QCReports.dataStatus(db, query));
+  if (pathname === '/api/portfolio/agents' && method === 'GET') return ok(res, { rows: QCReports.portfolioAgents(db, query) });
+
   /* bootstrap: همه داده‌های مرجع */
   if (pathname === '/api/bootstrap' && method === 'GET') {
     return ok(res, {
@@ -261,13 +272,7 @@ async function handleApi(req, res, pathname, query) {
   if (pathname === '/api/backup' && method === 'GET') {
     /* ?from=1405/01/01&to=1405/12/29  → در صورت داشتن از/تا، فقط رکوردهای در آن بازه (تاریخ بررسی) برمی‌گردد */
     const from = str(query.from), to = str(query.to);
-    const inRange = (d) => {
-      const s = String(d || '');
-      if (!s) return !(from || to);
-      if (from && s < from) return false;
-      if (to && s > to) return false;
-      return true;
-    };
+    const inRange = (d) => QCReports.inRange(d, from, to);
     const out = {
       schema: 'crm-qc-backup', version: 2, exportedAt: new Date().toISOString(),
       range: { from: from || null, to: to || null },
@@ -275,8 +280,8 @@ async function handleApi(req, res, pathname, query) {
       agents: db.agents,
       qcAgents: db.qcAgents,
       agentActions: db.agentActions || {},
-      tickets: db.tickets.filter((r) => inRange(r.reviewDate) || inRange(r.ticketDate)),
-      socials: db.socials.filter((r) => inRange(r.reviewDate) || inRange(r.socialDate)),
+      tickets: db.tickets.filter((r) => inRange(r.reviewDate)),
+      socials: db.socials.filter((r) => inRange(r.reviewDate)),
       callFeedbacks: (db.callFeedbacks || []).filter((r) => inRange(r.reviewDate)),
       callImport: db.callImport || null
     };
@@ -526,13 +531,13 @@ async function handleApi(req, res, pathname, query) {
   if (parts[1] === 'reports' && method === 'GET') {
     const type = query.type || 'social';
     const level = query.level === 'team' ? 'team' : 'agent';
-    const q = { from: query.from, to: query.to, team: query.team, agent: query.agent, qc: query.qc };
+    const q = { from: query.from, to: query.to, team: query.team, agent: query.agent, qc: query.qc, form: query.form };
     /* نرخ اقلام نسبت به کل دیتای فیلترشده — برای همه‌ی تب‌ها */
     const elements = QCReports.elementRates(db, q);
     if (type === 'combined') return ok(res, { type, level, rows: QCReports.combinedAgentReport(db, q), elements });
     if (type === 'call') {
       const rep = QCReports.callReport(db, level, q, { criteriaFor: P.criteriaFor, labelOf: P.labelOf });
-      return ok(res, { type: 'call', level, rows: rep.rows, elements: Object.assign({}, elements, { call: rep.elements }) });
+      return ok(res, { type: 'call', level, rows: rep.rows, calls: rep.calls, redlineRows: rep.redlineRows, elements: Object.assign({}, elements, { call: rep.elements }) });
     }
     const tt = type === 'ticket' ? 'ticket' : 'social';
     const rows = tt === 'ticket' ? QCReports.ticketReport(db, level, q) : QCReports.socialReport(db, level, q);
@@ -554,14 +559,14 @@ async function handleApi(req, res, pathname, query) {
       const acc = Array.isArray(obj.accRawData) ? obj.accRawData : [];
       const mlm = Array.isArray(obj.mlmRawData) ? obj.mlmRawData : [];
       const norm = (r, formType) => {
-        const dj = P.anyToJalali(r.dateRaw || r.registrationDateRaw || r.reviewDate);
+        const dj = P.anyToJalali(r.reviewDate || r.registrationDateRaw || r.dateRaw);
         return {
           expertName: P.normName(r.expertName),
-          score: typeof r.score === 'number' ? r.score : (r.score === '' || r.score == null ? null : +r.score),
+          score: C.normalizeScore(r.score),
           redline: P.isRedline(r.redline) ? 1 : 0,
           redlineReason: str(r.redlineReason),
           leadName: str(r.leadName), leadPhone: str(r.leadPhone),
-          listeningTime: str(r.listeningTime), qcComment: str(r.qcComment),
+          listeningTime: str(r.listeningTime), callDuration: str(r.callDuration), qcAgent: str(r.qcAgent), qcComment: str(r.qcComment),
           reviewDate: dj ? (dj.jy + '/' + String(dj.jm).padStart(2, '0') + '/' + String(dj.jd).padStart(2, '0')) : '',
           formType, elements: r.elements || {},
           sourceFile: 'qc_recovery.json'
@@ -594,12 +599,7 @@ async function handleApi(req, res, pathname, query) {
       const from = str(query.from), to = str(query.to);
       const before = (db.callFeedbacks || []).length;
       if (from || to) {
-        db.callFeedbacks = (db.callFeedbacks || []).filter((r) => {
-          const d = String(r.reviewDate || '');
-          if (!d) return true;
-          if (from && d >= from && (!to || d <= to)) return false;
-          return true;
-        });
+        db.callFeedbacks = (db.callFeedbacks || []).filter((r) => !QCReports.inRange(r.reviewDate, from, to));
       } else {
         db.callFeedbacks = [];
       }
@@ -639,13 +639,13 @@ async function handleApi(req, res, pathname, query) {
         const parsed = P.parseRows(rows, ftype);
         if (!parsed.length) { results.push({ name, ok: false, reason: 'ردیفی یافت نشد', type: ftype }); continue; }
         db.callFeedbacks = db.callFeedbacks.filter((r) => r.sourceFile !== name);
-        for (const r of parsed) db.callFeedbacks.push(Object.assign({ sourceFile: name, actions: '' }, r));
+        for (const r of parsed) db.callFeedbacks.push(Object.assign({ sourceFile: name }, r));
         results.push({ name, ok: true, type: ftype, count: parsed.length });
       }
-      /* dedupe به‌ازای (sourceFile|expert|phone|date) */
+      /* فقط هویت واقعی ردیف فایل تکراری است؛ تماس‌های یک روز با یک شماره مستقل‌اند. */
       const seen = new Map(); const out = [];
       for (const r of db.callFeedbacks) {
-        const key = r.sourceFile ? (r.sourceFile + '|' + (r.expertName || '') + '|' + (r.leadPhone || '') + '|' + (r.reviewDate || '')) : null;
+        const key = P.callRowKey(r);
         if (key && seen.has(key)) continue;
         if (key) seen.set(key, 1);
         out.push(r);
@@ -866,7 +866,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log('سامانه کنترل کیفیت CRM اجرا شد  →  http://0.0.0.0:' + PORT);
+  console.log('سامانه کنترل کیفیت CRM اجرا شد  →  http://0.0.0.0:' + server.address().port);
   // راه‌اندازی اتصال پوشه‌ی دیتای تماس (بازبینی هر ۱۵ ثانیه data/calls)
   loadStore();
   /* بازیابی خودکار دیتای نمونه‌ی تماس: محیط پیش‌نمایش فایل‌های gitignore را

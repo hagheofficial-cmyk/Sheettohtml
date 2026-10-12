@@ -11,6 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const P = require('./shared/parseQc.js');
+const C = require('./shared/calc.js');
 
 const DIR = path.join(__dirname, 'data', 'calls');
 const INTERVAL_MS = 15000;
@@ -43,7 +44,7 @@ function dedupeCallRows(db) {
   const seen = new Map();
   const out = [];
   for (const r of (db.callFeedbacks || [])) {
-    const key = r.sourceFile ? (r.sourceFile + '|' + (r.expertName || '') + '|' + (r.leadPhone || '') + '|' + (r.reviewDate || '')) : null;
+    const key = P.callRowKey(r);
     if (!key) { out.push(r); continue; }
     if (!seen.has(key)) { seen.set(key, 1); out.push(r); }
   }
@@ -60,14 +61,16 @@ function readRecoveryFile(recPath) {
 
   const norm = (r, formType, sourceFile) => ({
     expertName: normName(r.expertName),
-    score: (typeof r.score === 'number') ? r.score : (r.score == null || r.score === '' ? null : +r.score),
+    score: C.normalizeScore(r.score),
     redline: P.isRedline(r.redline) ? 1 : 0,
-    redlineReason: String(r.redlineReason || '').replace(/["']/g, '').trim(),
+    redlineReason: String(r.redlineReason || '').trim(),
     leadName: String(r.leadName || 'نامشخص').trim(),
     leadPhone: String(r.leadPhone || '').trim(),
     listeningTime: String(r.listeningTime || '-').replace(/["']/g, '').trim() || '-',
+    callDuration: String(r.callDuration == null ? '' : r.callDuration).trim(),
+    qcAgent: String(r.qcAgent == null ? '' : r.qcAgent).trim(),
     qcComment: String(r.qcComment || '').trim(),
-    reviewDate: P.anyToJalali(r.dateRaw || r.registrationDateRaw || r.reviewDate) ? (function () { const j = P.anyToJalali(r.dateRaw || r.registrationDateRaw || r.reviewDate); return j.jy + '/' + String(j.jm).padStart(2, '0') + '/' + String(j.jd).padStart(2, '0'); })() : '',
+    reviewDate: P.anyToJalali(r.reviewDate || r.registrationDateRaw || r.dateRaw) ? (function () { const j = P.anyToJalali(r.reviewDate || r.registrationDateRaw || r.dateRaw); return j.jy + '/' + String(j.jm).padStart(2, '0') + '/' + String(j.jd).padStart(2, '0'); })() : '',
     formType,
     elements: r.elements || {},
     actions: '',
@@ -116,7 +119,7 @@ function scanOnce(db, saveCallback, log) {
     const recFile = files.find((f) => f === 'qc_recovery.json');
     if (recFile) {
       const st = fs.statSync(path.join(DIR, recFile));
-      const sig = st.mtimeMs + ':' + st.size;
+      const sig = 'v' + P.PARSER_VERSION + ':' + st.mtimeMs + ':' + st.size;
       if (clicks[recFile] !== sig) {
         try {
           const rec = readRecoveryFile(path.join(DIR, recFile));
@@ -147,7 +150,7 @@ function scanOnce(db, saveCallback, log) {
       const lower = f.toLowerCase();
       if (!/\.(xlsx|xls|csv)$/.test(lower)) continue;
       const st = fs.statSync(path.join(DIR, f));
-      const sig = st.mtimeMs + ':' + st.size;
+      const sig = 'v' + P.PARSER_VERSION + ':' + st.mtimeMs + ':' + st.size;
       if (clicks[f] !== sig) {
         try {
           const fx = readFormFile(path.join(DIR, f));
@@ -226,7 +229,7 @@ function dirStatus(db) {
   }
   const out = files.map((f) => {
     let size = null, mtime = null, sig = null;
-    try { const st = fs.statSync(path.join(DIR, f)); size = st.size; mtime = st.mtimeMs; sig = st.mtimeMs + ':' + st.size; } catch (e) {}
+    try { const st = fs.statSync(path.join(DIR, f)); size = st.size; mtime = st.mtimeMs; sig = 'v' + P.PARSER_VERSION + ':' + st.mtimeMs + ':' + st.size; } catch (e) {}
     const lower = f.toLowerCase();
     let kind = 'other';
     if (f === 'qc_recovery.json') kind = 'recovery';

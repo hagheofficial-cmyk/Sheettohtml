@@ -1,16 +1,15 @@
-/* portfolio.js — پرونده کارشناس: فهرست همه‌ی کارشناسان دارای دیتا (تیکت/سوشال/تماس)
- * جستجو با نام یا داخلی + بازه تاریخِ تقویم. محاسبات به‌ازای هر تاریخ با منابع ترکیب می‌شود. */
+/* portfolio.js — پرونده‌ی همه‌ی کارشناسان رجیستری، حتی بدون ارزیابی؛ تیم + بازه‌ی سراسری. */
 (function () {
 'use strict';
-const { C, $, $$, api, fa, esc, el, toast, scorePill, rateCell, emptyState, debounce, scoreColorHex } = UI;
+const { C, $, $$, api, fa, esc, el, toast, scorePill, rateCell, emptyState, debounce, scoreColorHex, triValue, callRedlineBadge, bindCallRedlines, callTimeCell } = UI;
 
 const FORM_TYPE_FA = { tele: 'رفتار تلفنی', account: 'تیم اکانت', mlm: 'MLM/BNPL' };
 
-async function render(root) {
+async function render(root, arg) {
   root.innerHTML = `
     <div class="page-head">
       <div class="ph-ic"><i class="fa-solid fa-id-card-clip"></i></div>
-      <div><h2>پرونده کارشناس</h2><p>فهرست همه‌ی کارشناسان دارای دیتا — کلیک روی هر سطر → جزئیات کامل + تفکیک به‌ازای هر تاریخ</p></div>
+      <div><h2>پرونده کارشناس</h2><p>همه‌ی کارشناسان مدیریت کارشناسان — کلیک روی هر سطر برای نمره‌ها، معیارها و جزئیات هر تماس</p></div>
       <div class="spacer"></div>
     </div>
 
@@ -22,14 +21,7 @@ async function render(root) {
             <div id="pSugg" style="position:absolute;top:100%;left:0;right:0;background:var(--panel);border:1px solid var(--border);border-radius:0 0 10px 10px;max-height:230px;overflow-y:auto;z-index:50;display:none"></div>
           </div>
         </div>
-        <div class="field grow-0"><label>از تاریخ</label>
-          <div class="date-f"><input class="input" id="pFrom" dir="ltr" style="text-align:right;padding-left:34px" placeholder="۱۴۰۵/۰۶/۰۱" inputmode="numeric">
-            <button type="button" class="cal-btn" id="pFromBtn" title="تقویم"><i class="fa-regular fa-calendar"></i></button></div>
-        </div>
-        <div class="field grow-0"><label>تا تاریخ</label>
-          <div class="date-f"><input class="input" id="pTo" dir="ltr" style="text-align:right;padding-left:34px" placeholder="۱۴۰۵/۰۶/۳۱" inputmode="numeric">
-            <button type="button" class="cal-btn" id="pToBtn" title="تقویم"><i class="fa-regular fa-calendar"></i></button></div>
-        </div>
+        <div id="pTeamSlot"></div>
         <div class="field grow-0"><label>&nbsp;</label><button class="btn ghost" id="pReset"><i class="fa-solid fa-rotate-right"></i> بازنشانی</button></div>
         <div class="field grow-0"><label>&nbsp;</label><button class="btn success-soft" id="pXls" disabled><i class="fa-solid fa-file-excel"></i> خروجی اکسل</button></div>
       </div>
@@ -39,57 +31,82 @@ async function render(root) {
 
     <div id="pBody"></div>`;
 
-  const agents = App.state.agents;
-  let curAgent = null, curData = null, lastCombined = [];
+  const agents = await api.get('/api/agents');
+  const master = $('#pAll', root), profileBody = $('#pBody', root), sugg = $('#pSugg', root);
+  if (!master) return;
+  let curAgent = null, curData = null, lastCombined = [], historyCalls = [];
+  let masterId = 0, profileId = 0;
+  const teams = [...new Set(agents.map((a) => a.team).filter(Boolean))];
+  const msTeams = UI.multiSelect({ label: 'تیم کارشناس', allLabel: 'همه تیم‌ها',
+    items: teams.map((t) => ({ value: t, label: t })), onChange: () => {
+      const selected = msTeams.getValues();
+      if (curAgent && selected.length && !selected.includes((agents.find((a) => a.name === curAgent) || {}).team)) {
+        clearProfile();
+      }
+      refresh();
+    } });
+  $('#pTeamSlot').replaceWith(msTeams);
 
   /* ------------------------- فهرست اصلی کارشناسان با دیتا ------------------------- */
   function periodQ() {
-    const jf = C.parseJalali($('#pFrom').value), jt = C.parseJalali($('#pTo').value);
     const q = new URLSearchParams();
-    if (jf) q.set('from', C.formatJalali(jf));
-    if (jt) q.set('to', C.formatJalali(jt));
+    const selected = msTeams.getValues();
+    if (selected.length) q.set('team', selected.join(','));
     return q;
   }
 
   async function renderMaster() {
-    const wrap = $('#pAll');
+    const wrap = master, request = ++masterId;
+    if (!wrap.isConnected) return;
     wrap.innerHTML = `<div class="loading-page"><div class="spinner"></div><p>در حال بارگذاری فهرست…</p></div>`;
     try {
       const q = periodQ();
-      const d = await api.get('/api/reports?type=combined&level=agent&' + q.toString());
+      const d = await api.get('/api/portfolio/agents?' + q.toString());
+      if (request !== masterId || !wrap.isConnected) return;
       const rows = (d.rows || []).slice().sort((a, b) => (b.totalCount || 0) - (a.totalCount || 0));
       lastCombined = rows;
-      if (!rows.length) { wrap.innerHTML = `<div class="card-pad">${emptyState('fa-users', 'هنوز دیتایی نیست', 'تیکت/سوشال ثبت کن یا فایل‌های QC تماس را در پوشه‌ی data/calls بگذار تا طرح‌ها نمایش داده شوند.')}</div>`; return; }
+      if (!rows.length) { wrap.innerHTML = `<div class="card-pad">${emptyState('fa-users', 'کارشناسی در این تیم نیست', 'کارشناس را در مدیریت کارشناسان اضافه کنید یا فیلتر تیم را تغییر دهید.')}</div>`; return; }
       wrap.innerHTML = `
         <div class="card-head teal"><div class="head-icon"><i class="fa-solid fa-users"></i></div>
-          <div><h3>همه‌ی کارشناسان دارای دیتا (${fa(rows.length)} نفر)</h3><div class="sub">کلیک روی سطر → پرونده کامل</div></div></div>
+          <div><h3>کارشناس ها</h3><div class="sub">${fa(rows.length)} کارشناس · کلیک روی سطر = پرونده کامل؛ نمره‌ی خالی در میانگین صفر حساب نمی‌شود.</div></div></div>
         <div class="table-wrap" style="max-height:400px;overflow-y:auto">
           <table class="tbl">
             <thead><tr>
               <th>کارشناس</th><th>تیم</th>
-              <th>تیکت</th><th>میانگین</th>
-              <th>سوشال</th><th>میانگین</th>
-              <th>SLA واقعی</th>
-              <th>تماس</th><th>میانگین</th><th>ردلاین</th>
-              <th>مجموع</th><th>میانگین کل</th>
+              <th>تعداد ریت تیکت</th><th>میانگین نمره تیکت</th>
+              <th>تعداد ریت سوشال</th><th>میانگین نمره سوشال</th>
+              <th>تعداد ریت تماس</th><th>میانگین نمره تماس</th>
+              <th>ردلاین</th><th>میانگین کل نمرات کارشناس</th>
             </tr></thead>
             <tbody>${rows.map(r => `<tr style="cursor:pointer" data-name="${esc(r.name)}" title="جزئیات ${esc(r.name)}">
-              <td class="cell-main">${esc(r.name)}</td>
+              <td class="cell-main">${esc(r.name)}${r.active === false ? ' <span class="badge gray">بایگانی</span>' : ''}${!r.registered ? '<div class="cell-sub">در فایل‌های واردشده؛ در مدیریت کارشناسان ثبت نشده</div>' : ''}</td>
               <td><span class="tag-team">${esc(r.team || '—')}</span></td>
               <td>${fa(r.ticketCount || 0)}</td><td>${r.ticketAvg === '' ? '—' : scorePill(r.ticketAvg)}</td>
               <td>${fa(r.socialCount || 0)}</td><td>${r.socialAvg === '' ? '—' : scorePill(r.socialAvg)}</td>
-              <td>${r.socialSlaReal === '' ? '—' : fa(r.socialSlaReal) + '٪'}</td>
               <td>${fa(r.callCount || 0)}</td><td>${r.callAvg === '' ? '—' : scorePill(r.callAvg)}</td>
-              <td>${r.callRedline ? `<span class="batch bad">${fa(r.callRedline)}</span>` : '—'}</td>
-              <td><b>${fa(r.totalCount || 0)}</b></td>
+              <td>${redlinesCell(r)}</td>
               <td>${r.avgScore === '' ? '—' : scorePill(r.avgScore)}</td>
             </tr>`).join('')}</tbody>
           </table>
         </div>`;
       $$('tbody tr', wrap).forEach(tr => tr.addEventListener('click', () => pickAgent(tr.dataset.name)));
     } catch (e) {
+      if (request !== masterId || !wrap.isConnected) return;
       wrap.innerHTML = `<div class="card-pad">${emptyState('fa-triangle-exclamation', 'خطای بارگذاری', e.message)}</div>`;
     }
+  }
+
+  function redlinesCell(row) {
+    return [['تیکت', row.ticketRedline], ['سوشال', row.socialRedline], ['تماس', row.callRedline]]
+      .filter((x) => x[1] > 0).map((x) => `<span class="badge bad">${x[0]}: ${fa(x[1])}</span>`).join(' ') || '-';
+  }
+  function clearProfile() {
+    profileId++; curAgent = null; curData = null; $('#pSearch').value = '';
+    profileBody.innerHTML = ''; $('#pXls').disabled = true; App.clearCharts();
+  }
+  async function refresh() {
+    const name = curAgent;
+    await Promise.all([renderMaster(), name ? load(name) : Promise.resolve()]);
   }
 
   /* ------------------------- جستجوی نام ------------------------- */
@@ -97,8 +114,9 @@ async function render(root) {
     q = C.faToEn(String(q || '')).trim().toLowerCase();
     if (!q) return [];
     const dig = q.replace(/[^0-9]/g, '');
-    const fromAgents = agents.filter(a =>
-      a.name.toLowerCase().includes(q) || (dig.length >= 2 && String(a.ext).includes(dig)));
+    const selectedTeams = msTeams.getValues();
+    const fromAgents = agents.filter(a => (!selectedTeams.length || selectedTeams.includes(a.team)) &&
+      (a.name.toLowerCase().includes(q) || (dig.length >= 2 && String(a.ext).includes(dig))));
     // + کارشناسان دیتای تماس که درگانسی نیستند
     const agentNames = new Set(agents.map(a => a.name));
     const callOnly = (lastCombined || [])
@@ -109,7 +127,6 @@ async function render(root) {
 
   function renderSugg() {
     const list = matchAgents($('#pSearch').value).slice(0, 12);
-    const sugg = $('#pSugg');
     if (!list.length) { sugg.style.display = 'none'; sugg.innerHTML = ''; return; }
     sugg.innerHTML = list.map(a => `
       <button class="btn ghost" style="display:flex;justify-content:space-between;width:100%;border-radius:0;border-bottom:1px solid var(--border)" data-name="${esc(a.name)}">
@@ -126,7 +143,7 @@ async function render(root) {
 
   $('#pSearch').addEventListener('input', debounce(renderSugg, 150));
   $('#pSearch').addEventListener('focus', renderSugg);
-  $('#pSearch').addEventListener('blur', () => setTimeout(() => { $('#pSugg').style.display = 'none'; }, 180));
+  $('#pSearch').addEventListener('blur', () => setTimeout(() => { sugg.style.display = 'none'; }, 180));
   $('#pSearch').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       const list = matchAgents($('#pSearch').value);
@@ -136,34 +153,33 @@ async function render(root) {
 
   async function pickAgent(name) {
     $('#pSearch').value = name;
+    curAgent = name;
     await load(name);
-    $('#pXls').disabled = false;
+    if (!profileBody.isConnected) return;
+    $('#pXls').disabled = !curData;
     // اسکرول به پرونده
     try { $('#pBody').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
   }
 
-  $('#pFrom').addEventListener('change', () => { renderMaster(); if (curAgent) load(curAgent); });
-  $('#pTo').addEventListener('change', () => { renderMaster(); if (curAgent) load(curAgent); });
-  JCal.attach($('#pFromBtn'), { onPick(j) { $('#pFrom').value = j ? C.formatJalali(j) : ''; renderMaster(); if (curAgent) load(curAgent); } });
-  JCal.attach($('#pToBtn'), { onPick(j) { $('#pTo').value = j ? C.formatJalali(j) : ''; renderMaster(); if (curAgent) load(curAgent); } });
   $('#pReset').addEventListener('click', () => {
-    $('#pSearch').value = ''; $('#pFrom').value = ''; $('#pTo').value = ''; curAgent = null; curData = null;
-    $('#pBody').innerHTML = '';
-    $('#pXls').disabled = true;
-    renderMaster();
+    msTeams.setValues([]); clearProfile(); renderMaster();
   });
 
   async function load(name) {
-    const body = $('#pBody');
+    const body = profileBody, request = ++profileId;
+    if (!body.isConnected) return;
+    curData = null; $('#pXls').disabled = true;
     body.innerHTML = `<div class="loading-page"><div class="spinner"></div></div>`;
     const q = periodQ(); q.set('ident', name);
     try {
       const data = await api.get('/api/portfolio?' + q.toString());
-      curAgent = name; curData = data;
-      const from1 = $('#pFrom').value, to1 = $('#pTo').value;
-      const periodOr = from1 || to1 ? ('بازه ' + fa(from1 || '…') + ' تا ' + fa(to1 || '…')) : 'همه دوره‌ها';
+      if (request !== profileId || !body.isConnected) return;
+      App.clearCharts();
+      curAgent = name; curData = data; $('#pXls').disabled = false;
+      const periodOr = App.dateRangeLabel();
       renderProfile(body, data, periodOr);
     } catch (e) {
+      if (request !== profileId || !body.isConnected) return;
       curData = null;
       body.innerHTML = `<div class="card">${emptyState('fa-circle-exclamation', 'خطا', e.message)}</div>`;
     }
@@ -190,67 +206,29 @@ async function render(root) {
         <td dir="ltr">${fa(r.reviewDate)}</td><td>${slaTxt(r)}</td><td>${scorePill(r.score)}</td></tr>`).join('')}</tbody></table>`;
   }
   function callTable(rows) {
-    if (!rows.length) return emptyState('fa-headset', 'بدون دیتای ریت تماس', 'فایل فرمان QC را در data/calls بگذار یا با دکمه‌ی ایمپورت در صفحه‌ی مدیریت پایه وارد کن');
-    return `<table class="tbl"><thead><tr><th>تاریخ بررسی</th><th>لید</th><th>نوع</th><th>نمره</th><th>ردلاین</th><th>زمان</th></tr></thead>
-      <tbody>${rows.slice().sort((a, b) => (b.reviewDate || '').localeCompare(a.reviewDate || '')).map(r => `<tr>
-        <td dir="ltr">${fa(r.reviewDate || '—')}</td>
-        <td>${esc(r.leadName)}<div style="font-size:10px;color:var(--muted)" dir="ltr">${esc(r.leadPhone)}</div></td>
-        <td><span class="tag-team">${FORM_TYPE_FA[r.formType] || r.formType}</span></td>
-        <td>${scorePill(r.score)}</td>
-        <td>${r.redline === 1 ? `<span class="badge bad" title="${esc(r.redlineReason || '')}">بله</span>` : '—'}</td>
-        <td style="font-size:11px;color:var(--muted)">${esc(r.listeningTime)}</td></tr>`).join('')}</tbody></table>`;
-  }
-
-  /* ---------- تفکیک فایل‌محور تماس‌ها ─ هر فایل یک بلوک کاراسمان┘ص */
-  function filesBreakdown(rows) {
-    const byFile = {};
-    rows.forEach(r => {
-      const k = r.sourceFile || '(بدون فایل شناخته‌شده — از پنل/ایمپورت recovery)';
-      (byFile[k] = byFile[k] || []).push(r);
+    if (!rows.length) return emptyState('fa-headset', 'بدون دیتای ریت تماس', 'بازه‌ی تاریخ را تغییر دهید یا از مرکز داده فایل QC وارد کنید.');
+    historyCalls = rows.slice().sort((a, b) => {
+      const aj = C.parseDate(a.reviewDate), bj = C.parseDate(b.reviewDate);
+      return aj && bj ? C.jalaliCmp(bj, aj) : (bj ? 1 : aj ? -1 : 0);
     });
-    const fileNames = Object.keys(byFile);
-    if (!fileNames.length) return '';
-    return `<div class="card" style="margin-bottom:16px">
-      <div class="card-head"><div class="head-icon"><i class="fa-solid fa-folder-open"></i></div>
-        <div><h3>تفکیک به‌ازای هر فایل QC (${fa(fileNames.length)} فایل)</h3><div class="sub">هر فایل توسط سرور در پوشه‌ی data/calls اسکن و این رکوردها را آورده</div></div></div>
-      <div class="table-wrap">
-        <table class="tbl"><thead><tr><th>فایل</th><th>نوع</th><th>ردیف</th><th>میانگین</th><th>ردلاین</th><th>بازه تاریخ</th></tr></thead>
-        <tbody>${fileNames.map(fn => {
-          const rs = byFile[fn];
-          const avg = rs.length ? C.round2(rs.reduce((a, x) => a + (x.score || 0), 0) / rs.length) : '';
-          const dts = rs.map(x => x.reviewDate).filter(Boolean).sort();
-          const range = dts.length ? (dts[0] === dts[dts.length - 1] ? fa(dts[0]) : fa(dts[0]) + ' تا ' + fa(dts[dts.length - 1])) : '—';
-          return `<tr>
-            <td style="font-size:11px;direction:ltr;text-align:right">${esc(fn)}</td>
-            <td><span class="tag-team">${FORM_TYPE_FA[rs[0].formType] || rs[0].formType}</span></td>
-            <td>${fa(rs.length)}</td><td>${avg === '' ? '—' : scorePill(avg)}</td>
-            <td>${rs.filter(x => x.redline === 1).length ? fa(rs.filter(x => x.redline === 1).length) : '—'}</td>
-            <td dir="ltr">${range}</td>
-          </tr>`;
-        }).join('')}</tbody></table>
-      </div></div>`;
+    return `<table class="tbl" id="pCallHistory"><thead><tr><th>لید</th><th>نمره</th><th>ردلاین</th><th>جزئیات بیشتر</th></tr></thead>
+      <tbody>${historyCalls.map((r, index) => `<tr>
+        <td class="cell-main">${esc(r.leadName || '—')}</td><td>${scorePill(r.score)}</td>
+        <td>${callRedlineBadge(r, index)}</td>
+        <td><button type="button" class="btn ghost sm" data-call-detail="${index}" aria-expanded="false" aria-controls="pCallDetails-${index}">
+          <i class="fa-solid fa-chevron-down"></i> جزئیات بیشتر</button></td></tr>
+        <tr class="call-detail-row" id="pCallDetails-${index}" hidden><td colspan="4"></td></tr>`).join('')}</tbody></table>`;
   }
-
-  /* ---------- جدول روزانهی ترکیبی: هر تاریخ — تیکت + سوشال + تماس ---------- */
-  function dailyCard(daily) {
-    if (!Array.isArray(daily) || !daily.length) return '';
-    const rowsHtml = daily.map(r => `<tr>
-      <td dir="ltr">${r.date === 'بدون تاریخ' ? esc(r.date) : fa(r.date)}</td>
-      <td>${r.ticketCount ? fa(r.ticketCount) : '—'}</td><td>${r.ticketAvg === '' ? '—' : scorePill(r.ticketAvg)}</td>
-      <td>${r.socialCount ? fa(r.socialCount) : '—'}</td><td>${r.socialAvg === '' ? '—' : scorePill(r.socialAvg)}</td>
-      <td>${r.callCount ? fa(r.callCount) : '—'}</td><td>${r.callAvg === '' ? '—' : scorePill(r.callAvg)}</td>
-      <td style="font-size:11px">${r.byType.mlm ? 'MLM:' + fa(r.byType.mlm) + ' ' : ''}${r.byType.tele ? 'تل:' + fa(r.byType.tele) + ' ' : ''}${r.byType.account ? 'اکانت:' + fa(r.byType.account) : ''}</td>
-      <td>${r.redlines ? `<span class="badge bad">${fa(r.redlines)}</span>` : '—'}</td>
-    </tr>`).join('');
-    return `<div class="card" style="margin-bottom:16px">
-      <div class="card-head amber"><div class="head-icon"><i class="fa-solid fa-calendar-days"></i></div>
-        <div><h3>تفکیک به‌ازای هر تاریخ (${fa(daily.length)} روز)</h3><div class="sub">تیکت و سوشال و تماس در یک سطر — محاسبات فایل QC تماس با ریت سوشال/تیکت همان روز یکجاست</div></div></div>
-      <div class="table-wrap" style="max-height:360px;overflow-y:auto">
-        <table class="tbl">
-          <thead><tr><th>تاریخ</th><th>تیکت</th><th>میانگین</th><th>سوشال</th><th>میانگین</th><th>تماس</th><th>میانگین</th><th>جزئیات نوع تماس</th><th>ردلاین</th></tr></thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-      </div></div>`;
+  function callDetail(row, index) {
+    const keys = QCReports.criteriaKeys([row], row.formType, QCParse);
+    return `<div class="cell-sub" style="margin-bottom:8px">فرم: ${esc(FORM_TYPE_FA[row.formType] || row.formType)} · نمره‌ها عین فرم: 1 / 0 / -</div>
+      <div class="table-wrap"><table class="tbl call-detail-table"><thead><tr><th>لید</th><th>شماره تماس</th>
+        ${keys.map((key) => `<th>${esc(QCParse.labelOf(row.formType, key))}</th>`).join('')}
+        <th>ردلاین</th><th>تایم مکالمه</th><th>تاریخ بررسی</th></tr></thead><tbody><tr>
+          <td class="cell-main">${esc(row.leadName || '—')}</td><td dir="ltr">${esc(row.leadPhone || '—')}</td>
+          ${keys.map((key) => `<td>${triValue((row.elements || {})[key])}</td>`).join('')}
+          <td>${callRedlineBadge(row, index)}</td><td>${callTimeCell(row)}</td><td dir="ltr">${esc(fa(row.reviewDate))}</td>
+        </tr></tbody></table></div>`;
   }
 
   /* ---------- کارت نرخ موفقیت معیارهای تماس (پرتفوی) ---------- */
@@ -337,6 +315,7 @@ async function render(root) {
             <div style="font-size:19px;font-weight:800">${esc(a.name)}</div>
             <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:7px">
               <span class="tag-team">${esc(a.team)}</span>
+              ${a.id === 0 ? '<span class="badge warn">در فایل‌های واردشده؛ در مدیریت کارشناسان ثبت نشده</span>' : ''}
               ${a.ext != null ? `<span class="badge gray"><i class="fa-solid fa-hashtag"></i> داخلی ${fa(a.ext)}</span>` : ''}
               <span class="badge ${a.active ? 'ok' : 'bad'}">${a.active ? 'فعال' : 'بایگانی'}</span>
               ${monthLine}
@@ -356,8 +335,6 @@ async function render(root) {
           Ph.redlineCount > 0 ? 'danger' : '')}
       </div>
 
-      ${dailyCard(d.daily)}
-      ${filesBreakdown(Ph.rows)}
       ${criteriaCard(Ph.byTypeRates)}
       ${redlineCard(Ph.redlineRows)}
 
@@ -377,8 +354,8 @@ async function render(root) {
           <div class="card-head teal"><div class="head-icon"><i class="fa-solid fa-comments"></i></div><div><h3>سوابق سوشال (${fa(S.count)})</h3></div></div>
           <div class="table-wrap" style="max-height:340px;overflow-y:auto">${socialTable(S.rows)}</div>
         </div>
-        <div class="card">
-          <div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-headset"></i></div><div><h3>ریت تماس (${fa(Ph.count)})</h3></div></div>
+        <div class="card" style="grid-column:1/-1;min-width:0">
+          <div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-headset"></i></div><div><h3>سوابق ریت تماس (${fa(Ph.count)})</h3></div></div>
           <div class="card-pad" style="border-bottom:1px solid var(--border);padding:9px 14px;font-size:12px">${typeRows}</div>
           <div class="table-wrap" style="max-height:340px;overflow-y:auto">${callTable(Ph.rows)}</div>
         </div>
@@ -404,6 +381,17 @@ async function render(root) {
           : '<div style="color:var(--muted);text-align:center;padding:16px;font-size:12px">هنوز اقدامی ثبت نشده — تیکت‌گذر یا فیدبک اول را با «ثبت اقدام جدید» یادداشت کنید</div>'}
         </div>
       </div>` : ''}`;
+
+    bindCallRedlines($('#pCallHistory', body) || body, historyCalls);
+    $$('[data-call-detail]', body).forEach((button) => button.addEventListener('click', () => {
+      const index = Number(button.dataset.callDetail), detail = $('#pCallDetails-' + index, body);
+      const expanded = button.getAttribute('aria-expanded') === 'true';
+      button.setAttribute('aria-expanded', String(!expanded)); detail.hidden = expanded;
+      if (!expanded && !detail.firstElementChild.innerHTML) {
+        detail.firstElementChild.innerHTML = callDetail(historyCalls[index], index);
+        bindCallRedlines(detail, historyCalls);
+      }
+    }));
 
     if (d.actions.length || true) {
       const wrap = $('#pActionsWrap');
@@ -481,17 +469,23 @@ async function render(root) {
     const a = curData.agent;
     const rowsT = [['کد تیکت', 'تاریخ بررسی', 'تاریخ تیکت', 'q1', 'q2', 'q3', 'q4', 'ردلاین', 'نمره'], ...curData.tickets.rows.map(r => [r.ticketCode, r.reviewDate, r.ticketDate, r.q1, r.q2, r.q3, r.q4, r.redline, r.score])];
     const rowsS = [['تاریخ بررسی', 'وضعیت', 'شروع', 'پایان', 'دقیقه کاری', 'SLA', 'نمره'], ...curData.socials.rows.map(r => [r.reviewDate, r.responseStatus, r.receiveDate + ' ' + r.receiveTime, r.replyDate + ' ' + r.replyTime, r.durationMin, r.slaStatus, r.score])];
-    const rowsP = [['تاریخ بررسی', 'نام لید', 'تلفن', 'نوع فرم', 'نمره', 'ردلاین', 'علت', 'کامنت'], ...curData.calls.rows.map(r => [r.reviewDate, r.leadName, r.leadPhone, r.formType, r.score, r.redline, r.redlineReason, r.qcComment])];
-    const rowsD = [['تاریخ', 'تیکت', 'میانگین تیکت', 'سوشال', 'میانگین سوشال', 'تماس', 'میانگین تماس', 'تلفنی', 'اکانت', 'MLM', 'ردلاین'], ...(curData.daily || []).map(r => [r.date, r.ticketCount, r.ticketAvg, r.socialCount, r.socialAvg, r.callCount, r.callAvg, r.byType.tele, r.byType.account, r.byType.mlm, r.redlines])];
+    const callSheets = ['tele', 'account', 'mlm'].map((form) => {
+      const calls = curData.calls.rows.filter((r) => r.formType === form);
+      const keys = QCReports.criteriaKeys(calls, form, QCParse);
+      return { name: FORM_TYPE_FA[form], rows: [
+        ['لید', 'شماره تماس', 'نمره', ...keys.map((key) => QCParse.labelOf(form, key)), 'ردلاین', 'علت ردلاین', 'تایم مکالمه', 'زمان شنود', 'تاریخ بررسی'],
+        ...calls.map((r) => [r.leadName, r.leadPhone, C.normalizeScore(r.score), ...keys.map((key) => C.normalizeTri((r.elements || {})[key])),
+          QCReports.hasRedline(r, 'call') ? 1 : '-', r.redlineReason || '', r.callDuration || '', r.listeningTime || '', r.reviewDate])
+      ] };
+    }).filter((sheet) => sheet.rows.length > 1);
     window.QCExport.sheets(`${a.name} — پرونده`, [
-      { name: 'تیکت', rows: rowsT },
-      { name: 'سوشال', rows: rowsS },
-      { name: 'تماس', rows: rowsP },
-      { name: 'روزانه ترکیبی', rows: rowsD }
+      { name: 'تیکت', rows: rowsT }, { name: 'سوشال', rows: rowsS }, ...callSheets
     ]);
   });
 
-  renderMaster();
+  App.onDateRangeChange(refresh);
+  await renderMaster();
+  if (arg && master.isConnected) await pickAgent(decodeURIComponent(arg));
 }
 
 App.register('portfolio', { title: 'پرونده کارشناس', render });

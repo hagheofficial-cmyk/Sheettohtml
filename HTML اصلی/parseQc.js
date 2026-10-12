@@ -65,22 +65,8 @@ const CRITERIA_LABELS = {
 /* ---------- پاک‌سازی ارزش (معادل cleanAndParseValue پنل) ---------- */
 /* ---------------------- اصلاح: ترجمه‌ی هم‌منطق پنل
    مقدار خام با کوتیشن‌های اضافی '"'1'"' را به عدد/رشته درمی‌آورد */
-function cleanValue(val, isScore) {
-  if (val === undefined || val === null) return isScore ? 0 : '-';
-  let clean = String(val).replace(/["']/g, '').trim();
-  if (clean === '-') return '-';
-  const parsed = parseFloat(clean);
-  return isNaN(parsed) ? 0 : parsed;
-}
 /* redline به شکل‌های مختلف: 1 | '1' | '\"1\"' | '1.0' | true */
-function isRedline(v) {
-  if (v === true) return true;
-  if (typeof v === 'number') return v === 1;
-  if (v === undefined || v === null) return false;
-  const s = String(v).replace(/["']/g, '').trim();
-  const n = parseFloat(s);
-  return !isNaN(n) && n === 1;
-}
+function isRedline(v) { return C.normalizeTri(v) === 1; }
 function cleanText(val) {
   if (val === undefined || val === null) return '';
   return String(val).replace(/["']/g, '').trim();
@@ -89,37 +75,18 @@ function cleanText(val) {
 /* ---------- تبدیل هر نوع تاریخ به اجزای جلالی ---------- */
 /* ورودی: عدد اکسل (میلادی، مثل 46259.49)، رشته ISO/میلادی، رشته شمسی '1405/06/03'
  * خروجی: {jy,jm,jd} یا null */
-function anyToJalali(v) {
-  if (v === undefined || v === null || v === 'نامشخص' || v === '') return null;
-  if (typeof v === 'number') {
-    // date serial Excel (گرگوریان) — منطق parseQcDate پنل
-    if (v > 30000 && v < 60000) {
-      const d = new Date((v - 25569) * 86400 * 1000);
-      if (isNaN(d.getTime())) return null;
-      return C.toJalaali(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
-    }
-    // تاریخ عددی شمسی مثل 14050603
-    const s = String(Math.floor(v));
-    if (s.length === 8) return C.parseJalali(s.slice(0, 4) + '/' + s.slice(4, 6) + '/' + s.slice(6, 8));
-    return null;
-  }
-  const s0 = String(v).trim();
-  // شمسی؟
-  const j = C.parseJalali(s0);
-  if (j) return j;
-  // ISO / میلادی
-  const d = new Date(s0.replace(/[۰-۹]/g, (ch) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(ch)));
-  if (!isNaN(d.getTime())) return C.toJalaali(d.getFullYear(), d.getMonth() + 1, d.getDate());
-  return null;
-}
-
-function cleanQcDate(v) { const j = anyToJalali(v); return j ? C.formatJalali(j) : null; }
+function anyToJalali(v) { return C.parseDate(v); }
+function cleanQcDate(v) { const j = anyToJalali(v); return j ? C.formatJalali(j) : ''; }
 
 /* ---------- تشخیص کلیدها (case-insensitive, بدون فاصله) ---------- */
 function findKey(row, candidates) {
   const keys = Object.keys(row);
   const norm = (k) => k.trim().toLowerCase();
-  for (const k of keys) if (candidates.includes(norm(k))) return k;
+  // ترتیب candidates مهم است؛ ترتیب ستون‌های فایل نباید تاریخ بررسی را عوض کند.
+  for (const candidate of candidates) {
+    const key = keys.find((k) => norm(k) === candidate);
+    if (key != null) return key;
+  }
   return null;
 }
 
@@ -130,51 +97,68 @@ function findKey(row, candidates) {
  *          listeningTime, qcComment, reviewDate, formType, elements}] */
 function parseRows(rows, type) {
   const mappingRef = type === 'tele' ? TELE_CRITERIA : (type === 'mlm' ? MLM_CRITERIA : ACCOUNT_CRITERIA);
-  const dt = type === 'mlm'
-    ? ['form_created_date', 'form created date', 'action_date', 'action date']
-    : ['action_date', 'action date', 'form_created_date', 'form created date'];
+  const dt = ['review_date', 'reviewdate', 'تاریخ بررسی', 'form_created_date', 'form created date', 'action_date', 'action date'];
   const list = [];
-  for (const r of (rows || [])) {
-    const nameKey = findKey(r, ['tele_expert_name']);
-    const expertName = nameKey ? String(r[nameKey]).trim() : '';
+  for (const [index, r] of (rows || []).entries()) {
+    const nameKey = findKey(r, ['tele_expert_name', 'expert_name', 'expertname']);
+    const expertName = nameKey ? normName(cleanText(r[nameKey])) : '';
     if (!expertName) continue;
 
     const scoreKey = findKey(r, ['score']);
     const redlineKey = findKey(r, ['red_line', 'red line']);
     const redlineReasonKey = findKey(r, ['red_line_reason', 'red line reason', 'علت ردلاین', 'علت خط قرمز']);
     const lsKey = findKey(r, ['listening time (second)', 'listening_time_(second)', 'listening_time_second', 'listening_time']);
-    const dateKey = findKey(r, dt);
+    // تاریخ بررسیِ غیرخالی ولی نامعتبر را با تاریخ تماس جایگزین نکنیم.
+    const reviewKey = dt.slice(0, -2).map((key) => findKey(r, [key])).find((key) => key != null && cleanText(r[key]) !== '');
+    const dateKey = reviewKey != null ? reviewKey : findKey(r, ['action_date', 'action date']);
+    const actionDateKey = findKey(r, ['action_date', 'action date']);
+    const qcKey = findKey(r, ['qc_expert_name', 'qc_agent', 'qcagent']);
+    const leadKey = findKey(r, ['lead_name', 'lead name']);
+    const phoneKey = findKey(r, ['lead_phone', 'lead phone']);
+    const commentKey = findKey(r, ['qc comment', 'qc_comment', 'کامنت']);
+    const durationKey = findKey(r, ['call_duration', 'call duration', 'call_duration_second', 'call_duration (second)', 'conversation_time', 'talk_time', 'مدت مکالمه', 'تایم مکالمه']);
+    const idKey = findKey(r, ['evaluation_id', 'form_id', 'call_id']);
 
-    let score = cleanValue(scoreKey ? r[scoreKey] : undefined, true);
-    const redline = cleanValue(redlineKey ? r[redlineKey] : undefined, true);
+    const score = C.normalizeScore(scoreKey ? r[scoreKey] : null);
+    const redline = isRedline(redlineKey ? r[redlineKey] : null) ? 1 : 0;
     const redlineReason = redlineReasonKey ? cleanText(r[redlineReasonKey]) : '';
 
     const elements = {};
     for (const elKey of mappingRef) {
       let cell = undefined;
       for (const k of Object.keys(r)) if (k.trim().toLowerCase() === elKey.toLowerCase()) { cell = r[k]; break; }
-      if (cell === undefined) elements[elKey] = '-';
-      else {
-        const c = cleanText(cell);
-        elements[elKey] = c === '1' ? 1 : (c === '0' ? 0 : '-');
-      }
+      // ستون غایب را به فرم اضافه نکن؛ سلول خالی با «-» صریح فرق دارد.
+      if (cell !== undefined) elements[elKey] = C.normalizeTri(cell);
     }
 
     list.push({
       expertName,
-      score: (typeof score === 'number') ? score : null,
+      score,
       redline: (redline === 1 || redline === 0) ? redline : 0,
       redlineReason,
-      leadName: r['lead_name'] || r['Lead Name'] || 'نامشخص',
-      leadPhone: r['lead_phone'] || r['Lead Phone'] || 'نامشخص',
+      leadName: leadKey ? cleanText(r[leadKey]) : '',
+      leadPhone: phoneKey ? cleanText(r[phoneKey]) : '',
       listeningTime: lsKey ? cleanText(r[lsKey]) || '-' : '-',
-      qcComment: r['QC comment'] || r['QC_comment'] || r['کامنت'] || '',
-      reviewDate: (dateKey ? cleanQcDate(r[dateKey]) : null) || '',
+      callDuration: durationKey ? cleanText(r[durationKey]) : '',
+      qcAgent: qcKey ? normName(cleanText(r[qcKey])) : '',
+      qcComment: commentKey ? cleanText(r[commentKey]) : '',
+      reviewDate: dateKey ? cleanQcDate(r[dateKey]) : '',
+      callDate: actionDateKey ? cleanQcDate(r[actionDateKey]) : '',
+      sourceRow: index + 2,
+      evaluationId: idKey ? cleanText(r[idKey]) : '',
       formType: type,
       elements
     });
   }
   return list;
+}
+
+/* هویت ردیف از فایل، نه ترکیب کارشناس/تلفن/روز: دو تماس یک روز حذف نشوند.
+ * رکورد قدیمی بدون شناسه را نمی‌توان با اطمینان تکراری اعلام کرد. */
+function callRowKey(row) {
+  if (!row.sourceFile) return null;
+  const identity = row.sourceRow != null ? 'row:' + row.sourceRow : (row.evaluationId ? 'id:' + row.evaluationId : '');
+  return identity ? JSON.stringify([row.sourceFile, row.formType, identity]) : null;
 }
 
 /* ---------- تشخیص نوع فایل اکسل از روی نام ---------- */
@@ -220,7 +204,7 @@ function labelOf(type, key) {
 }
 
 return {
-  anyToJalali, parseRows, formTypeOfFileName, sniffFormType, normName, isRedline,
+  PARSER_VERSION: 2, anyToJalali, parseRows, formTypeOfFileName, sniffFormType, normName, isRedline, callRowKey,
   criteriaFor, criteriaLabelsFor, labelOf,
   TELE_CRITERIA, ACCOUNT_CRITERIA, MLM_CRITERIA, CRITERIA_LABELS
 };

@@ -112,7 +112,7 @@ window.QCExport = {
   tickets(rows, settings) { download(ticketsWorkbook(rows, settings), `QC_Ticket_Evaluation_${stamp()}.xlsx`); },
   socials(rows, settings) { download(socialsWorkbook(rows, settings), `QC_Social_Evaluation_${stamp()}.xlsx`); },
   reports(type, agentRows, teamRows) { download(reportsWorkbook(type, agentRows, teamRows), `QC_${type === 'social' ? 'Social' : 'Ticket'}_Report_${stamp()}.xlsx`); },
-  calls(agentRows, teamRows, elements) {
+  calls(agentRows, teamRows, elements, calls) {
     const wb = XLSX.utils.book_new();
     const mk = (aoa) => {
       const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -127,8 +127,17 @@ window.QCExport = {
     XLSX.utils.book_append_sheet(wb, mk([hT, ...teamRows.map((r) => [r.name, r.count, r.avgScore, r.redlines, r.teleCount, r.teleAvg, r.accCount, r.accAvg, r.mlmCount, r.mlmAvg, r.total])]), 'Team Report');
     if (elements && elements.length) {
       const FORM_FA = { tele: 'تلفنی', account: 'اکانت', mlm: 'MLM' };
-      const hE = ['المان', 'فرم', 'رعایت‌شده', 'عدم رعایت', 'مجموع', 'نرخ رعایت ٪', 'نرخ عدم رعایت ٪'];
-      XLSX.utils.book_append_sheet(wb, mk([hE, ...elements.map((x) => [x.label, FORM_FA[x.form] || x.form, x.ok, x.bad, x.total, x.successRate, x.errorRate])]), 'المان‌های کلی');
+      const hE = ['المان', 'رعایت شده', 'عدم رعایت', 'موضوعیت نداشته', 'مجموع', 'نرخ رعایت ٪', 'نرخ عدم رعایت ٪'];
+      XLSX.utils.book_append_sheet(wb, mk([hE, ...elements.map((x) => [x.label + ' — ' + (FORM_FA[x.form] || x.form), x.ok, x.bad, x.na, x.total, x.successRate, x.errorRate])]), 'المان‌های کلی');
+    }
+    for (const form of ['tele', 'account', 'mlm']) {
+      const subset = (calls || []).filter((r) => r.formType === form);
+      if (!subset.length) continue;
+      const keys = QCReports.criteriaKeys(subset, form, QCParse);
+      const header = ['نام کارشناس', 'نمره کلی تماس', 'نام شریک', ...keys.map((key) => QCParse.labelOf(form, key)), 'ردلاین ها', 'توضیحات ردلاین'];
+      const data = subset.map((r) => [r.expertName, C.normalizeScore(r.score), r.leadName,
+        ...keys.map((key) => C.normalizeTri((r.elements || {})[key])), QCReports.hasRedline(r, 'call') ? 1 : '-', r.redlineReason || '']);
+      XLSX.utils.book_append_sheet(wb, mk([header, ...data]), 'جزئیات ' + ({ tele: 'تلفنی', account: 'اکانت', mlm: 'MLM' }[form]));
     }
     download(wb, `QC_Call_Report_${stamp()}.xlsx`);
   },

@@ -199,12 +199,6 @@ async function listPage(root) {
   });
   filters.insertBefore(fTeam, fAgent);
   const fQc = mk(`<div class="field"><label>کارشناس QC</label><select class="input"><option value="">همه</option>${st.qcAgents.map((t) => `<option>${esc(t)}</option>`).join('')}</select></div>`);
-  const fFrom = mk(`<div class="field"><label>از تاریخ بررسی</label>
-    <div class="date-f"><input class="input" dir="ltr" style="text-align:right;padding-left:34px" placeholder="14xx/mm/dd" inputmode="numeric">
-      <button type="button" class="cal-btn" title="تقویم"><i class="fa-regular fa-calendar"></i></button></div></div>`);
-  const fTo = mk(`<div class="field"><label>تا تاریخ بررسی</label>
-    <div class="date-f"><input class="input" dir="ltr" style="text-align:right;padding-left:34px" placeholder="14xx/mm/dd" inputmode="numeric">
-      <button type="button" class="cal-btn" title="تقویم"><i class="fa-regular fa-calendar"></i></button></div></div>`);
   const btnXls = mk(`<div class="field grow-0"><label>&nbsp;</label><button class="btn success-soft"><i class="fa-solid fa-file-excel"></i> خروجی اکسل</button></div>`);
   const btnReset = mk(`<div class="field grow-0"><label>&nbsp;</label><button class="btn ghost"><i class="fa-solid fa-rotate-right"></i> پاک‌سازی</button></div>`);
 
@@ -214,19 +208,20 @@ async function listPage(root) {
     const __tv = fTeam.getValues(); if (__tv.length) p.set('team', __tv.join(','));
     const __av = fAgent.getValues(); if (__av.length) p.set('agent', __av.join(','));
     if ($('select', fQc).value) p.set('qc', $('select', fQc).value);
-    const jf = C.parseJalali($('input', fFrom).value), jt = C.parseJalali($('input', fTo).value);
-    if (jf) p.set('from', C.formatJalali(jf));
-    if (jt) p.set('to', C.formatJalali(jt));
     p.set('page', F.page); p.set('per', 15);
     return p.toString();
   }
 
+  const wrap = $('#tblWrap', root);
+  let loadId = 0;
   async function load() {
-    const wrap = $('#tblWrap');
+    const request = ++loadId;
+    if (!wrap.isConnected) return;
     wrap.innerHTML = `<div class="loading-page"><div class="spinner"></div></div>`;
     let data;
     try { data = await api.get('/api/tickets?' + query()); }
-    catch (e) { wrap.innerHTML = emptyState('fa-triangle-exclamation', 'خطا', e.message); return; }
+    catch (e) { if (request === loadId && wrap.isConnected) wrap.innerHTML = emptyState('fa-triangle-exclamation', 'خطا', e.message); return; }
+    if (request !== loadId || !wrap.isConnected) return;
 
     if (!data.rows.length) {
       wrap.innerHTML = emptyState('fa-ticket', 'رکوردی یافت نشد', 'فیلترها را تغییر دهید یا ارزیابی جدیدی ثبت کنید.', `<a class="btn primary sm" href="#/tickets/new"><i class="fa-solid fa-plus"></i>ثبت ارزیابی</a>`);
@@ -303,14 +298,11 @@ async function listPage(root) {
   const reload1 = debounce(() => { F.page = 1; load(); }, 350);
   $('input', fSearch).addEventListener('input', reload1);
   $('select', fQc).addEventListener('change', reload1);
-  [$('input', fFrom), $('input', fTo)].forEach((i) => i.addEventListener('change', () => { F.page = 1; load(); }));
-  JCal.attach($('.cal-btn', fFrom), { onPick(j) { $('input', fFrom).value = j ? C.formatJalali(j) : ''; F.page = 1; load(); } });
-  JCal.attach($('.cal-btn', fTo), { onPick(j) { $('input', fTo).value = j ? C.formatJalali(j) : ''; F.page = 1; load(); } });
   $('button', btnReset).addEventListener('click', () => {
     $('input', fSearch).value = ''; $('select', fQc).value = '';
     fTeam.setValues([]); fTeam.setItems((st.teams || []).map((t) => ({ value: t, label: t })), false);
     fAgent.setValues([]); fAgent.setItems(__agentItems(), false);
-    $('input', fFrom).value = ''; $('input', fTo).value = ''; F.page = 1; load();
+    F.page = 1; load();
   });
   $('button', btnXls).addEventListener('click', async () => {
     const btn = $('button', btnXls); btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> در حال آماده‌سازی…';
@@ -323,7 +315,8 @@ async function listPage(root) {
     btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-file-excel"></i> خروجی اکسل';
   });
 
-  load();
+  App.onDateRangeChange(() => { F.page = 1; return load(); });
+  await load();
 }
 
 App.register('tickets', {

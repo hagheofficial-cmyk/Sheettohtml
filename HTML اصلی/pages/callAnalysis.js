@@ -34,7 +34,7 @@ async function render(root) {
   const teamFormMap = { 'tele sales': 'tele', 'account': 'account', 'mlm': 'mlm', 'bnpl': 'mlm' };
   const FORM_LABEL = { tele: 'تلفنی', account: 'اکانت', mlm: 'MLM / BNPL' };
   const teamList = (st.teams || []).slice().sort();
-  const F = { team: '', form: '', from: '', to: '' };
+  const F = { team: '', form: '' };
 
   function buildTeamTabs() {
     const tabs = [{ key: '', label: 'همه تیم‌ها', icon: 'fa-layer-group' }];
@@ -64,22 +64,11 @@ async function render(root) {
           <div class="tabs" id="formTabs">${tabs.map((t, i) => `<button data-t="${esc(t.key)}" class="${i === 0 ? 'active' : ''}"><i class="fa-solid ${t.icon}"></i> ${esc(t.label)}</button>`).join('')}</div>
         </div>
         <div id="fAgentSlot"></div>
-        <div class="field grow-0"><label>از تاریخ</label>
-          <div class="date-f"><input class="input" id="fFrom" dir="ltr" style="text-align:right;padding-left:34px" inputmode="numeric" placeholder="۱۴۰۵/۰۱/۰۱">
-            <button type="button" class="cal-btn" id="fFromBtn" title="انتخاب از تقویم"><i class="fa-regular fa-calendar"></i></button></div>
-        </div>
-        <div class="field grow-0"><label>تا تاریخ</label>
-          <div class="date-f"><input class="input" id="fTo" dir="ltr" style="text-align:right;padding-left:34px" inputmode="numeric" placeholder="۱۴۰۵/۱۲/۲۹">
-            <button type="button" class="cal-btn" id="fToBtn" title="انتخاب از تقویم"><i class="fa-regular fa-calendar"></i></button></div>
-        </div>
         <div class="field grow-0"><label>&nbsp;</label><button class="btn ghost" id="fReset"><i class="fa-solid fa-rotate-right"></i> پاک‌سازی</button></div>
       </div>
     </div>
 
     <div id="anBody"><div class="loading-page"><div class="spinner"></div></div></div>`;
-
-  JCal.attach($('#fFromBtn'), { onPick(j) { $('#fFrom').value = j ? C.formatJalali(j) : ''; load(); } });
-  JCal.attach($('#fToBtn'), { onPick(j) { $('#fTo').value = j ? C.formatJalali(j) : ''; load(); } });
 
   /* فیلتر چندانتخابی کارشناس — آیتم‌ها بر اساس تیم انتخاب‌شده به‌روز می‌شوند */
   const allAgents = (st.agents || []).filter((a) => a.active !== false);
@@ -110,29 +99,32 @@ async function render(root) {
     load();
   });
   $('#fReset').addEventListener('click', () => {
-    F.team = ''; F.form = ''; F.from = ''; F.to = '';
-    $('#fFrom').value = ''; $('#fTo').value = '';
+    F.team = ''; F.form = '';
     msAgents.setItems(agentItemsFor(), false); msAgents.setValues([]);
     $$('#formTabs button').forEach((x, i) => x.classList.toggle('active', i === 0));
     load();
   });
 
+  const body = $('#anBody', root);
+  let loadId = 0, lastAnalysis = null;
   async function load() {
+    const request = ++loadId;
+    if (!body.isConnected) return;
+    lastAnalysis = null;
     const p = new URLSearchParams();
     if (F.form) p.set('form', F.form);
     if (F.team) p.set('team', F.team);
     const av = msAgents.getValues(); if (av.length) p.set('agent', av.join(','));
-    const jf = C.parseJalali($('#fFrom').value), jt = C.parseJalali($('#fTo').value);
-    if (jf) p.set('from', C.formatJalali(jf));
-    if (jt) p.set('to', C.formatJalali(jt));
-    const body = $('#anBody');
     body.innerHTML = '<div class="loading-page"><div class="spinner"></div></div>';
     try {
       const an = await api.get('/api/calls/analysis?' + p.toString());
+      if (request !== loadId || !body.isConnected) return;
+      App.clearCharts();
       renderAnalysis(an);
       drawCharts(an);
-      window.__lastAnalysis = an;
+      lastAnalysis = an;
     } catch (e) {
+      if (request !== loadId || !body.isConnected) return;
       body.innerHTML = `<div class="card">${UI.emptyState('fa-triangle-exclamation', 'خطا در تحلیل', esc(e.message))}</div>`;
       toast.error(e.message);
     }
@@ -147,7 +139,6 @@ async function render(root) {
 
   function renderAnalysis(an) {
     const k = an.kpis || {};
-    const body = $('#anBody');
     const form = F.form || null;
 
     const kpiRow = `
@@ -161,13 +152,13 @@ async function render(root) {
     </div>`;
 
     /* نمودارها */
-    const chartsRow = `
+    const chartsRow = F.team ? `
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(360px,1fr));margin-bottom:16px">
       <div class="card"><div class="card-head"><div class="head-icon"><i class="fa-solid fa-chart-area"></i></div><div><h3>روند ماهانه</h3><div class="sub">میانگین نمره و تعداد فیدبک در هر ماه</div></div></div>
         <div class="ch-box" style="height:240px"><canvas id="chMonthly"></canvas></div></div>
       <div class="card"><div class="card-head"><div class="head-icon"><i class="fa-solid fa-chart-column"></i></div><div><h3 id="chElTitle">نرخ موفقیت معیارها</h3><div class="sub">درصد رعایت هر معیار در تماس‌های ارزیابی‌شده</div></div></div>
         <div class="ch-box" style="height:240px"><canvas id="chElements"></canvas></div></div>
-    </div>`;
+    </div>` : '';
 
     /* جدول معیارها — با تگ نوع فرم که انتخاب شده */
     let ratesSection = '';
@@ -295,6 +286,7 @@ async function render(root) {
   }
 
   function drawCharts(an) {
+    if (!F.team) return; // دو نمودار ابتدایی در حالت «همه تیم‌ها» حذف شده‌اند.
     /* روند ماهانه */
     const monthly = an.monthly || [];
     const labels = monthly.map((m) => m.month.replace('1405/', '').replace(/^1404/, '04/').replace(/^0*/, '') + ' ماه');
@@ -305,7 +297,7 @@ async function render(root) {
         data: {
           labels: monthly.map((m) => m.month),
           datasets: [
-            { label: 'میانگین نمره', data: monthly.map((m) => m.avgScore || null), borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,.12)', fill: true, tension: 0.35, yAxisID: 'y' },
+            { label: 'میانگین نمره', data: monthly.map((m) => m.avgScore === '' ? null : m.avgScore), borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,.12)', fill: true, tension: 0.35, yAxisID: 'y' },
             { label: 'تعداد فیدبک', data: monthly.map((m) => m.count), borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,.1)', fill: true, tension: 0.35, yAxisID: 'y1' }
           ]
         },
@@ -349,7 +341,7 @@ async function render(root) {
 
   /* خروجی اکسل تحلیل — ۵ شیت */
   $('#btnXls').addEventListener('click', () => {
-    const an = window.__lastAnalysis;
+    const an = lastAnalysis;
     if (!an) return toast.info('ابتدا تحلیل بارگذاری شود');
     const sheets = [];
     sheets.push({ name: 'رتبه‌بندی', rows: [
@@ -381,7 +373,8 @@ async function render(root) {
     toast.success('فایل اکسل تحلیل دانلود شد (' + fa(sheets.length) + ' شیت)');
   });
 
-  load();
+  App.onDateRangeChange(load);
+  await load();
 }
 
 App.register('call-analysis', { title: 'تحلیل ریت تماس', render });

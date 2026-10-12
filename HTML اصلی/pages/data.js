@@ -35,13 +35,15 @@ async function render(root) {
   <div class="card" style="margin-bottom:16px" id="statusCard">
     <div class="card-head">
       <div class="head-icon" style="background:rgba(56,189,248,.12);color:#38bdf8"><i class="fa-solid fa-chart-column"></i></div>
-      <div><h3>وضعیت فعلی داده‌ها</h3><div class="sub">تعداد کلی رکوردهای ذخیره‌شده در سیستم</div></div>
+      <div><h3>وضعیت فعلی داده‌ها</h3><div class="sub" id="statusRange">رکوردهای بازه‌ی انتخاب‌شده، به تفکیک تیم</div></div>
     </div>
     <div class="card-pad">
       <div class="stat-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:11px" id="statusGrid">
         <div class="loading-page" style="grid-column:1/-1"><div class="spinner"></div></div>
       </div>
+      <div id="statusUndated"></div>
     </div>
+    <div class="table-wrap" id="statusTeams"></div>
   </div>
 
   <!-- آپلود اکسل ریت تماس -->
@@ -139,19 +141,23 @@ async function render(root) {
   `;
 
   /* ------- وضعیت کلی داده‌ها ------- */
+  const grid = $('#statusGrid', root), teamTable = $('#statusTeams', root);
+  let statusId = 0;
   async function loadStatus() {
-    const grid = $('#statusGrid');
+    const request = ++statusId;
+    if (!grid.isConnected) return;
     try {
-      const b = await api.get('/api/bootstrap');
-      const cm = b.counts;
-      const callCounts = cm.callMeta ? cm.callMeta.counts : null;
+      const [b, cm] = await Promise.all([api.get('/api/bootstrap'), api.get('/api/data/status')]);
+      if (request !== statusId || !grid.isConnected) return;
+      const callCounts = cm.byForm;
+      $('#statusRange').textContent = App.dateRangeLabel() + ' · مبنا: تاریخ بررسی فرم';
       grid.innerHTML = `
         ${stat('تیکت‌های ارزیابی', fa(cm.tickets), '#38bdf8')}
         ${stat('سوشال‌های ارزیابی', fa(cm.socials), '#a78bfa')}
         ${stat('کارشناسان فعال', fa(b.agents.length), '#34d399')}
         ${stat('کارشناسان QC', fa(b.qcAgents.length), '#fbbf24')}
-        ${stat('تماس‌ها (فیدبک)', fa(cm.calls), '#fff')}
-        ${stat('تیم‌ها', fa(b.teams.length), '#ff7a59')}
+        ${stat('ریت‌های تماس', fa(cm.calls), '#fff')}
+        ${stat('تیم‌ها', fa(cm.byTeam.length), '#ff7a59')}
       ` + (callCounts ? `
         <div style="grid-column:1/-1;background:var(--panel-soft);border-radius:10px;padding:10px 14px;display:flex;gap:14px;flex-wrap:wrap;font-size:12px">
           <span style="color:var(--muted)">تماس‌ها به تفکیک فرم:</span>
@@ -159,7 +165,16 @@ async function render(root) {
           <span>اکانت <b>${fa(callCounts.account || 0)}</b></span>
           <span>MLM <b>${fa(callCounts.mlm || 0)}</b></span>
         </div>` : '');
+      teamTable.innerHTML = `<table class="tbl"><thead><tr><th>تیم</th><th>تعداد ریت تیکت</th><th>تعداد ریت سوشال</th><th>تعداد ریت تماس</th><th>مجموع داده</th></tr></thead>
+        <tbody>${cm.byTeam.map((t) => `<tr><td><span class="tag-team">${esc(t.team)}</span></td>
+          <td>${fa(t.ticketCount)}</td><td>${fa(t.socialCount)}</td><td>${fa(t.callCount)}</td><td><b>${fa(t.totalCount)}</b></td></tr>`).join('')}</tbody></table>`;
+      const undated = cm.undated.tickets + cm.undated.socials + cm.undated.calls;
+      $('#statusUndated').innerHTML = undated ? `<div class="note" style="margin:12px 0 0"><i class="fa-solid fa-circle-info"></i>
+        ${fa(undated)} رکورد بدون تاریخ بررسی معتبر در سامانه وجود دارد (تیکت: ${fa(cm.undated.tickets)}، سوشال: ${fa(cm.undated.socials)}، تماس: ${fa(cm.undated.calls)}).
+        این رکوردها در «همه تاریخ‌ها» دیده می‌شوند؛ به روز دلخواه نسبت داده نمی‌شوند.</div>` : '';
     } catch (e) {
+      if (request !== statusId || !grid.isConnected) return;
+      teamTable.innerHTML = '';
       grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><i class="fa-solid fa-triangle-exclamation"></i> خطا: ${esc(e.message)}</div>`;
     }
   }
@@ -208,7 +223,7 @@ async function render(root) {
         resEl.innerHTML += `<div style="margin-top:7px;color:#fbbf24;font-size:11px"><i class="fa-solid fa-triangle-exclamation"></i> نادیده‌گرفته: ${[...badF.map((x) => x.name), ...errs].join('، ')}</div>`;
       }
       toast.success(`${fa((r.counts || {}).total || 0)} تماس وارد سیستم شد`);
-      loadStatus();
+      loadStatus(); App.refreshCounts();
       if (!STANDALONE) loadFiles();
     } catch (e) {
       resEl.style.background = 'rgba(248,113,113,.08)'; resEl.style.color = '#f87171';
@@ -246,7 +261,7 @@ async function render(root) {
       }
       const formFa = { tele: 'تلفنی', account: 'اکانت', mlm: 'MLM' };
       fl.innerHTML = `<div style="border-top:1px solid var(--line-soft);padding-top:10px;margin-top:10px">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:7px">فایل‌های آپلود‌شده:</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:7px">فایل‌های منبع (تعداد ردیف کل فایل، مستقل از بازه‌ی گزارش):</div>
         <table class="tbl" style="font-size:12px;margin:0">
           <thead><tr><th>فایل</th><th>نوع فرم</th><th>ردیف‌ها</th><th>حجم</th></tr></thead>
           <tbody>${files.map((f) => `<tr>
@@ -377,8 +392,9 @@ async function render(root) {
 
   $('#btnRescan').addEventListener('click', () => { loadStatus(); if (!STANDALONE) loadFiles(); toast.info('تازه‌سازی شد'); });
 
-  loadStatus();
-  if (!STANDALONE) loadFiles();
+  App.onDateRangeChange(loadStatus);
+  await loadStatus();
+  if (!STANDALONE) await loadFiles();
 }
 
 App.register('data', { title: 'مرکز داده', render });
