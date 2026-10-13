@@ -1,0 +1,10 @@
+# دیتای زمان اجرا (store) — ریستور می‌شود نه کامیت
+data/store.json
+data/store.json.tmp
+node_modules/
+node_modules
+*.log
+# پوشه دیتای تماس
+data/calls/*
+!data/calls/.gitkeep
+!data/calls/README.md

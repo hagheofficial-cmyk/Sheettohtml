@@ -1,0 +1,6 @@
+# Keep only the requested presentation and its editing companion in Git.
+*
+!.gitignore
+!README.md
+!CRM-QC-Introduction.pptx
+!Fonts-and-Editing-Guide.zip
