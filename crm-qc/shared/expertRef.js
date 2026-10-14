@@ -279,6 +279,8 @@
           counts: countsOf(rows),
           lastAction: pickAction(shown),
           lastActionDone: !!done.length,
+          actionCount: acts.length,
+          doneCount: done.length,
           pendingActions: pending.length,
           openReminders: rems.filter((r) => !r.done).length,
           nextReminder: nextReminder ? { id: nextReminder.id, date: nextReminder.date, text: nextReminder.text } : null,

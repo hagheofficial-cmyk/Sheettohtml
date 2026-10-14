@@ -231,7 +231,7 @@ function cardHtml(c) {
     : `<span class="xc-chip ext"><i class="fa-solid fa-phone-volume"></i> داخلی ${fa(c.ext)}</span>
        <button type="button" class="xc-icon sm" data-copy="${esc(String(c.ext))}" title="کپی شماره داخلی" aria-label="کپی شماره داخلی"><i class="fa-regular fa-copy"></i></button>`;
   const lastRow = la
-    ? `<div class="xc-last"><span class="xc-last-l">${c.lastActionDone ? 'آخرین اقدام انجام‌شده' : 'آخرین اقدام'}</span>
+    ? `<div class="xc-last"><span class="xc-chip xc-count" title="کل اقدام‌های ثبت‌شده"><i class="fa-regular fa-hand-pointer"></i> ${fa(c.actionCount || 0)}</span><span class="xc-last-l">${c.lastActionDone ? 'آخرین اقدام انجام‌شده' : 'آخرین اقدام'}</span>
          <select class="input xc-result ex-result" data-aid="${la.id}" aria-label="نتیجه آخرین اقدام">${resultOptions(la.result)}</select>
          <span class="xc-date"><i class="fa-regular fa-calendar"></i> ${fa(la.date)}</span></div>`
     : '<div class="xc-last muted">هنوز اقدامی برای این کارشناس ثبت نشده است</div>';

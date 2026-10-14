@@ -262,7 +262,8 @@
 .xc-chip.violet { background: var(--violet-soft); border-color: transparent; color: var(--violet); }
 .xc-chip.violet i { color: var(--violet); }
 .xc-chips { display: flex; flex-wrap: wrap; gap: 6px; align-content: center; min-width: 0; }
-.xc-last { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--bg-2); border: 1px dashed var(--line); border-radius: 12px; padding: 8px 10px; font-size: 12px; min-width: 0; }
+.xc-last { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; font-size: 12px; min-width: 0; }
+.xc-count { background: var(--bg); }
 .xc-last.muted { color: var(--muted); }
 .xc-last-l { color: var(--muted); font-weight: 700; }
 .xc-last .xc-result { max-width: 150px; padding: 4px 8px; font-size: 12px; }
