@@ -171,3 +171,12 @@ test('نوع فرم از نام فایل فارسی و انگلیسی تشخیص
   assert.equal(P.formTypeOfFileName('تلفنی ۱۴۰۵.xlsx'), 'tele');
   assert.equal(P.formTypeOfFileName('نامشخص.xlsx'), null);
 });
+
+test('فرم اکانت کارشناس تیم Tele روی تیم Account حساب می‌شود؛ فرم تله همچنان تیم کارشناس را دنبال می‌کند', () => {
+  const data = { agents: [{ name: 'الف', team: 'Tele sales', active: true }], tickets: [], socials: [], callFeedbacks: [
+    { expertName: 'الف', reviewDate: '1405/06/20', formType: 'account', score: 80, redline: 0, elements: {} },
+    { expertName: 'الف', reviewDate: '1405/06/20', formType: 'tele', score: 70, redline: 0, elements: {} }
+  ] };
+  assert.equal(R.filterCalls(data, { ...DAY, team: 'Account' }).length, 1);
+  assert.equal(R.filterCalls(data, { ...DAY, team: 'Tele sales' }).length, 1);
+});

@@ -36,7 +36,13 @@
     var a = P.resolveExpert(agents || [], name).agent;
     return a ? a.team : '';
   }
-  function rowTeam(data, row) { return teamOf(data && data.agents, row.expertName || row.agentName) || row.team || ''; }
+  /* تیم ردیف: معمولاً تیم فعلی کارشناس (انتقال تیم در رجیستری منعکس می‌شود).
+   استثنا: فرم اکانت هر کارشناسی (حتی کارشناس تیم Tele) روی تیم Account حساب می‌شود. */
+  function rowTeam(data, row) {
+    var agentTeam = teamOf(data && data.agents, row.expertName || row.agentName) || row.team || '';
+    if (row.formType === 'account' && row.expertName !== undefined && P.teamForm(agentTeam) !== 'account') return 'Account';
+    return agentTeam;
+  }
 
   /** یک فیلتر مشترک برای همه‌ی گزارش‌ها؛ انتقال تیم در رجیستری هم منعکس می‌شود. */
   function filterRows(rows, q, data) {
