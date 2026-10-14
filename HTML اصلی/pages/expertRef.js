@@ -225,51 +225,63 @@ function drawGrid(root) {
 }
 
 function cardHtml(c) {
-  const la = c.lastAction;
-  const lastLabel = la ? (c.lastActionDone ? 'آخرین اقدام انجام‌شده' : 'آخرین اقدام (هنوز انجام نشده)') : 'آخرین اقدام';
-  const lastBody = la
-    ? `<div class="ex-last-main"><span class="t" title="${esc(la.title)}">${esc(la.title)}</span><span class="ex-date"><i class="fa-regular fa-calendar"></i> ${fa(la.date)}</span></div>
-       <div class="ex-last-main"><span class="ex-res-label">نتیجه</span>
-         <select class="input ex-result" data-aid="${la.id}" aria-label="نتیجه اقدام">${resultOptions(la.result)}</select></div>`
-    : '<div class="ex-empty">هنوز اقدامی برای این کارشناس ثبت نشده است</div>';
-  const badges = [];
-  if (c.pendingActions) badges.push(`<span class="badge warn"><i class="fa-solid fa-hourglass-half"></i> ${fa(c.pendingActions)} اقدام در انتظار</span>`);
-  if (c.nextReminder) badges.push(`<span class="badge violet ex-clip" title="${esc(c.nextReminder.text)}"><i class="fa-regular fa-bell"></i> ${fa(c.nextReminder.date)} · ${esc(c.nextReminder.text)}</span>`);
-  const mo = c.monthly;
+  const la = c.lastAction, mo = c.monthly;
+  const ext = c.ext == null
+    ? '<span class="xc-chip"><i class="fa-solid fa-phone-slash"></i> بدون داخلی</span>'
+    : `<span class="xc-chip ext"><i class="fa-solid fa-phone-volume"></i> داخلی ${fa(c.ext)}</span>
+       <button type="button" class="xc-icon sm" data-copy="${esc(String(c.ext))}" title="کپی شماره داخلی" aria-label="کپی شماره داخلی"><i class="fa-regular fa-copy"></i></button>`;
+  const pill = la
+    ? `<span class="xc-pill" title="${esc(la.title)}">${esc(la.title)}</span>`
+    : '<span class="xc-pill muted">بدون اقدام</span>';
+  const lastRow = la
+    ? `<div class="xc-last"><span class="xc-last-l">${c.lastActionDone ? 'آخرین اقدام انجام‌شده' : 'آخرین اقدام'}</span>
+         <select class="input xc-result ex-result" data-aid="${la.id}" aria-label="نتیجه آخرین اقدام">${resultOptions(la.result)}</select>
+         <span class="xc-date"><i class="fa-regular fa-calendar"></i> ${fa(la.date)}</span></div>`
+    : '<div class="xc-last muted">هنوز اقدامی برای این کارشناس ثبت نشده است</div>';
+  const chips = [
+    `<span class="xc-chip"><i class="fa-solid fa-phone"></i> ${fa(c.counts.calls)} ریت تماس</span>`,
+    `<span class="xc-chip"><i class="fa-solid fa-ticket"></i> ${fa(c.counts.tickets)} تیکت</span>`,
+    `<span class="xc-chip"><i class="fa-solid fa-comments"></i> ${fa(c.counts.socials)} سوشال</span>`,
+    c.pendingActions ? `<span class="xc-chip warn"><i class="fa-solid fa-hourglass-half"></i> ${fa(c.pendingActions)} در انتظار</span>` : '',
+    c.nextReminder ? `<span class="xc-chip violet ex-clip" title="${esc(c.nextReminder.text)}"><i class="fa-regular fa-bell"></i> ${fa(c.nextReminder.date)} · ${esc(c.nextReminder.text)}</span>` : '',
+    `<span class="xc-chip" title="آخرین تغییر اقدام یا یادآور"><i class="fa-regular fa-clock"></i> ${chgLabel(c)}</span>`
+  ].filter(Boolean).join('');
   return `<article class="ex-card" data-name="${esc(c.name)}">
-    <header class="ex-head">
-      <div class="ex-avatar">${initialOf(c.name)}</div>
-      <div class="ex-title"><h4 title="${esc(c.name)}">${esc(c.name)}</h4>
-        <div class="ex-meta">${teamTag(c.team)}${extChip(c.ext)}</div>
-        <div class="ex-chg" title="آخرین تغییر اقدام یا یادآور این کارشناس"><i class="fa-regular fa-clock"></i> آخرین تغییر: ${chgLabel(c)}</div></div>
-    </header>
-    <div class="ex-counts">
-      <div><span><i class="fa-solid fa-phone"></i> ریت تماس</span><b>${fa(c.counts.calls)}</b></div>
-      <div><span><i class="fa-solid fa-ticket"></i> تیکت</span><b>${fa(c.counts.tickets)}</b></div>
-      <div><span><i class="fa-solid fa-comments"></i> سوشال</span><b>${fa(c.counts.socials)}</b></div>
-    </div>
-    <div class="ex-last">
-      <div class="ex-last-h">${lastLabel}</div>
-      ${lastBody}
-      ${badges.length ? `<div class="ex-badges">${badges.join('')}</div>` : ''}
-    </div>
-    <footer class="ex-foot">
-      <div class="ex-score" title="میانگین نمره‌های ${esc(mo.label)} (${fa(mo.count)} ارزیابی)">
-        <span>نمره ${fa(mo.label)}</span>
-        <b style="color:${scoreColor(mo.score)}">${scoreText(mo.score)}</b>
-        <small>${fa(mo.count)} ارزیابی</small>
+    <header class="xc-top">
+      <div class="xc-who">
+        <div class="ex-avatar">${initialOf(c.name)}</div>
+        <div class="xc-name"><h4 title="${esc(c.name)}">${esc(c.name)}</h4>${teamTag(c.team)}</div>
       </div>
-      <div class="ex-actions">
+      ${pill}
+      <button type="button" class="xc-icon" data-act="history" title="تاریخچه و اقدامات" aria-label="تاریخچه"><i class="fa-solid fa-clock-rotate-left"></i></button>
+    </header>
+    <div class="xc-contact">${ext}</div>
+    ${lastRow}
+    <div class="xc-chips">${chips}</div>
+    <footer class="xc-foot">
+      <div class="xc-cart" title="میانگین نمره‌های ${esc(mo.label)} (${fa(mo.count)} ارزیابی)">
+        <i class="fa-solid fa-cart-shopping"></i>
+        <b style="color:${scoreColor(mo.score)}">${scoreText(mo.score)}</b>
+        <small>نمره ${fa(mo.label)} · ${fa(mo.count)} ارزیابی</small>
+      </div>
+      <div class="xc-btns">
         <button type="button" class="btn primary sm" data-act="actions"><i class="fa-solid fa-bolt"></i> ثبت اکشن</button>
-        <button type="button" class="btn ghost sm" data-act="forms"><i class="fa-solid fa-file-circle-plus"></i> فرم‌ها</button>
-        <button type="button" class="btn ghost sm" data-act="reminder"><i class="fa-regular fa-bell"></i> ریمایندر</button>
-        <button type="button" class="btn ghost sm" data-act="history"><i class="fa-solid fa-clock-rotate-left"></i> تاریخچه</button>
+        <button type="button" class="xc-icon" data-act="forms" title="فرم‌ها" aria-label="فرم‌ها"><i class="fa-solid fa-file-circle-plus"></i></button>
+        <button type="button" class="xc-icon" data-act="reminder" title="ریمایندر" aria-label="ریمایندر"><i class="fa-regular fa-bell"></i></button>
       </div>
     </footer>
   </article>`;
 }
 
 function onGridClick(e, root) {
+  const copy = e.target.closest('[data-copy]');
+  if (copy) {
+    const v = copy.dataset.copy;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(v).then(() => toast.success('شماره داخلی کپی شد'), () => toast.error('کپی انجام نشد'));
+    } else toast.error('کپی در این مرورگر پشتیبانی نمی‌شود');
+    return;
+  }
   const btn = e.target.closest('[data-act]');
   if (!btn) return;
   const name = btn.closest('.ex-card').dataset.name;
