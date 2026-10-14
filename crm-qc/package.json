@@ -1,0 +1,30 @@
+{
+  "name": "crm-qc",
+  "version": "1.0.0",
+  "description": "سیستم کامل QC برای تیم CRM که سه بخش را یکجا جمع می‌کند:",
+  "main": "server.js",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "start": "node server.js",
+    "test:unit": "node --test test/calculations.test.js",
+    "test:browser": "node test/browser-check.cjs",
+    "test:session:browser": "node test/session-browser-check.cjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fontsource/vazirmatn": "^5.3.0",
+    "@fortawesome/fontawesome-free": "^7.3.1",
+    "chart.js": "^4.5.1",
+    "exceljs": "^4.4.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.1",
+    "jszip": "^3.10.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^26.1.0"
+  }
+}

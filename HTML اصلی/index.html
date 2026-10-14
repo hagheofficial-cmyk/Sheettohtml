@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>سامانه یکپارچه کنترل کیفیت CRM</title>
+<link href="vendor/fontawesome/css/all.min.css" rel="stylesheet">
+<link rel="icon" type="image/png" sizes="64x64" href="favicon.png?v=2">
+<link rel="shortcut icon" href="favicon.ico?v=2">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#087bbd">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<script src="vendor/chart.umd.min.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
+<script>try{document.documentElement.dataset.theme=localStorage.getItem("crmqc.theme.v1")||"dark"}catch(e){document.documentElement.dataset.theme="dark"}</script>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="enhancements.css">
+</head>
+<body>
+
+<div id="app" class="app">
+  <!-- نوار کناری -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-logo brand-logo-img"><img src="logo.png" alt="لوگوی سامانه کنترل کیفیت" width="48" height="48"></div>
+      <div class="brand-text">
+        <strong id="orgName">سامانه کنترل کیفیت</strong>
+        <span>CRM Quality Assurance</span>
+      </div>
+      <button class="sidebar-close" id="sidebarClose" aria-label="بستن"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <nav class="nav" id="nav">
+      <a href="#/dashboard" class="nav-item" data-route="dashboard"><i class="fa-solid fa-gauge-high"></i><span>داشبورد</span></a>
+
+      <div class="nav-group">
+        <div class="nav-group-title" data-toggle="tickets">
+          <i class="fa-solid fa-ticket"></i><span>ارزیابی تیکت</span>
+          <i class="fa-solid fa-chevron-down chevron"></i>
+        </div>
+        <div class="nav-sub" id="sub-tickets">
+          <a href="#/tickets/new" class="nav-subitem" data-route="tickets-new"><i class="fa-solid fa-plus"></i><span>ثبت ارزیابی</span></a>
+          <a href="#/tickets" class="nav-subitem" data-route="tickets"><i class="fa-solid fa-list-check"></i><span>سوابق ارزیابی</span></a>
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title" data-toggle="socials">
+          <i class="fa-solid fa-comments"></i><span>ارزیابی سوشال</span>
+          <i class="fa-solid fa-chevron-down chevron"></i>
+        </div>
+        <div class="nav-sub" id="sub-socials">
+          <a href="#/socials/new" class="nav-subitem" data-route="socials-new"><i class="fa-solid fa-plus"></i><span>ثبت ارزیابی</span></a>
+          <a href="#/socials" class="nav-subitem" data-route="socials"><i class="fa-solid fa-list-check"></i><span>سوابق ارزیابی</span></a>
+        </div>
+      </div>
+
+      <a href="#/reports" class="nav-item" data-route="reports"><i class="fa-solid fa-chart-pie"></i><span>گزارش‌ها</span></a>
+      <a href="#/portfolio" class="nav-item" data-route="portfolio"><i class="fa-solid fa-id-card-clip"></i><span>پرونده کارشناس</span></a>
+      <a href="#/expert-ref" class="nav-item" data-route="expert-ref"><i class="fa-solid fa-address-book"></i><span>مرجع کارشناسان</span></a>
+      <a href="#/data" class="nav-item" data-route="data"><i class="fa-solid fa-database"></i><span>مرکز داده</span></a>
+      <a href="#/call-analysis" class="nav-item" data-route="call-analysis"><i class="fa-solid fa-chart-line"></i><span>تحلیل ریت تماس</span></a>
+      <a href="#/callreport" class="nav-item" data-route="callreport"><i class="fa-solid fa-phone"></i><span>گزارش تماس</span></a>
+      <a href="#/criteria" class="nav-item" data-route="criteria"><i class="fa-solid fa-sliders"></i><span>تغییر المان‌ها</span></a>
+      <a href="#/directory" class="nav-item" data-route="directory"><i class="fa-solid fa-users-gear"></i><span>مدیریت پایه</span></a>
+      <a href="#/agents" class="nav-item" data-route="agents"><i class="fa-solid fa-user-group"></i><span>مدیریت کارشناسان</span></a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="mini-stat"><i class="fa-solid fa-database"></i><span id="footCounts">—</span></div>
+    </div>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+  <!-- ستون اصلی -->
+  <div class="main">
+    <header class="topbar">
+      <button class="hamburger" id="hamburger" aria-label="منو"><i class="fa-solid fa-bars"></i></button>
+      <a class="topbar-logo" href="#/dashboard" aria-label="داشبورد سامانه"><img src="logo.png" alt="لوگوی سامانه" width="36" height="36"></a>
+      <div class="topbar-title" id="pageTitle">داشبورد</div>
+      <div class="topbar-left">
+        <div class="confirm-control"><button class="btn success-soft" id="confirmData" type="button" title="ذخیره کل اطلاعات ثبت‌شده در همین مرورگر برای بازکردن بعدی"><i class="fa-solid fa-circle-check"></i><span>تأیید اطلاعات</span></button><small id="confirmedInfo" role="status" aria-live="polite">هنوز تأیید نشده</small></div>
+        <span class="data-source-badge" id="dataSourceBadge">سرور</span>
+        <button class="btn ghost sm" id="useServerData" type="button" hidden title="نمایش اطلاعات سرور به جای نسخه این مرورگر"><i class="fa-solid fa-cloud"></i><span>اطلاعات سرور</span></button>
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="تغییر حالت روشن و تاریک" title="تغییر حالت روشن و تاریک"><i class="fa-solid fa-sun"></i><span>حالت روشن</span></button>
+        <div class="today-chip" id="todayChip"><i class="fa-regular fa-calendar"></i><span></span></div>
+      </div>
+    </header>
+
+    <form class="global-range no-print" id="globalRange" aria-label="فیلتر تاریخ کل سامانه">
+      <div class="range-title"><span class="range-icon"><i class="fa-solid fa-calendar-days"></i></span><div><strong>بازه بررسی عملکرد</strong><small>یک تاریخ؛ همه گزارش‌ها</small></div></div>
+      <div class="field grow-0"><label for="gFrom">از تاریخ بررسی</label>
+        <div class="date-f"><input class="input" id="gFrom" dir="ltr" inputmode="numeric" placeholder="۱۴۰۵/۰۶/۰۱" autocomplete="off">
+          <button type="button" class="cal-btn" id="gFromBtn" aria-label="تقویم تاریخ شروع"><i class="fa-regular fa-calendar"></i></button></div>
+      </div>
+      <div class="field grow-0"><label for="gTo">تا تاریخ بررسی</label>
+        <div class="date-f"><input class="input" id="gTo" dir="ltr" inputmode="numeric" placeholder="۱۴۰۵/۰۶/۳۱" autocomplete="off">
+          <button type="button" class="cal-btn" id="gToBtn" aria-label="تقویم تاریخ پایان"><i class="fa-regular fa-calendar"></i></button></div>
+      </div>
+      <div class="field grow-0"><label for="gPreset">بازه آماده</label>
+        <select class="input" id="gPreset"><option value="all">همه تاریخ‌ها</option><option value="today">امروز</option>
+          <option value="cur">ماه جاری</option><option value="prev">ماه قبل</option><option value="custom">بازه دلخواه</option></select>
+      </div>
+      <button type="submit" class="btn primary" id="gApply"><i class="fa-solid fa-check"></i> اعمال بازه</button>
+      <button type="button" class="btn ghost" id="gReset"><i class="fa-solid fa-rotate-right"></i> حذف بازه</button>
+      <span class="range-state" id="gRangeState" role="status">اعمال‌شده</span>
+      <div class="range-note" id="gRangeNote" role="status" aria-live="polite"></div>
+    </form>
+
+    <main class="content" id="content">
+      <div class="loading-page"><div class="spinner"></div><p>در حال بارگذاری…</p></div>
+    </main>
+  </div>
+</div>
+
+<div id="toastZone" class="toast-zone"></div>
+<div id="modalRoot"></div>
+
+<script src="calc.js"></script>
+<script src="parseQc.js"></script>
+<script src="seed-data.js"></script>
+<script src="reports.js"></script>
+<script src="expertRef.js"></script>
+<script src="registry.js"></script>
+<script src="importData.js"></script>
+<script src="storage.js"></script>
+<script src="jcal.js"></script>
+<script src="export.js"></script>
+<script src="vendor/html2canvas.min.js"></script>
+<script src="app.js"></script>
+<script src="session.js"></script>
+<script src="capture.js"></script>
+<script src="tableTools.js"></script>
+<script src="pages/dashboard.js"></script>
+<script src="pages/tickets.js"></script>
+<script src="pages/socials.js"></script>
+<script src="pages/reports.js"></script>
+<script src="pages/expertRef.js"></script>
+<script src="pages/portfolio.js"></script>
+<script src="pages/data.js"></script>
+<script src="pages/callAnalysis.js"></script>
+<script src="pages/callReport.js"></script>
+<script src="pages/directory.js"></script>
+<script src="pages/agents.js"></script>
+<script src="pages/criteria.js"></script>
+<script>App.init();</script>
+</body>
+</html>
