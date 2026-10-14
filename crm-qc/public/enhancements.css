@@ -240,13 +240,13 @@
 .er-ic.tone-good { background: var(--good-soft); color: var(--good); }
 .badge.violet + small, .er-tl-main small .badge { font-size: 10.5px; padding: 1px 8px; }
 /* ---- کارت کارشناس (طرح مرجع: هدر، داخلی، آخرین اقدام، چیپ‌ها، فوتر با نمره‌ی ماه در سمت راست) ---- */
-.ex-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 14px 20px; display: grid; grid-template-columns: minmax(230px, 1.3fr) minmax(220px, 1.2fr) minmax(220px, 1.6fr) auto; align-items: center; column-gap: 20px; row-gap: 10px; width: 100%; min-width: 0; min-height: 96px; box-sizing: border-box; transition: border-color .15s; }
+.ex-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 14px 20px; display: grid; grid-template-columns: minmax(280px, 1.5fr) minmax(220px, 1.2fr) minmax(220px, 1.5fr) auto; align-items: center; column-gap: 20px; row-gap: 10px; width: 100%; min-width: 0; min-height: 96px; box-sizing: border-box; transition: border-color .15s; }
 .xc-main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .ex-card:hover { border-color: #33507f; }
 .xc-top { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: nowrap; }
 .xc-who { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
-.xc-name { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
-.xc-name h4 { font-size: 15px; font-weight: 800; color: var(--ink); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xc-name { min-width: 0; flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.xc-name h4 { font-size: 15px; font-weight: 800; color: var(--ink); max-width: 100%; white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
 .xc-pill { background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 700; color: var(--ink-2); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: none; }
 .xc-pill.muted { color: var(--muted); font-weight: 600; }
 .xc-icon { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: var(--bg-2); color: var(--ink-2); cursor: pointer; display: grid; place-items: center; flex: none; font-size: 12px; transition: all .15s; }

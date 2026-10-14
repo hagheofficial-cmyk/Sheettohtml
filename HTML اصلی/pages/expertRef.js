@@ -230,9 +230,6 @@ function cardHtml(c) {
     ? '<span class="xc-chip"><i class="fa-solid fa-phone-slash"></i> بدون داخلی</span>'
     : `<span class="xc-chip ext"><i class="fa-solid fa-phone-volume"></i> داخلی ${fa(c.ext)}</span>
        <button type="button" class="xc-icon sm" data-copy="${esc(String(c.ext))}" title="کپی شماره داخلی" aria-label="کپی شماره داخلی"><i class="fa-regular fa-copy"></i></button>`;
-  const pill = la
-    ? `<span class="xc-pill" title="${esc(la.title)}">${esc(la.title)}</span>`
-    : '<span class="xc-pill muted">بدون اقدام</span>';
   const lastRow = la
     ? `<div class="xc-last"><span class="xc-last-l">${c.lastActionDone ? 'آخرین اقدام انجام‌شده' : 'آخرین اقدام'}</span>
          <select class="input xc-result ex-result" data-aid="${la.id}" aria-label="نتیجه آخرین اقدام">${resultOptions(la.result)}</select>
@@ -253,7 +250,6 @@ function cardHtml(c) {
         <div class="ex-avatar">${initialOf(c.name)}</div>
         <div class="xc-name"><h4 title="${esc(c.name)}">${esc(c.name)}</h4>${teamTag(c.team)}</div>
       </div>
-      ${pill}
       <button type="button" class="xc-icon" data-act="history" title="تاریخچه و اقدامات" aria-label="تاریخچه"><i class="fa-solid fa-clock-rotate-left"></i></button>
     </header>
     <div class="xc-contact">${ext}</div>
