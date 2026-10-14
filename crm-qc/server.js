@@ -626,8 +626,8 @@ async function handleApi(req, res, pathname, query) {
       for (const f of files.slice(0, 200)) {
         const name = str(f.name) || 'unnamed.xlsx';
         const rows = Array.isArray(f.rows) ? f.rows : [];
-        /* نوع فرم فقط از نام فایل یا محتوای ستون‌ها تعیین می‌شود؛ تیم مقصد (body.team) فقط برای نام‌های ثبت‌نشده است. */
-        const ftype = P.formTypeOfFileName(name) || P.sniffFormType(rows, db.settings.callCriteria);
+        /* ترتیب تشخیص: نام فایل ← فرم تیم انتخاب‌شده در «تیم مقصد» ← محتوای ستون‌ها */
+        const ftype = P.formTypeOfFileName(name) || P.teamForm(str(body.team)) || P.sniffFormType(rows, db.settings.callCriteria);
         if (!ftype) { results.push({ name, ok: false, reason: 'نوع فرم تشخیص داده نشد' }); continue; }
         const parsed = P.parseRows(rows, ftype, { agents: db.agents, criteria: db.settings.callCriteria, team: str(body.team) });
         if (!parsed.length) { results.push({ name, ok: false, reason: 'ردیفی یافت نشد', type: ftype }); continue; }
