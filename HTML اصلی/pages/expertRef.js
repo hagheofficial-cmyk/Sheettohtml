@@ -247,6 +247,7 @@ function cardHtml(c) {
     `<span class="xc-chip" title="آخرین تغییر اقدام یا یادآور"><i class="fa-regular fa-clock"></i> ${chgLabel(c)}</span>`
   ].filter(Boolean).join('');
   return `<article class="ex-card" data-name="${esc(c.name)}">
+    <div class="xc-main">
     <header class="xc-top">
       <div class="xc-who">
         <div class="ex-avatar">${initialOf(c.name)}</div>
@@ -256,6 +257,7 @@ function cardHtml(c) {
       <button type="button" class="xc-icon" data-act="history" title="تاریخچه و اقدامات" aria-label="تاریخچه"><i class="fa-solid fa-clock-rotate-left"></i></button>
     </header>
     <div class="xc-contact">${ext}</div>
+    </div>
     ${lastRow}
     <div class="xc-chips">${chips}</div>
     <footer class="xc-foot">
