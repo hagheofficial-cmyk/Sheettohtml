@@ -23,10 +23,21 @@ App.register('dashboard', {
         </div>
       </div>
 
+      <div class="card" style="margin-bottom:16px">
+        <div class="filters" style="border-bottom:none"><div id="dTeamSlot"></div></div>
+      </div>
       <div id="dContent"><div class="loading-page"><div class="spinner"></div><p>در حال دریافت آمار…</p></div></div>`;
 
     const cont = $('#dContent', root);
     let loadId = 0;
+    /* فیلتر تیم: روی همه‌ی آمار داشبورد اعمال می‌شود (بازه‌ی سراسری تاریخ هم همچنان اعمال است) */
+    const teams = (App.state.teams || []).slice().sort();
+    const msTeam = UI.multiSelect({
+      label: 'تیم', allLabel: 'همه تیم‌ها',
+      items: teams.map((t) => ({ value: t, label: QCParse.displayTeam(t) })),
+      onChange: () => load()
+    });
+    $('#dTeamSlot', root).replaceWith(msTeam);
 
     async function load() {
       const request = ++loadId;
@@ -34,7 +45,8 @@ App.register('dashboard', {
       cont.innerHTML = `<div class="loading-page"><div class="spinner"></div><p>در حال دریافت آمار…</p></div>`;
       let d;
       try {
-        d = await api.get('/api/dashboard');
+        const sel = msTeam.getValues();
+        d = await api.get('/api/dashboard' + (sel.length ? '?team=' + encodeURIComponent(sel.join(',')) : ''));
         if (request !== loadId || !cont.isConnected) return;
       } catch (e) {
         if (request !== loadId || !cont.isConnected) return;

@@ -300,6 +300,129 @@
     };
   }
 
+  /* ------------------------------------------------ داشبورد بررسی (همه‌ی اقدام‌ها) */
+  const RESULT_OPEN = ['در انتظار', 'نیاز به پیگیری'];
+  const listOf = (v) => String(v == null ? '' : v).split(',').map((x) => x.trim()).filter(Boolean);
+  const pct = (a, b) => (a + b ? C.round2(100 * a / (a + b)) : '');
+
+  /**
+   * همه‌ی اقدام‌های ثبت‌شده (وظیفه‌ها) برای بررسی QC.
+   * فیلترها (همه اختیاری، چندمقداری با ویرگول): team, agent, type, status, result؛ بازه‌ی تاریخ اقدام: aFrom/aTo.
+   * بازه‌ی سراسری تاریخ بررسی روی این داشبورد اثر ندارد (تا اقدام‌های قدیمی‌تر گم نشوند).
+   */
+  function reviewDashboard(db, q) {
+    ensure(db);
+    q = q || {};
+    const aFrom = str(q.aFrom), aTo = str(q.aTo);
+    const rangeErr = R.validateRange({ from: aFrom, to: aTo });
+    if (rangeErr) fail(rangeErr);
+    const from = aFrom ? C.parseDate(aFrom) : null, to = aTo ? C.parseDate(aTo) : null;
+    const sets = { team: new Set(listOf(q.team)), agent: new Set(listOf(q.agent)), type: new Set(listOf(q.type)),
+      status: new Set(listOf(q.status)), result: new Set(listOf(q.result)) };
+
+    const rows = [];
+    let undated = 0;
+    Object.keys(db.agentActions || {}).forEach((key) => {
+      const a = findAgent(db, key);
+      const name = a ? a.name : key;
+      const team = a ? (a.team || '') : '';
+      if (sets.agent.size && !sets.agent.has(name)) return;
+      if (sets.team.size && !sets.team.has(team)) return;
+      (db.agentActions[key] || []).forEach((it) => {
+        const status = it.status === DONE ? DONE : NOT_DONE;
+        const result = it.result || 'در انتظار';
+        if (sets.type.size && !sets.type.has(it.title)) return;
+        if (sets.status.size && !sets.status.has(status)) return;
+        if (sets.result.size && !sets.result.has(result)) return;
+        const j = C.parseJalali(it.date);
+        if (!j) undated++;
+        if ((from || to) && (!j || !C.jalaliInRange(j, from, to))) return;
+        rows.push({ id: it.id, expert: name, team, title: it.title, date: it.date || '', status, result,
+          problem: it.problem || '', problemSource: it.problemSource || '', note: it.note || '',
+          createdAt: it.createdAt || '', updatedAt: it.updatedAt || '' });
+      });
+    });
+    rows.sort((x, y) => (dateKey(y.date) - dateKey(x.date)) || ((y.id || 0) - (x.id || 0)));
+
+    const isOpen = (r) => RESULT_OPEN.includes(r.result);
+    const done = rows.filter((r) => r.status === DONE).length;
+    const success = rows.filter((r) => r.result === 'موفق').length;
+    const failed = rows.filter((r) => r.result === 'ناموفق').length;
+    const waiting = rows.filter(isOpen).length;
+
+    /* هر کارشناس: جمع‌بندی اقدام‌ها + یادآورهای او */
+    const expMap = new Map();
+    rows.forEach((r) => {
+      if (!expMap.has(r.expert)) expMap.set(r.expert, { name: r.expert, team: r.team, total: 0, done: 0, notDone: 0,
+        success: 0, failed: 0, waiting: 0, lastDate: r.date, lastTitle: r.title, lastResult: r.result });
+      const e = expMap.get(r.expert);
+      e.total++;
+      if (r.status === DONE) e.done++; else e.notDone++;
+      if (r.result === 'موفق') e.success++;
+      if (r.result === 'ناموفق') e.failed++;
+      if (isOpen(r)) e.waiting++;
+    });
+    const byExpert = [...expMap.values()].map((e) => {
+      const rems = reminderList(db, e.name);
+      return Object.assign(e, { successRate: pct(e.success, e.failed), openReminders: rems.filter((x) => !x.done).length,
+        doneReminders: rems.filter((x) => x.done).length });
+    }).sort((x, y) => x.name.localeCompare(y.name, 'fa'));
+
+    /* نوع اقدام: تعداد، انجام‌شده/نشده و نتیجه */
+    const typeMap = new Map();
+    rows.forEach((r) => {
+      if (!typeMap.has(r.title)) typeMap.set(r.title, { title: r.title, total: 0, done: 0, notDone: 0, success: 0, failed: 0, waiting: 0 });
+      const t = typeMap.get(r.title);
+      t.total++;
+      if (r.status === DONE) t.done++; else t.notDone++;
+      if (r.result === 'موفق') t.success++;
+      if (r.result === 'ناموفق') t.failed++;
+      if (isOpen(r)) t.waiting++;
+    });
+    const byType = [...typeMap.values()].sort((x, y) => (y.total - x.total) || x.title.localeCompare(y.title, 'fa'));
+
+    /* نتیجه‌ها به ترتیب ثابت */
+    const byResult = RESULTS.map((label) => ({ label, count: rows.filter((r) => r.result === label).length }));
+
+    /* روند ماهانه بر اساس تاریخ اقدام (جلالی) */
+    const monthMap = new Map();
+    rows.forEach((r) => {
+      const j = C.parseJalali(r.date);
+      if (!j) return;
+      const key = j.jy * 100 + j.jm;
+      if (!monthMap.has(key)) monthMap.set(key, { key, label: C.MONTHS_FA[j.jm - 1] + ' ' + j.jy, total: 0, done: 0, notDone: 0, success: 0, failed: 0 });
+      const m = monthMap.get(key);
+      m.total++;
+      if (r.status === DONE) m.done++; else m.notDone++;
+      if (r.result === 'موفق') m.success++;
+      if (r.result === 'ناموفق') m.failed++;
+    });
+    const byMonth = [...monthMap.values()].sort((x, y) => x.key - y.key);
+
+    /* مشکل‌ها (ماتریس): کدام مشکل بیشتر اقدام شده و چند تا باز است */
+    const probMap = new Map();
+    rows.forEach((r) => {
+      const label = r.problem || 'بدون مشکل ثبت‌شده';
+      if (!probMap.has(label)) probMap.set(label, { problem: label, source: r.problemSource, total: 0, done: 0, failed: 0, open: 0 });
+      const p = probMap.get(label);
+      p.total++;
+      if (r.status === DONE) p.done++;
+      if (r.result === 'ناموفق') p.failed++;
+      if (r.status !== DONE) p.open++;
+    });
+    const byProblem = [...probMap.values()].sort((x, y) => (y.total - x.total) || x.problem.localeCompare(y.problem, 'fa')).slice(0, 15);
+
+    const teams = [...new Set((db.agents || []).map((a) => a.team).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'fa'));
+    const agents = (db.agents || []).filter((a) => a.active !== false).map((a) => a.name).sort((x, y) => x.localeCompare(y, 'fa'));
+    return {
+      kpis: { total: rows.length, done, notDone: rows.length - done, success, failed, waiting,
+        successRate: pct(success, failed), experts: expMap.size, undated,
+        openReminders: byExpert.reduce((n, e) => n + e.openReminders, 0) },
+      byExpert, byType, byResult, byMonth, byProblem, rows,
+      meta: { teams, agents, actionTypes: actionTypes(db), results: RESULTS.slice(), statuses: { done: DONE, notDone: NOT_DONE } }
+    };
+  }
+
   /* ------------------------------------------------------- ماتریس مشکلات */
   function flatStat(rows, key) {
     let ok = 0, bad = 0, na = 0;
@@ -396,6 +519,6 @@
     ensure, findAgent, actionTypes, addActionType, deleteActionType,
     saveAction, updateAction, deleteAction, findAction,
     reminderList, saveReminder, updateReminder, deleteReminder,
-    agentRows, monthlyScore, overview, matrix, history, detail, clone
+    agentRows, monthlyScore, overview, matrix, history, detail, reviewDashboard, clone
   };
 });

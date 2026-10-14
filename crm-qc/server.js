@@ -416,7 +416,7 @@ async function handleApi(req, res, pathname, query) {
 
   /* داشبورد */
   if (pathname === '/api/dashboard' && method === 'GET') {
-    return ok(res, QCReports.dashboard(db, { from: query.from, to: query.to }));
+    return ok(res, QCReports.dashboard(db, { from: query.from, to: query.to, team: query.team }));
   }
 
   /* ارزیابی تیکت */
@@ -659,6 +659,8 @@ async function handleApi(req, res, pathname, query) {
 
   /* مرجع کارشناسان: کارت‌ها، جزئیات/ماتریس/تاریخچه هر کارشناس (منطق در shared/expertRef.js) */
   if (pathname === '/api/expert-ref' && method === 'GET') return ok(res, ExpertRef.overview(db, query));
+  /* داشبورد بررسی: همه‌ی اقدام‌ها (قبل از مسیر جزئیات کارشناس تا «review» به‌عنوان نام کارشناس خوانده نشود) */
+  if (pathname === '/api/expert-ref/review' && method === 'GET') return ok(res, ExpertRef.reviewDashboard(db, query));
   if (parts[1] === 'expert-ref' && parts.length === 3 && method === 'GET') {
     return ok(res, ExpertRef.detail(db, parts[2], query));
   }

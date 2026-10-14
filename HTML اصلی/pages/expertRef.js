@@ -123,12 +123,17 @@ function sorter(kind) {
 }
 
 /* ----------------------------------------------------------- صفحه */
-async function render(root) {
+async function render(root, arg) {
+  if (arg === 'review') return window.QCExpertReview.render(root); // «داشبورد بررسی» همین بخش
   root.innerHTML = `
     <div class="page-head">
       <div class="ph-ic"><i class="fa-solid fa-address-book"></i></div>
       <div><h2>مرجع کارشناسان</h2><p>کارت هر کارشناس؛ اقدام و نتیجه، شماره داخلی، شمارش ریت‌ها و نمره‌ی ماه جاری. از همین‌جا اقدام، یادآور و فرم ثبت کنید.</p></div>
       <div class="spacer"></div>
+      <div class="tabs er-view-tabs">
+        <button type="button" data-view="cards" class="active">کارت‌ها</button>
+        <button type="button" data-view="review">داشبورد بررسی</button>
+      </div>
     </div>
     <div class="card" style="margin-bottom:16px">
       <div class="filters" style="border-bottom:none;align-items:flex-end">
@@ -146,6 +151,7 @@ async function render(root) {
     <div id="erSummary" class="er-summary"></div>
     <div id="erGrid" class="ex-grid"><div class="loading-page"><div class="spinner"></div><p>در حال بارگذاری کارت‌ها…</p></div></div>`;
 
+  root.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => { location.hash = b.dataset.view === 'review' ? '#/expert-ref/review' : '#/expert-ref'; }));
   let reqId = 0;
   const teams = (App.state.teams || []).slice().sort();
   const msTeam = UI.multiSelect({
@@ -869,5 +875,5 @@ function timelineItem(h) {
   </div>`;
 }
 
-App.register('expert-ref', { title: 'مرجع کارشناسان', render });
+App.register('expert-ref', { title: (arg) => (arg === 'review' ? 'داشبورد بررسی — مرجع کارشناسان' : 'مرجع کارشناسان'), render });
 })();

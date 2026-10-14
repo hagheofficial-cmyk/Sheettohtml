@@ -556,6 +556,7 @@ const App = {
   withDateRange(url, method) {
     if (method !== 'GET') return url; // ثبت، حذف و بک‌اپ کامل به‌صورت پنهان محدود نشوند.
     const [pathname, query] = url.split('?');
+    if (pathname === '/api/expert-ref/review') return url; // داشبورد بررسی بازه‌ی اختصاصی خودش را دارد (aFrom/aTo)
     if (!['/api/dashboard', '/api/reports', '/api/portfolio', '/api/portfolio/agents', '/api/tickets',
       '/api/socials', '/api/data/status', '/api/calls/analysis', '/api/expert-ref'].includes(pathname) && !pathname.startsWith('/api/portfolio/') && !pathname.startsWith('/api/expert-ref/')) return url;
     const p = new URLSearchParams(query || '');

@@ -410,6 +410,7 @@ function route(method, url, body) {
   /* مرجع کارشناسان — همان منطق سرور (shared/expertRef.js) */
   if (name === 'expert-ref' && method === 'GET') {
     if (id == null) return clone(X.overview(db, q));
+    if (id === 'review') return clone(X.reviewDashboard(db, q));
     return clone(X.detail(db, id, q));
   }
   if (name === 'action-types') {
