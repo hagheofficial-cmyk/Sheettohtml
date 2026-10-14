@@ -767,7 +767,16 @@ const App = {
     this.bindDateRangeUI();
     $('#themeToggle').addEventListener('click', () => {this.applyTheme(this.theme === 'dark' ? 'light' : 'dark');if(window.BrowserSession)BrowserSession.markChanged();});
     if(window.BrowserSession)BrowserSession.bind();
-    $('#hamburger').addEventListener('click', () => { $('#sidebar').classList.add('open'); $('#sidebarBackdrop').classList.add('show'); });
+    // همبرگر: در موبایل دراور را باز می‌کند؛ در دسکتاپ فهرست کناری را جمع/باز می‌کند (انتخاب کاربر ذخیره می‌شود)
+    const narrowMQ = window.matchMedia ? window.matchMedia('(max-width: 1024px)') : { get matches() { return window.innerWidth <= 1024; } };
+    try { if (localStorage.getItem('crmqc.sidebar.v1') === 'collapsed') $('#app').classList.add('sidebar-collapsed'); } catch (e) { /* بی‌اثر */ }
+    $('#hamburger').addEventListener('click', () => {
+      if (narrowMQ.matches) { $('#sidebar').classList.add('open'); $('#sidebarBackdrop').classList.add('show'); return; }
+      const collapsed = $('#app').classList.toggle('sidebar-collapsed');
+      $('#hamburger').setAttribute('aria-expanded', String(!collapsed));
+      try { localStorage.setItem('crmqc.sidebar.v1', collapsed ? 'collapsed' : 'open'); } catch (e) { /* بی‌اثر */ }
+    });
+    $('#hamburger').setAttribute('aria-expanded', String(!$('#app').classList.contains('sidebar-collapsed')));
     $('#sidebarClose').addEventListener('click', () => this.closeSidebar());
     $('#sidebarBackdrop').addEventListener('click', () => this.closeSidebar());
     $$('.nav-group-title').forEach((g) => g.addEventListener('click', () => g.parentElement.classList.toggle('open')));

@@ -369,15 +369,51 @@
 }
 
 /* =========================================================================
-   فیلترها و منوهای شناور — یکدست، و بالای همه‌ی UI
+   فیلترها — شبکه‌ی یکدست: همه‌ی فیلدها و دکمه‌ها هم‌عرض و هم‌ارتفاع
    ========================================================================= */
-.filters { gap: 12px; padding: 14px 18px; align-items: flex-end; }
-.filters .field { min-width: 165px; gap: 5px; }
-.filters .field.grow-0 { flex: 0 0 auto; }
-.filters label { font-size: 11.5px; font-weight: 700; color: var(--muted); margin: 0; }
-.filters .input, .filters .mselect .ms-btn { height: 36px; padding: 0 11px; font-size: 12.6px; line-height: 1.2; }
-.filters .mselect .ms-btn { min-width: 170px; }
+:root { --ctl-h: 38px; }
+.filters {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px; padding: 16px 18px; align-items: end; background: var(--filters-bg, rgba(13,19,34,.5));
+}
+.filters > div[id$="Slot"] { display: contents; }
+.filters .field { min-width: 0; margin: 0; gap: 6px; }
+.filters .field:has(> .tabs) { grid-column: span 2; justify-self: start; }
+.filters .field > label, .global-range .field > label {
+  height: 16px; line-height: 16px; font-size: 11.5px; font-weight: 700; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.filters .input, .filters .ms-btn, .global-range .input {
+  height: var(--ctl-h); padding-block: 0; padding-inline: 11px; font-size: 12.6px; line-height: 1.2; min-width: 0; width: 100%;
+}
+.filters .mselect, .filters .mselect .ms-btn { width: 100%; }
+.filters .mselect .ms-btn { min-width: 0; }
+.filters .btn, .global-range .btn { height: var(--ctl-h); padding-block: 0; justify-content: center; white-space: nowrap; }
+.filters > .btn { width: 100%; }
+.filters .tabs { height: var(--ctl-h); align-items: stretch; width: auto; max-width: 100%; box-sizing: border-box; }
+.filters .tabs button { padding: 0 12px; justify-content: center; white-space: nowrap; }
+.filters .field > .tabs { display: inline-flex; }
+.filters .tri { height: var(--ctl-h); }
+.filters .tri button { padding: 0 12px; }
+
+/* سلکت‌ها: فلش یکدست در هر دو حالت */
+.filters select.input, .global-range select.input {
+  -webkit-appearance: none; appearance: none; cursor: pointer;
+  padding-inline-start: 12px; padding-inline-end: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238ea0bd' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: left 11px center;
+}
+[data-theme="light"] .filters select.input, [data-theme="light"] .global-range select.input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235a6e89' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
 [data-theme="light"] .filters { background: var(--filters-bg); }
+
+/* نوار بازه‌ی سراسری: همان ارتفاع و خط‌بندی */
+.global-range { align-items: flex-end; }
+.global-range .field > label { display: block; }
+.global-range .date-f .input { width: 156px; }
+.global-range .range-title, .global-range .range-state { align-self: center; }
+.global-range .date-f .cal-btn { top: calc(var(--ctl-h) / 2); }
 
 /* منوی چندانتخابی وقتی باز است به body منتقل می‌شود (position:fixed، بالای کارت‌ها و جدول‌ها) */
 .mselect.ms-portal { position: fixed; z-index: 6000; min-width: 235px; }
@@ -386,3 +422,14 @@
 .jcal-pop { z-index: 6000; }
 [data-theme="light"] .ms-menu, [data-theme="light"] .combo .menu { background: var(--panel); box-shadow: 0 12px 30px rgba(28,52,88,.16); }
 [data-theme="light"] .jcal-pop { background: var(--panel); box-shadow: 0 14px 38px rgba(28,52,88,.18); }
+
+/* =========================================================================
+   همبرگر و فهرست کناری: در دسکتاپ جمع/باز می‌شود (در موبایل همان دراور قبلی)
+   ========================================================================= */
+.hamburger { display: grid; place-items: center; flex-shrink: 0; }
+@media (min-width: 1025px) {
+  .sidebar { transition: width .22s ease, border-color .22s ease; }
+  .sidebar > * { transition: opacity .15s ease; }
+  .app.sidebar-collapsed .sidebar { width: 0; border-left-color: transparent; overflow: hidden; }
+  .app.sidebar-collapsed .sidebar > * { opacity: 0; visibility: hidden; }
+}

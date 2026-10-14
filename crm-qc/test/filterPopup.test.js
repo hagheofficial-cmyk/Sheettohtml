@@ -32,3 +32,21 @@ test('public: multi-select menu opens in a fixed layer on body, flips up when sh
   w.document.body.click();
   assert.equal(w.document.querySelector('.ms-portal'), null, 'outside click closes the menu');
 });
+
+test('public: hamburger collapses the sidebar on desktop, remembers the choice, and keeps the drawer on narrow screens', async (t) => {
+  const { w, dom } = browser('public');
+  t.after(() => dom.window.close());
+  w.innerWidth = 1440;
+  await w.App.init();
+  const app = w.document.getElementById('app');
+  w.document.getElementById('hamburger').click();
+  assert.ok(app.classList.contains('sidebar-collapsed'), 'desktop click collapses');
+  assert.equal(w.localStorage.getItem('crmqc.sidebar.v1'), 'collapsed');
+  w.document.getElementById('hamburger').click();
+  assert.ok(!app.classList.contains('sidebar-collapsed'), 'second click expands');
+  assert.equal(w.localStorage.getItem('crmqc.sidebar.v1'), 'open');
+  w.innerWidth = 800;
+  w.document.getElementById('hamburger').click();
+  assert.ok(w.document.getElementById('sidebar').classList.contains('open'), 'narrow screens open the drawer');
+  assert.ok(!app.classList.contains('sidebar-collapsed'), 'narrow screens do not collapse');
+});
