@@ -115,7 +115,7 @@ i { font-style: normal; }
 /* -------------------------------------------------------------------------------- */
 .topbar {
   height: var(--topbar-h); display: flex; align-items: center; gap: 14px; padding: 0 22px;
-  background: rgba(9,13,22,.85); backdrop-filter: blur(10px);
+  background: var(--topbar-bg, rgba(9,13,22,.85)); backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line-soft); position: sticky; top: 0; z-index: 50;
 }
 .topbar-title { font-size: 16px; font-weight: 800; }
@@ -311,7 +311,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
 .mini-bar > div { height: 100%; border-radius: 99px; background: var(--good); }
 
 /* فیلتر بار */
-.filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; padding: 14px 20px; border-bottom: 1px solid var(--line-soft); background: rgba(13,19,34,.5); }
+.filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; padding: 14px 20px; border-bottom: 1px solid var(--line-soft); background: var(--filters-bg, rgba(13,19,34,.5)); }
 .filters .field { min-width: 150px; flex: 1; }
 .filters .field.grow-0 { flex: 0 0 auto; min-width: unset; }
 .filters label { font-size: 11.3px; font-weight: 700; color: var(--muted); }

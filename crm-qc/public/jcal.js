@@ -119,14 +119,16 @@ function attach(el, opts) {
     ensurePopup();
     popup.innerHTML = '';
     renderMonth(popup, opts.onPick);
-    // جایگذاری
+    // جایگذاری: fixed + زیر فیلد (یا بالای آن اگر جا نبود)، تراز با لبه‌ی راست فیلد (RTL)
     const rect = el.getBoundingClientRect();
-    popup.style.position = 'absolute';
-    popup.style.top = (rect.bottom + window.scrollY + 6) + 'px';
-    const width = popup.offsetWidth || 300;
-  const left = Math.max(window.scrollX + 8, Math.min(rect.left + window.scrollX, window.scrollX + window.innerWidth - width - 8));
-  popup.style.left = left + 'px';
+    popup.style.position = 'fixed';
     popup.classList.add('show');
+    const pw = popup.offsetWidth || 300, ph = popup.offsetHeight || 320;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let top = rect.bottom + 6;
+    if (top + ph > vh - 8 && rect.top - 6 - ph >= 8) top = rect.top - 6 - ph;
+    popup.style.top = Math.max(8, Math.min(top, vh - ph - 8)) + 'px';
+    popup.style.left = Math.max(8, Math.min(rect.right - pw, vw - pw - 8)) + 'px';
     e.stopPropagation();
   });
   // نمایش اولیه

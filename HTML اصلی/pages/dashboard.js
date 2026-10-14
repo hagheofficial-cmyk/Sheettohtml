@@ -125,7 +125,7 @@ App.register('dashboard', {
             datasets: [{
               data: d.dist || [0, 0, 0, 0],
               backgroundColor: ['rgba(52,211,153,.7)', 'rgba(56,189,248,.7)', 'rgba(251,191,36,.7)', 'rgba(248,113,113,.7)'],
-              borderColor: '#111a2e', borderWidth: 3
+              borderColor: (typeof App !== 'undefined' && App.theme === 'light') ? '#f3f6fb' : '#111a2e', borderWidth: 3
             }]
           },
           options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '62%' }
@@ -147,7 +147,7 @@ App.register('dashboard', {
           type: 'doughnut',
           data: {
             labels: slaParts.map((x) => x[0]),
-            datasets: [{ data: slaParts.map((x) => x[1]), backgroundColor: slaParts.map((x) => x[2]), borderColor: '#111a2e', borderWidth: 3 }]
+            datasets: [{ data: slaParts.map((x) => x[1]), backgroundColor: slaParts.map((x) => x[2]), borderColor: (typeof App !== 'undefined' && App.theme === 'light') ? '#f3f6fb' : '#111a2e', borderWidth: 3 }]
           },
           options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '62%' }
         });

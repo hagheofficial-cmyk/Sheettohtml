@@ -78,8 +78,10 @@ function pickMulti(w, label, values) {
   const field = [...w.document.querySelectorAll('.field')].find((node) => node.firstElementChild && node.firstElementChild.textContent === label);
   if (!field) throw new Error('Missing multi-select: ' + label);
   field.querySelector('.ms-btn').click();
+  // منوی باز به یک لایه‌ی شناور روی body منتقل می‌شود؛ لیست همان منوی باز این فیلد است
+  const list = w.document.querySelector('.ms-portal.open .ms-list') || field.querySelector('.ms-list');
   for (const value of values) {
-    const cb = [...field.querySelectorAll('.ms-list input')].find((node) => node.dataset.v === value);
+    const cb = [...list.querySelectorAll('input')].find((node) => node.dataset.v === value);
     if (!cb) throw new Error('Missing option: ' + value);
     cb.checked = true; cb.dispatchEvent(new w.Event('change', { bubbles: true }));
   }

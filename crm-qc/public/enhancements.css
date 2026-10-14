@@ -2,18 +2,20 @@
 :root { color-scheme: dark; }
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg:#f4f7fc; --bg-2:#edf2f9; --panel:#ffffff; --panel-2:#f5f8fd; --panel-soft:#f0f5fb;
-  --soft:#e8eef7; --line:#d5dfed; --line-soft:#e2e9f3; --border:#d5dfed; --border-soft:#e2e9f3;
-  --ink:#14263e; --ink-2:#334a66; --muted:#576d87;
-  --brand:#036ea7; --brand-deep:#0369a1; --brand-soft:rgba(2,132,199,.09);
-  --violet:#6d42c8; --violet-soft:rgba(109,66,200,.08);
-  --good:#047857; --good-deep:#047857; --good-soft:rgba(5,150,105,.10);
-  --bad:#be2637; --bad-deep:#be2637; --bad-soft:rgba(225,29,72,.08);
-  --warn:#9a6407; --warn-soft:rgba(217,119,6,.10); --shadow:0 12px 36px rgba(26,55,96,.09);
+  /* پالت حالت روشن: خاکستری‌آبی ملایم‌تر (کمتر سفید، کمتر خیرگی) */
+  --bg:#e4eaf3; --bg-2:#dde6f1; --panel:#f3f6fb; --panel-2:#e9eff7; --panel-soft:#e1e9f4;
+  --soft:#d6e0ed; --line:#bccbdd; --line-soft:#cfdae8; --border:#bccbdd; --border-soft:#cfdae8;
+  --ink:#1c2c42; --ink-2:#3a4e69; --muted:#5a6e89;
+  --brand:#0a6a9c; --brand-deep:#095f8c; --brand-soft:rgba(2,132,199,.10);
+  --violet:#6540bd; --violet-soft:rgba(109,66,200,.09);
+  --good:#066b4f; --good-deep:#066b4f; --good-soft:rgba(5,150,105,.11);
+  --bad:#b42539; --bad-deep:#b42539; --bad-soft:rgba(225,29,72,.09);
+  --warn:#8e5f08; --warn-soft:rgba(217,119,6,.11); --shadow:0 10px 28px rgba(28,52,88,.11);
+  --filters-bg:#e9eff7;
 }
-[data-theme="light"] .sidebar { background:linear-gradient(180deg,#fff,#edf3fb); }
-[data-theme="light"] .topbar { background:rgba(255,255,255,.95); }
-[data-theme="light"] .global-range { background:rgba(255,255,255,.98); }
+[data-theme="light"] .sidebar { background:linear-gradient(180deg,#eef3f9,#dfe7f2); }
+[data-theme="light"] .topbar { background:rgba(228,234,243,.94); }
+[data-theme="light"] .global-range { background:var(--panel-2); }
 [data-theme="light"] .tbl thead { background:var(--panel-2); }
 [data-theme="light"] .btn.primary,[data-theme="light"] .btn.brand { color:#fff; }
 [data-theme="light"] .heatmap td { color:var(--ink); }
@@ -365,3 +367,22 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* =========================================================================
+   فیلترها و منوهای شناور — یکدست، و بالای همه‌ی UI
+   ========================================================================= */
+.filters { gap: 12px; padding: 14px 18px; align-items: flex-end; }
+.filters .field { min-width: 165px; gap: 5px; }
+.filters .field.grow-0 { flex: 0 0 auto; }
+.filters label { font-size: 11.5px; font-weight: 700; color: var(--muted); margin: 0; }
+.filters .input, .filters .mselect .ms-btn { height: 36px; padding: 0 11px; font-size: 12.6px; line-height: 1.2; }
+.filters .mselect .ms-btn { min-width: 170px; }
+[data-theme="light"] .filters { background: var(--filters-bg); }
+
+/* منوی چندانتخابی وقتی باز است به body منتقل می‌شود (position:fixed، بالای کارت‌ها و جدول‌ها) */
+.mselect.ms-portal { position: fixed; z-index: 6000; min-width: 235px; }
+.mselect.ms-portal .ms-menu { position: relative; top: auto; inset-inline-start: auto; z-index: auto; min-width: 0; width: 100%; }
+.mselect.ms-portal.open .ms-menu { display: block; }
+.jcal-pop { z-index: 6000; }
+[data-theme="light"] .ms-menu, [data-theme="light"] .combo .menu { background: var(--panel); box-shadow: 0 12px 30px rgba(28,52,88,.16); }
+[data-theme="light"] .jcal-pop { background: var(--panel); box-shadow: 0 14px 38px rgba(28,52,88,.18); }

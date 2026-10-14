@@ -252,6 +252,7 @@ function combo(opts) {
   return wrap;
 }
 
+let openMs = null; // منوی چندانتخابی بازِ فعلی (فقط یکی همزمان)
 /** چندانتخابی جستجوپذیر (چک‌باکسی) — برای فیلترها */
 function multiSelect(opts) {
   // opts: {label, items:[{value,label,sub}], allLabel, placeholder, onChange, width}
@@ -301,13 +302,50 @@ function multiSelect(opts) {
   }
   function getValues() { return items.filter((x) => x._sel).map((x) => x.value); }
 
-  btn.addEventListener('click', (e) => { e.stopPropagation(); const was = box.classList.contains('open'); $$('.mselect.open').forEach((x) => x.classList.remove('open')); if (!was) { box.classList.add('open'); search.value = ''; renderList(''); search.focus(); } });
+  // منوی شناور: هنگام باز شدن به body منتقل و با position:fixed کنار دکمه قرار می‌گیرد (بالای همه‌ی UI)
+  const portal = document.createElement('div');
+  portal.className = 'mselect ms-portal';
+  function placeMenu() {
+    const r = btn.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const width = Math.max(235, r.width);
+    const spaceBelow = vh - r.bottom - 10, spaceAbove = r.top - 10;
+    const left = Math.max(8, Math.min(r.right - width, vw - width - 8));
+    portal.style.left = left + 'px';
+    portal.style.minWidth = width + 'px';
+    if (spaceBelow >= 200 || spaceBelow >= spaceAbove) {
+      portal.style.top = (r.bottom + 5) + 'px'; portal.style.bottom = 'auto';
+      menu.style.maxHeight = Math.max(120, Math.min(290, spaceBelow)) + 'px';
+    } else {
+      portal.style.bottom = (vh - r.top + 5) + 'px'; portal.style.top = 'auto';
+      menu.style.maxHeight = Math.max(120, Math.min(290, spaceAbove)) + 'px';
+    }
+  }
+  function closeMenu() {
+    if (!portal.classList.contains('open')) return;
+    portal.classList.remove('open'); portal.remove();
+    box.classList.remove('open'); box.appendChild(menu);
+    menu.style.maxHeight = '';
+    if (openMs === closeMenu) openMs = null;
+  }
+  function openMenu() {
+    if (openMs && openMs !== closeMenu) openMs();
+    portal.appendChild(menu); document.body.appendChild(portal);
+    portal.classList.add('open'); box.classList.add('open');
+    placeMenu(); openMs = closeMenu;
+    search.value = ''; renderList(''); search.focus({ preventScroll: true });
+  }
+  btn.addEventListener('click', (e) => { e.stopPropagation(); if (portal.classList.contains('open')) closeMenu(); else openMenu(); });
   menu.addEventListener('click', (e) => e.stopPropagation());
   search.addEventListener('input', () => renderList(search.value));
   allCb.addEventListener('change', () => {
     if (allCb.checked) { items.forEach((it) => { it._sel = false; }); renderList(search.value); syncLabel(); if (opts.onChange) opts.onChange([]); }
   });
-  document.addEventListener('click', () => box.classList.remove('open'));
+  document.addEventListener('click', closeMenu);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+  window.addEventListener('resize', closeMenu);
+  window.addEventListener('hashchange', closeMenu);
+  window.addEventListener('scroll', closeMenu, { passive: true });
   wrap.addEventListener('destroy', () => {});
 
   wrap.getValues = getValues;

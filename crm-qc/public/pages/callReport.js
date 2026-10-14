@@ -30,7 +30,7 @@ function render(root) {
       <a id="crNewTab" class="btn soft" href="${esc(src)}" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> باز کردن در تب جدید</a>
     </div>
     <div class="card" style="padding:0;overflow:hidden">
-      <div id="crWrap" style="position:relative;background:#0f172a;height:calc(100vh - 178px);min-height:560px">
+      <div id="crWrap" style="position:relative;background:var(--bg-2,#0f172a);height:calc(100vh - 178px);min-height:560px">
         <iframe id="crFrame" src="${esc(src)}" title="گزارش تماس روزانه تیم‌ها" style="width:100%;height:100%;border:0;display:block"></iframe>
       </div>
     </div>`;

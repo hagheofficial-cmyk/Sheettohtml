@@ -20,8 +20,8 @@
         * { font-family: 'Vazirmatn', Tahoma, Arial, sans-serif; box-sizing: border-box; }
         
         body {
-            background: linear-gradient(135deg, #0f172a 0%, #1e2937 100%);
-            color: #e2e8f0;
+            background: linear-gradient(135deg, var(--cr-bg-deep,#0f172a) 0%, var(--cr-panel,#1e2937) 100%);
+            color: var(--cr-ink,#e2e8f0);
             margin: 0;
             padding: 20px;
             min-height: 100vh;
@@ -41,7 +41,7 @@
             flex-wrap: wrap;
             gap: 15px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-            border: 1px solid #334155;
+            border: 1px solid var(--cr-line,#334155);
         }
         
         .logo {
@@ -66,7 +66,7 @@
         .btn-success { background: linear-gradient(90deg, #16a34a, #22c55e); color: white; box-shadow: 0 4px 12px rgba(22,163,74,0.3); }
         .btn-warning { background: linear-gradient(90deg, #d97706, #f59e0b); color: white; }
         .btn-purple { background: linear-gradient(90deg, #7c3aed, #8b5cf6); color: white; }
-        .btn-secondary { background: rgba(30,41,59,0.8); color: #cbd5e1; border: 1px solid #64748b; }
+        .btn-secondary { background: rgba(30,41,59,0.8); color: var(--cr-ink-2,#cbd5e1); border: 1px solid #64748b; }
         .btn-danger { background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid #ef4444; }
         /* Step Panels */
         .step-panel {
@@ -77,7 +77,7 @@
         
         .step-title {
             display: flex; align-items: center; gap: 12px; margin-top: 0; margin-bottom: 20px;
-            color: #bae6fd; font-size: 1.4rem; border-bottom: 1px solid #334155; padding-bottom: 12px;
+            color: #bae6fd; font-size: 1.4rem; border-bottom: 1px solid var(--cr-line,#334155); padding-bottom: 12px;
         }
         
         .step-badge {
@@ -85,29 +85,29 @@
             display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; font-weight: bold; flex-shrink: 0;
         }
         /* Tabs inside Expert management */
-        .tabs { display: flex; gap: 10px; margin-bottom: 18px; border-bottom: 1px solid #334155; padding-bottom: 10px; flex-wrap: wrap; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 18px; border-bottom: 1px solid var(--cr-line,#334155); padding-bottom: 10px; flex-wrap: wrap; }
         .tab-btn {
-            background: transparent; color: #94a3b8; border: 1px solid transparent;
+            background: transparent; color: var(--cr-muted,#94a3b8); border: 1px solid transparent;
             padding: 8px 16px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 0.9rem;
             transition: all 0.2s;
         }
-        .tab-btn.active { background: #1e2937; color: #38bdf8; border-color: #38bdf8; }
+        .tab-btn.active { background: var(--cr-panel,#1e2937); color: #38bdf8; border-color: #38bdf8; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         /* Editable Table */
-        .expert-table-wrap { max-height: 400px; overflow-y: auto; border: 1px solid #334155; border-radius: 12px; margin-bottom: 15px; }
-        table { width: 100%; border-collapse: collapse; background: #1e2937; text-align: right; }
-        th, td { padding: 12px 14px; border-bottom: 1px solid #334155; vertical-align: middle; }
-        th { background: #0f172a; color: #bae6fd; font-weight: 700; position: sticky; top: 0; z-index: 10; white-space: nowrap; }
+        .expert-table-wrap { max-height: 400px; overflow-y: auto; border: 1px solid var(--cr-line,#334155); border-radius: 12px; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; background: var(--cr-panel,#1e2937); text-align: right; }
+        th, td { padding: 12px 14px; border-bottom: 1px solid var(--cr-line,#334155); vertical-align: middle; }
+        th { background: var(--cr-bg-deep,#0f172a); color: #bae6fd; font-weight: 700; position: sticky; top: 0; z-index: 10; white-space: nowrap; }
         
         .input-inline {
-            background: #0f172a; border: 1px solid #475569; color: white;
+            background: var(--cr-bg-deep,#0f172a); border: 1px solid #475569; color: white;
             padding: 8px 10px; border-radius: 8px; width: 100%; font-family: inherit; font-size: 0.88rem;
         }
         .input-inline:focus { border-color: #38bdf8; outline: none; }
         textarea {
-            width: 100%; height: 140px; background: #0f172a; border: 1px solid #475569;
-            color: #e2e8f0; border-radius: 12px; padding: 15px; font-family: inherit; font-size: 0.92rem;
+            width: 100%; height: 140px; background: var(--cr-bg-deep,#0f172a); border: 1px solid #475569;
+            color: var(--cr-ink,#e2e8f0); border-radius: 12px; padding: 15px; font-family: inherit; font-size: 0.92rem;
             line-height: 1.6; resize: vertical; margin-bottom: 15px;
         }
         textarea:focus { border-color: #38bdf8; outline: none; }
@@ -120,15 +120,15 @@
         .upload-area:hover { background: rgba(30,41,59,0.8); border-color: #38bdf8; }
         /* Compact & Slim Batch Actions Box */
         .compact-batch-box {
-            background: linear-gradient(90deg, #1e3a8a, #1e2937);
+            background: linear-gradient(90deg, var(--cr-hover,#1e3a8a), var(--cr-panel,#1e2937));
             border: 1px solid #3b82f6; border-radius: 14px; padding: 12px 20px; margin-bottom: 18px;
             display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
             box-shadow: 0 8px 20px rgba(30,58,138,0.3);
         }
         /* Executive Dashboard Wrapper */
         #executiveDashboardContainer {
-            background: #1e2937;
-            border: 1px solid #334155;
+            background: var(--cr-panel,#1e2937);
+            border: 1px solid var(--cr-line,#334155);
             border-radius: 24px;
             padding: 26px;
             margin-bottom: 25px;
@@ -145,12 +145,12 @@
             box-shadow: 0 8px 20px rgba(0,0,0,0.3); transition: transform 0.3s;
         }
         .card:hover { transform: translateY(-3px); border-color: #60a5fa; }
-        .card h3 { margin: 0 0 6px 0; color: #94a3b8; font-size: 0.88rem; font-weight: 600; }
-        .card h2 { margin: 0 0 4px 0; font-size: 1.6rem; font-weight: 900; color: #f8fafc; }
+        .card h3 { margin: 0 0 6px 0; color: var(--cr-muted,#94a3b8); font-size: 0.88rem; font-weight: 600; }
+        .card h2 { margin: 0 0 4px 0; font-size: 1.6rem; font-weight: 900; color: var(--cr-ink-strong,#f8fafc); }
         .card .sub-metric { display: block; font-size: 0.8rem; color: #38bdf8; font-weight: 600; }
         /* Filter Row with Multi-select Checkboxes */
         .filters-bar {
-            background: rgba(15, 23, 42, 0.9); border: 1px solid #334155;
+            background: rgba(15, 23, 42, 0.9); border: 1px solid var(--cr-line,#334155);
             padding: 14px 20px; border-radius: 14px; margin-bottom: 20px;
             display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
         }
@@ -160,7 +160,7 @@
             display: inline-block;
         }
         .multi-select-btn {
-            background: #1e2937; border: 1px solid #475569; color: white;
+            background: var(--cr-panel,#1e2937); border: 1px solid #475569; color: white;
             padding: 9px 16px; border-radius: 10px; font-weight: 600; font-size: 0.88rem;
             cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s;
         }
@@ -170,19 +170,19 @@
         }
         .multi-select-dropdown {
             display: none; position: absolute; top: 110%; right: 0;
-            background: #0f172a; border: 1px solid #38bdf8; border-radius: 12px;
+            background: var(--cr-bg-deep,#0f172a); border: 1px solid #38bdf8; border-radius: 12px;
             padding: 14px; min-width: 250px; z-index: 500;
             box-shadow: 0 15px 35px rgba(0,0,0,0.8);
         }
         .multi-select-dropdown.show { display: block; }
         .select-actions {
-            display: flex; justify-content: space-between; border-bottom: 1px solid #334155;
+            display: flex; justify-content: space-between; border-bottom: 1px solid var(--cr-line,#334155);
             padding-bottom: 8px; margin-bottom: 10px; font-size: 0.82rem;
         }
         .select-actions a { color: #38bdf8; cursor: pointer; text-decoration: none; font-weight: 600; }
         .select-actions a:hover { text-decoration: underline; }
         .checkbox-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-        .checkbox-item { display: flex; align-items: center; gap: 8px; color: #e2e8f0; font-size: 0.86rem; cursor: pointer; }
+        .checkbox-item { display: flex; align-items: center; gap: 8px; color: var(--cr-ink,#e2e8f0); font-size: 0.86rem; cursor: pointer; }
         .checkbox-item input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #2563eb; }
         /* Shift start time picker (appears when first-call column is shown) */
         .start-time-control {
@@ -198,7 +198,7 @@
             color: #fcd34d; font-weight: 700; font-size: 0.84rem; white-space: nowrap;
         }
         .start-time-control input[type="time"] {
-            background: #0f172a;
+            background: var(--cr-bg-deep,#0f172a);
             border: 1px solid #f59e0b;
             color: #fef08a;
             padding: 5px 10px;
@@ -235,8 +235,8 @@
         
         /* Table container formatted for perfectly fixed alignment with zero clipping */
         #tableContainer {
-            background: #1e2937;
-            border: 1px solid #334155;
+            background: var(--cr-panel,#1e2937);
+            border: 1px solid var(--cr-line,#334155);
             border-radius: 20px;
             padding: 22px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
@@ -244,7 +244,7 @@
         }
         .results-table-wrap {
             border-radius: 14px; overflow-x: auto;
-            border: 1px solid #334155; background: #0f172a;
+            border: 1px solid var(--cr-line,#334155); background: var(--cr-bg-deep,#0f172a);
         }
         
         #resultsTable { width: 100%; table-layout: auto; }
@@ -252,7 +252,7 @@
         #resultsTable td { padding: 11px 7px; font-size: 0.93rem; line-height: 1.45; text-align: center; }
         #resultsTable td:nth-child(3) { text-align: right; }
         .badge-team {
-            background: #1e3a8a; color: #bfdbfe;
+            background: var(--cr-hover,#1e3a8a); color: #bfdbfe;
             padding: 4px 8px; border-radius: 8px;
             font-size: 0.84rem; font-weight: 600;
             display: inline-block; line-height: 1.3;
@@ -266,7 +266,7 @@
             max-width: 165px; word-wrap: break-word;
         }
         select.attendance-select {
-            background: #1e2937; border: 1px solid #f59e0b; color: #fef08a;
+            background: var(--cr-panel,#1e2937); border: 1px solid #f59e0b; color: #fef08a;
             padding: 4px 8px; border-radius: 8px; font-size: 0.86rem; font-weight: bold;
             cursor: pointer; outline: none;
             max-width: 175px;
@@ -312,7 +312,7 @@
             text-align: center; padding: 20px;
         }
         .progress-box {
-            background: #1e2937; border: 1px solid #60a5fa; border-radius: 24px;
+            background: var(--cr-panel,#1e2937); border: 1px solid #60a5fa; border-radius: 24px;
             padding: 35px 45px; max-width: 500px; width: 100%; box-shadow: 0 25px 50px rgba(0,0,0,0.8);
         }
     
@@ -343,9 +343,9 @@
         }
         
         .menu-tab-btn {
-            background: #0f172a !important; /* Dark solid tab background */
-            border: 1px solid #334155 !important;
-            color: #94a3b8 !important;
+            background: var(--cr-bg-deep,#0f172a) !important; /* Dark solid tab background */
+            border: 1px solid var(--cr-line,#334155) !important;
+            color: var(--cr-muted,#94a3b8) !important;
             padding: 8px 12px !important;
             font-size: 0.76rem !important;
             cursor: pointer !important;
@@ -362,8 +362,8 @@
             margin: 0 !important;
         }
         .menu-tab-btn:hover {
-            background: #1e293b !important;
-            color: #f8fafc !important;
+            background: var(--cr-panel-2,#1e293b) !important;
+            color: var(--cr-ink-strong,#f8fafc) !important;
         }
         .menu-tab-btn.active {
             background: #2563eb !important; /* Solid blue for active tab */
@@ -379,8 +379,8 @@
             bottom: 56px;
             left: 0;
             width: 340px;
-            background: #1e293b !important; /* Solid dark theme, 100% solid, no glassmorphism */
-            border: 1px solid #334155 !important; /* Solid crisp border */
+            background: var(--cr-panel-2,#1e293b) !important; /* Solid dark theme, 100% solid, no glassmorphism */
+            border: 1px solid var(--cr-line,#334155) !important; /* Solid crisp border */
             border-radius: 16px !important;
             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6) !important;
             overflow: hidden !important;
@@ -397,9 +397,9 @@
         }
         
         #quickMenuPanel .btn {
-            background: #0f172a !important; /* Solid darker button back */
-            border: 1px solid #334155 !important;
-            color: #cbd5e1 !important;
+            background: var(--cr-bg-deep,#0f172a) !important; /* Solid darker button back */
+            border: 1px solid var(--cr-line,#334155) !important;
+            color: var(--cr-ink-2,#cbd5e1) !important;
             padding: 10px 14px !important;
             border-radius: 10px !important;
             cursor: pointer !important;
@@ -422,7 +422,7 @@
             text-align: center !important;
         }
         #quickMenuPanel .btn:hover {
-            background: #1e293b !important;
+            background: var(--cr-panel-2,#1e293b) !important;
             border-color: #475569 !important;
             color: #ffffff !important;
             transform: translateY(-1px) !important;
@@ -467,13 +467,13 @@
         }
         /* Sortable table headers */
         #resultsTable th.sortable { cursor: pointer; user-select: none; position: relative; transition: all 0.2s; }
-        #resultsTable th.sortable:hover { background: #1e3a8a !important; color: #f8fafc !important; }
+        #resultsTable th.sortable:hover { background: var(--cr-hover,#1e3a8a) !important; color: var(--cr-ink-strong,#f8fafc) !important; }
         #resultsTable th.sortable.active { background: #2563eb !important; color: #fff !important; }
         .sort-icon { margin-right: 4px; font-size: 0.75rem; opacity: 0.6; }
         .sort-icon.active { opacity: 1; color: #fcd34d; }
         /* Small top-of-page column toggle buttons (visible in main access & generated access files) */
-        .col-top-btn { display:inline-flex; align-items:center; gap:5px; padding:6px 11px; font-size:0.78rem; font-weight:700; border-radius:10px; cursor:pointer; font-family:'Vazirmatn',sans-serif; background:rgba(30,41,59,0.7); color:#94a3b8; border:1px solid #334155; transition:all 0.2s; white-space:nowrap; }
-        .col-top-btn:hover { border-color:#64748b; color:#e2e8f0; }
+        .col-top-btn { display:inline-flex; align-items:center; gap:5px; padding:6px 11px; font-size:0.78rem; font-weight:700; border-radius:10px; cursor:pointer; font-family:'Vazirmatn',sans-serif; background:rgba(30,41,59,0.7); color:var(--cr-muted,#94a3b8); border:1px solid var(--cr-line,#334155); transition:all 0.2s; white-space:nowrap; }
+        .col-top-btn:hover { border-color:#64748b; color:var(--cr-ink,#e2e8f0); }
         .col-top-btn i { font-size:0.75rem; }
         .col-top-btn.active[data-col="first"]  { background:rgba(56,189,248,0.14);  border-color:#38bdf8; color:#7dd3fc; }
         .col-top-btn.active[data-col="reason"] { background:rgba(245,158,11,0.14);  border-color:#f59e0b; color:#fcd34d; }
@@ -489,7 +489,7 @@
                 <div class="logo" style="overflow:hidden;background:none"><img src="logo.png" width="52" height="52" alt="لوگوی سامانه"></div>
                 <div>
                     <h1>گزارش تماس روزانه تیم ها / شرکای بیمه بازار</h1>
-                    <span style="font-size:0.9rem; color:#94a3b8;">شرکای بیمه بازار | مدیریت هوشمند تماس‌ها و کارشناسان</span>
+                    <span style="font-size:0.9rem; color:var(--cr-muted,#94a3b8);">شرکای بیمه بازار | مدیریت هوشمند تماس‌ها و کارشناسان</span>
                 </div>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -503,7 +503,7 @@
                 <span class="step-badge">۱</span>
                 مدیریت لیست کارشناسان، تیم‌ها و تیم‌های زیر مجموعه (جدول ثابت و قابل ویرایش)
             </h2>
-            <p style="color:#94a3b8; margin-top:-15px; margin-bottom:18px;">
+            <p style="color:var(--cr-muted,#94a3b8); margin-top:-15px; margin-bottom:18px;">
                 اطلاعات وارد شده در مرورگر شما ذخیره می‌شود تا در مراجعات بعدی نیازی به وارد کردن مجدد نباشد. همچنین می‌توانید از فایل اکسل یا تکست‌باکس استفاده کنید.
             </p>
             <div class="tabs">
@@ -551,9 +551,9 @@
             </div>
             <!-- Tab 2: Batch Text Paste -->
             <div id="tab-text" class="tab-content">
-                <p style="color:#cbd5e1; margin-top:0;">
+                <p style="color:var(--cr-ink-2,#cbd5e1); margin-top:0;">
                     متن حاوی اطلاعات کارشناسان (مثلاً کپی شده از اکسل یا تلگرام) را در کادر زیر وارد کنید. هر کارشناس در یک خط باشد:
-                    <br><small style="color:#94a3b8;">فرمت‌های پشتیبانی شده: <code>داخلی [فاصله/تب] نام کارشناس [فاصله/تب] تیم اصلی [فاصله/تب] تیم زیر مجموعه</code></small>
+                    <br><small style="color:var(--cr-muted,#94a3b8);">فرمت‌های پشتیبانی شده: <code>داخلی [فاصله/تب] نام کارشناس [فاصله/تب] تیم اصلی [فاصله/تب] تیم زیر مجموعه</code></small>
                 </p>
                 <textarea id="batchTextArea" placeholder="مثال:&#10;3035	علی باقری	تیم فروش حضوری ویژه	تیم زیر مجموعه مروارید&#10;3079	زهرا میرزائی	تیم فروش ۱	تیم زیر مجموعه فریبا&#10;3081	سیما معصومی	تیم فروش ۲	تیم زیر مجموعه مروارید"></textarea>
                 <div style="display:flex; justify-content:flex-end; gap:10px;">
@@ -565,7 +565,7 @@
                 <div class="upload-area" onclick="document.getElementById('mappingFileInput').click()">
                     <i class="fas fa-file-excel" style="font-size:3.5rem; color:#a78bfa; margin-bottom:12px;"></i>
                     <h3 style="margin:0 0 8px 0;">برای انتخاب فایل اکسل کارشناسان کلیک کنید یا فایل را اینجا بکشید</h3>
-                    <p style="color:#94a3b8; margin:0;">ستون‌های مجاز: CallerID (یا داخلی)، نام کارشناس، تیم اصلی، تیم زیر مجموعه</p>
+                    <p style="color:var(--cr-muted,#94a3b8); margin:0;">ستون‌های مجاز: CallerID (یا داخلی)، نام کارشناس، تیم اصلی، تیم زیر مجموعه</p>
                     <input type="file" id="mappingFileInput" accept=".xlsx,.xls" style="display:none;" onchange="handleExpertExcelUpload(event)">
                 </div>
                 <div style="margin-top:15px; text-align:center;">
@@ -576,7 +576,7 @@
         </div>
         <!-- Step 2: Upload Call Reports Data -->
         <div id="step2Panel" class="step-panel" style="display:none;">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:12px; margin-bottom:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--cr-line,#334155); padding-bottom:12px; margin-bottom:20px;">
                 <h2 class="step-title" style="border:none; margin:0; padding:0;">
                     <span class="step-badge" style="background:#16a34a;">۲</span>
                     آپلود فایل گزارش تماس‌ها (خام اکسل)
@@ -586,7 +586,7 @@
             <div class="upload-area" id="dropArea2" onclick="document.getElementById('fileInput').click()">
                 <i class="fas fa-cloud-upload-alt" style="font-size:4.5rem; color:#60a5fa; margin-bottom:12px;"></i>
                 <h2 style="margin:0 0 8px 0;">فایل گزارش تماس‌ها را انتخاب کنید</h2>
-                <p style="color:#94a3b8; font-size:1.05rem; margin:0;">فایل اکسل خروجی مرکز تماس را آپلود کنید (محاسبه ۱۰۰٪ دقیق مختص کارشناسان تعریف‌شده)</p>
+                <p style="color:var(--cr-muted,#94a3b8); font-size:1.05rem; margin:0;">فایل اکسل خروجی مرکز تماس را آپلود کنید (محاسبه ۱۰۰٪ دقیق مختص کارشناسان تعریف‌شده)</p>
                 <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none;">
             </div>
             <div id="step2Status" class="status-msg"></div>
@@ -670,7 +670,7 @@
                         <button type="button" onclick="toggleTaskColumn()" id="topToggleTaskBtn" class="col-top-btn" data-col="task" title="نمایش / مخفی‌سازی ستون تسک / پیگیری"><i class="fas fa-eye"></i><span>تسک / پیگیری</span></button>
                         <button type="button" onclick="toggleShiftColumn()" id="topToggleShiftBtn" class="col-top-btn" data-col="shift" title="نمایش / مخفی‌سازی ستون شیفت (شروع-پایان)"><i class="fas fa-eye"></i><span>شیفت</span></button>
                     </div>
-                    <span style="width:1px; height:26px; background:#334155; border-radius:2px;"></span>
+                    <span style="width:1px; height:26px; background:var(--cr-line,#334155); border-radius:2px;"></span>
                     <button onclick="toggleChartsRendering()" class="btn btn-secondary" id="toggleChartsBtn" style="padding:8px 12px; font-size:0.84rem; background:linear-gradient(90deg, #7c3aed, #4f46e5); color:white;"><i class="fas fa-chart-pie"></i> نمایش و تحلیل نمودارها</button>
                     <button onclick="showMappingModal()" class="btn btn-secondary" style="padding:8px 12px; font-size:0.84rem;"><i class="fas fa-users"></i> کارشناسان</button>
                 </div>
@@ -679,27 +679,27 @@
             <div id="executiveDashboardContainer">
                 
                 <!-- Executive Dashboard Header banner inside downloaded screenshot -->
-                <div style="background:linear-gradient(135deg, #0f172a, #1e2937); border:1px solid #475569; border-radius:18px; padding:18px 22px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
+                <div style="background:linear-gradient(135deg, var(--cr-bg-deep,#0f172a), var(--cr-panel,#1e2937)); border:1px solid #475569; border-radius:18px; padding:18px 22px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
                     <div style="display:flex; align-items:center; gap:14px;">
                         <div class="logo" style="width:50px; height:50px; font-size:22px;"><i class="fas fa-tachometer-alt"></i></div>
                         <div>
-                            <h2 style="margin:0; font-size:1.35rem; color:#f8fafc; font-weight:900;">گزارش تحلیلی تماس تیم ها / شرکای بیمه بازار</h2>
+                            <h2 style="margin:0; font-size:1.35rem; color:var(--cr-ink-strong,#f8fafc); font-weight:900;">گزارش تحلیلی تماس تیم ها / شرکای بیمه بازار</h2>
                             <div style="margin-top:5px; color:#38bdf8; font-size:0.92rem; font-weight:700; line-height:1.5;" id="dashSubtitleText">فیلتر فعال: کل تیم‌ها و زیرمجموعه‌ها</div>
                         </div>
                     </div>
-                    <div style="display:flex; align-items:center; gap:14px; background:#1e2937; padding:10px 18px; border-radius:12px; border:1px solid #334155; flex-wrap:wrap;">
+                    <div style="display:flex; align-items:center; gap:14px; background:var(--cr-panel,#1e2937); padding:10px 18px; border-radius:12px; border:1px solid var(--cr-line,#334155); flex-wrap:wrap;">
                         <div style="display:flex; align-items:center; gap:8px;">
                             <i class="fas fa-calendar-alt" style="color:#60a5fa; font-size:1.1rem;"></i>
                             <div>
-                                <span style="font-size:0.75rem; color:#94a3b8; display:block;">تاریخ گزارش:</span>
+                                <span style="font-size:0.75rem; color:var(--cr-muted,#94a3b8); display:block;">تاریخ گزارش:</span>
                                 <strong id="dashDateText" style="color:#fef08a; font-size:0.95rem;">—</strong>
                             </div>
                         </div>
-                        <div style="width:1px; height:28px; background:#334155;"></div>
+                        <div style="width:1px; height:28px; background:var(--cr-line,#334155);"></div>
                         <div style="display:flex; align-items:center; gap:8px;">
                             <i class="fas fa-clock" style="color:#4ade80; font-size:1.1rem;"></i>
                             <div>
-                                <span style="font-size:0.75rem; color:#94a3b8; display:block;">ساعت گزارش:</span>
+                                <span style="font-size:0.75rem; color:var(--cr-muted,#94a3b8); display:block;">ساعت گزارش:</span>
                                 <strong id="dashTimeText" style="color:#a78bfa; font-size:0.95rem;">—</strong>
                             </div>
                         </div>
@@ -729,30 +729,30 @@
             <div id="tableContainer">
                 
                 <!-- Report Header inside the captured image -->
-                <div style="background:linear-gradient(135deg, #0f172a, #1e2937); border:1px solid #475569; border-radius:16px; padding:16px 20px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
+                <div style="background:linear-gradient(135deg, var(--cr-bg-deep,#0f172a), var(--cr-panel,#1e2937)); border:1px solid #475569; border-radius:16px; padding:16px 20px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
                     <div style="display:flex; align-items:center; gap:12px;">
                         <div class="logo" style="width:48px; height:48px; font-size:20px;"><i class="fas fa-file-invoice"></i></div>
                         <div>
-                            <h2 style="margin:0; font-size:1.32rem; color:#f8fafc; font-weight:900;">گزارش تماس روزانه تیم ها / شرکای بیمه بازار</h2>
+                            <h2 style="margin:0; font-size:1.32rem; color:var(--cr-ink-strong,#f8fafc); font-weight:900;">گزارش تماس روزانه تیم ها / شرکای بیمه بازار</h2>
                             <div style="margin-top:4px; display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
                                 <span style="color:#38bdf8; font-size:0.88rem; font-weight:700; line-height:1.5;" id="tableSubtitleText">فیلتر فعال: کل تیم‌ها و زیرمجموعه‌ها</span>
                                 <span style="color:#fcd34d; font-size:0.85rem; background:rgba(252,211,77,0.1); padding:2px 8px; border-radius:6px; border:1px solid rgba(252,211,77,0.3);" id="imgHeaderAvgText">میانگین هر کارشناس: ۰ تماس</span>
                             </div>
                         </div>
                     </div>
-                    <div style="display:flex; align-items:center; gap:14px; background:#1e2937; padding:10px 18px; border-radius:12px; border:1px solid #334155; flex-wrap:wrap;">
+                    <div style="display:flex; align-items:center; gap:14px; background:var(--cr-panel,#1e2937); padding:10px 18px; border-radius:12px; border:1px solid var(--cr-line,#334155); flex-wrap:wrap;">
                         <div style="display:flex; align-items:center; gap:8px;">
                             <i class="fas fa-calendar-alt" style="color:#60a5fa; font-size:1.1rem;"></i>
                             <div>
-                                <span style="font-size:0.75rem; color:#94a3b8; display:block;">تاریخ گزارش:</span>
+                                <span style="font-size:0.75rem; color:var(--cr-muted,#94a3b8); display:block;">تاریخ گزارش:</span>
                                 <strong id="reportDateText" style="color:#fef08a; font-size:0.95rem;">—</strong>
                             </div>
                         </div>
-                        <div style="width:1px; height:28px; background:#334155;"></div>
+                        <div style="width:1px; height:28px; background:var(--cr-line,#334155);"></div>
                         <div style="display:flex; align-items:center; gap:8px;">
                             <i class="fas fa-clock" style="color:#4ade80; font-size:1.1rem;"></i>
                             <div>
-                                <span style="font-size:0.75rem; color:#94a3b8; display:block;">ساعت گزارش (بازه تماس‌ها):</span>
+                                <span style="font-size:0.75rem; color:var(--cr-muted,#94a3b8); display:block;">ساعت گزارش (بازه تماس‌ها):</span>
                                 <strong id="reportTimeRangeText" style="color:#a78bfa; font-size:0.95rem;">—</strong>
                             </div>
                         </div>
@@ -787,13 +787,13 @@
         </div>
         <!-- Team Experts Management Modal (restricted team access) -->
         <div id="teamExpertsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:100002; overflow-y:auto; padding:40px 20px;">
-            <div style="background:#1e2937; border:2px solid #3b82f6; border-radius:20px; max-width:840px; margin:0 auto; padding:25px; box-shadow:0 25px 60px rgba(0,0,0,0.8);">
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:12px; margin-bottom:14px;">
+            <div style="background:var(--cr-panel,#1e2937); border:2px solid #3b82f6; border-radius:20px; max-width:840px; margin:0 auto; padding:25px; box-shadow:0 25px 60px rgba(0,0,0,0.8);">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--cr-line,#334155); padding-bottom:12px; margin-bottom:14px;">
                     <h3 style="margin:0; color:#bae6fd; font-size:1.15rem;"><i class="fas fa-users-gear" style="color:#60a5fa; margin-left:8px;"></i>مدیریت کارشناسان: <span id="teamExpertsModalTitle" style="color:#fcd34d; font-weight:900;"></span></h3>
-                    <button onclick="closeTeamExpertsModal()" style="background:none; border:none; color:#94a3b8; font-size:1.5rem; cursor:pointer;">✕</button>
+                    <button onclick="closeTeamExpertsModal()" style="background:none; border:none; color:var(--cr-muted,#94a3b8); font-size:1.5rem; cursor:pointer;">✕</button>
                 </div>
-                <p style="color:#94a3b8; font-size:0.8rem; margin:0 0 12px 0; line-height:1.6;">افزودن، ویرایش (داخلی / نام / زیرمجموعه) یا حذف کارشناسان <strong style="color:#fef08a;">همین تیم</strong> - تغییرات همین‌جا ذخیره می‌شود و <strong style="color:#4ade80;">روی فایل HTML دسترسی این تیم</strong> اعمال می‌گردد. بعد از ذخیره، فایل دسترسی را دوباره دانلود کنید تا نسخه به‌روز به سرپرست تیم برسد.</p>
-                <div style="max-height:420px; overflow-y:auto; border-radius:12px; border:1px solid #334155;">
+                <p style="color:var(--cr-muted,#94a3b8); font-size:0.8rem; margin:0 0 12px 0; line-height:1.6;">افزودن، ویرایش (داخلی / نام / زیرمجموعه) یا حذف کارشناسان <strong style="color:#fef08a;">همین تیم</strong> - تغییرات همین‌جا ذخیره می‌شود و <strong style="color:#4ade80;">روی فایل HTML دسترسی این تیم</strong> اعمال می‌گردد. بعد از ذخیره، فایل دسترسی را دوباره دانلود کنید تا نسخه به‌روز به سرپرست تیم برسد.</p>
+                <div style="max-height:420px; overflow-y:auto; border-radius:12px; border:1px solid var(--cr-line,#334155);">
                     <table style="width:100%;">
                         <thead>
                             <tr>
@@ -815,12 +815,12 @@
         </div>
         <!-- Experts Preview Modal -->
         <div id="mappingModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:1000; overflow-y:auto; padding:40px 20px;">
-            <div style="background:#1e2937; border:1px solid #475569; border-radius:20px; max-width:800px; margin:0 auto; padding:25px;">
+            <div style="background:var(--cr-panel,#1e2937); border:1px solid #475569; border-radius:20px; max-width:800px; margin:0 auto; padding:25px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
                     <h3 style="margin:0; color:#bae6fd;"><i class="fas fa-users-cog"></i> اطلاعات کارشناسان و تیم‌بندی فعال</h3>
-                    <button onclick="closeMappingModal()" style="background:none; border:none; color:#94a3b8; font-size:1.5rem; cursor:pointer;">✕</button>
+                    <button onclick="closeMappingModal()" style="background:none; border:none; color:var(--cr-muted,#94a3b8); font-size:1.5rem; cursor:pointer;">✕</button>
                 </div>
-                <div style="max-height:420px; overflow-y:auto; border-radius:12px; border:1px solid #334155;">
+                <div style="max-height:420px; overflow-y:auto; border-radius:12px; border:1px solid var(--cr-line,#334155);">
                     <table>
                         <thead>
                             <tr>
@@ -838,22 +838,22 @@
         </div>
         <!-- Batch Selection Modal -->
         <div id="batchSelectionModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:1000; overflow-y:auto; padding:40px 20px;">
-            <div style="background:#1e2937; border:1px solid #38bdf8; border-radius:24px; max-width:650px; margin:0 auto; padding:30px; box-shadow:0 25px 50px rgba(0,0,0,0.8);">
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:15px; margin-bottom:20px;">
+            <div style="background:var(--cr-panel,#1e2937); border:1px solid #38bdf8; border-radius:24px; max-width:650px; margin:0 auto; padding:30px; box-shadow:0 25px 50px rgba(0,0,0,0.8);">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--cr-line,#334155); padding-bottom:15px; margin-bottom:20px;">
                     <h3 style="margin:0; color:#bae6fd; font-size:1.3rem;"><i class="fas fa-tasks"></i> انتخاب تیم‌ها و زیرمجموعه‌ها برای دانلود عکس (ZIP)</h3>
-                    <button onclick="closeBatchSelectionModal()" style="background:none; border:none; color:#94a3b8; font-size:1.5rem; cursor:pointer;">✕</button>
+                    <button onclick="closeBatchSelectionModal()" style="background:none; border:none; color:var(--cr-muted,#94a3b8); font-size:1.5rem; cursor:pointer;">✕</button>
                 </div>
-                <p style="color:#cbd5e1; font-size:0.9rem; margin-top:0;">
+                <p style="color:var(--cr-ink-2,#cbd5e1); font-size:0.9rem; margin-top:0;">
                     گزارش‌هایی که تمایل دارید تصویر آن‌ها تولید و در فایل ZIP قرار گیرد را انتخاب کنید:
                 </p>
-                <div style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; padding:10px 15px; border-radius:10px; margin-bottom:15px; font-size:0.88rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--cr-bg-deep,#0f172a); padding:10px 15px; border-radius:10px; margin-bottom:15px; font-size:0.88rem;">
                     <div>
                         <a onclick="toggleAllBatchTargets(true)" style="color:#38bdf8; cursor:pointer; font-weight:bold;">انتخاب همه</a> | 
                         <a onclick="toggleAllBatchTargets(false)" style="color:#f87171; cursor:pointer; font-weight:bold;">لغو همه</a>
                     </div>
                     <span id="batchSelectedCountText" style="color:#fef08a; font-weight:bold;">۰ گزارش انتخاب شده</span>
                 </div>
-                <div id="batchTargetsContainer" style="max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; background:#0f172a; padding:15px; border-radius:12px; border:1px solid #334155; margin-bottom:25px;"></div>
+                <div id="batchTargetsContainer" style="max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; background:var(--cr-bg-deep,#0f172a); padding:15px; border-radius:12px; border:1px solid var(--cr-line,#334155); margin-bottom:25px;"></div>
                 <div style="display:flex; gap:12px; justify-content:flex-end;">
                     <button onclick="closeBatchSelectionModal()" class="btn btn-secondary" style="padding:11px 22px;"><i class="fas fa-times"></i> انصراف</button>
                     <button onclick="startBatchImagesZip()" class="btn btn-primary" style="padding:11px 26px; background:linear-gradient(90deg,#38bdf8,#2563eb);"><i class="fas fa-file-archive"></i> شروع ساخت و دانلود ZIP</button>
@@ -864,9 +864,9 @@
         <div id="progressOverlay">
             <div class="progress-box">
                 <i class="fas fa-circle-notch fa-spin" style="font-size:3.5rem; color:#38bdf8; margin-bottom:20px;"></i>
-                <h3 style="margin:0 0 10px 0; color:#f8fafc;" id="progressTitle">در حال تولید گزارش‌های گروهی...</h3>
-                <p style="color:#94a3b8; margin:0 0 20px 0;" id="progressDetail">لطفاً چند لحظه شکیبا باشید</p>
-                <div style="background:#0f172a; border-radius:10px; height:12px; width:100%; overflow:hidden; margin-bottom:25px;">
+                <h3 style="margin:0 0 10px 0; color:var(--cr-ink-strong,#f8fafc);" id="progressTitle">در حال تولید گزارش‌های گروهی...</h3>
+                <p style="color:var(--cr-muted,#94a3b8); margin:0 0 20px 0;" id="progressDetail">لطفاً چند لحظه شکیبا باشید</p>
+                <div style="background:var(--cr-bg-deep,#0f172a); border-radius:10px; height:12px; width:100%; overflow:hidden; margin-bottom:25px;">
                     <div id="progressBarFill" style="background:linear-gradient(90deg,#38bdf8,#2563eb); height:100%; width:0%; transition:width 0.3s;"></div>
                 </div>
                 <button onclick="cancelBatchProcess()" class="btn btn-danger" style="padding:10px 24px; font-size:0.95rem; width:100%; justify-content:center;"><i class="fas fa-stop-circle"></i> لغو و توقف عملیات</button>
@@ -874,12 +874,12 @@
         </div>
         <!-- Per-Expert Shift Edit Modal -->
         <div id="shiftEditModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:2000; overflow-y:auto; padding:40px 20px;">
-            <div style="background:#1e2937; border:1px solid #22d3ee; border-radius:20px; max-width:520px; margin:0 auto; padding:26px; box-shadow:0 25px 60px rgba(0,0,0,0.8);">
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:12px; margin-bottom:18px;">
+            <div style="background:var(--cr-panel,#1e2937); border:1px solid #22d3ee; border-radius:20px; max-width:520px; margin:0 auto; padding:26px; box-shadow:0 25px 60px rgba(0,0,0,0.8);">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--cr-line,#334155); padding-bottom:12px; margin-bottom:18px;">
                     <h3 style="margin:0; color:#bae6fd; font-size:1.2rem;"><i class="fas fa-user-clock" style="color:#22d3ee; margin-left:8px;"></i> تنظیم شیفت اختصاصی کارشناس</h3>
-                    <button onclick="closeShiftModal()" style="background:none; border:none; color:#94a3b8; font-size:1.5rem; cursor:pointer;">✕</button>
+                    <button onclick="closeShiftModal()" style="background:none; border:none; color:var(--cr-muted,#94a3b8); font-size:1.5rem; cursor:pointer;">✕</button>
                 </div>
-                <div id="shiftModalExpertInfo" style="background:#0f172a; border:1px solid #334155; border-radius:12px; padding:12px 16px; margin-bottom:18px;"></div>
+                <div id="shiftModalExpertInfo" style="background:var(--cr-bg-deep,#0f172a); border:1px solid var(--cr-line,#334155); border-radius:12px; padding:12px 16px; margin-bottom:18px;"></div>
                 <div style="background:rgba(34,211,238,0.08); border:1px solid #22d3ee; border-radius:12px; padding:14px; margin-bottom:18px; font-size:0.84rem; color:#a5f3fc; line-height:1.7;">
                     <i class="fas fa-info-circle" style="color:#22d3ee;"></i>
                     در صورتی که این کارشناس شیفتش با شیفت پیش‌فرض کل تیم تفاوت دارد (مثلاً از ۱۲ تا ۲۱) ساعت‌های اختصاصی زیر را ثبت کنید. اگر ساعت شروع را خالی بگذارید، ساعت شروع شیفت پیش‌فرض تیم برایش اعمال می‌شود.
@@ -887,16 +887,16 @@
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-bottom:14px;">
                     <div>
                         <label style="display:block; color:#67e8f9; font-weight:700; font-size:0.88rem; margin-bottom:6px;"><i class="fas fa-play"></i> ساعت شروع شیفت:</label>
-                        <input type="time" id="shiftModalStart" style="width:100%; background:#0f172a; border:1px solid #22d3ee; color:#67e8f9; padding:10px; border-radius:10px; font-family:inherit; font-size:1rem; font-weight:700; direction:ltr; text-align:center; outline:none;">
+                        <input type="time" id="shiftModalStart" style="width:100%; background:var(--cr-bg-deep,#0f172a); border:1px solid #22d3ee; color:#67e8f9; padding:10px; border-radius:10px; font-family:inherit; font-size:1rem; font-weight:700; direction:ltr; text-align:center; outline:none;">
                     </div>
                     <div>
                         <label style="display:block; color:#a7f3d0; font-weight:700; font-size:0.88rem; margin-bottom:6px;"><i class="fas fa-stop"></i> ساعت پایان شیفت:</label>
-                        <input type="time" id="shiftModalEnd" style="width:100%; background:#0f172a; border:1px solid #22c55e; color:#bbf7d0; padding:10px; border-radius:10px; font-family:inherit; font-size:1rem; font-weight:700; direction:ltr; text-align:center; outline:none;">
+                        <input type="time" id="shiftModalEnd" style="width:100%; background:var(--cr-bg-deep,#0f172a); border:1px solid #22c55e; color:#bbf7d0; padding:10px; border-radius:10px; font-family:inherit; font-size:1rem; font-weight:700; direction:ltr; text-align:center; outline:none;">
                     </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:8px; margin-bottom:22px;">
                     <input type="checkbox" id="shiftModalUseDefault" style="width:18px; height:18px; cursor:pointer; accent-color:#22d3ee;" onchange="onShiftModalUseDefaultChange(this.checked)">
-                    <label for="shiftModalUseDefault" style="color:#cbd5e1; font-size:0.9rem; cursor:pointer;">استفاده از ساعت پیش‌فرض تیم (بدون شیفت اختصاصی)</label>
+                    <label for="shiftModalUseDefault" style="color:var(--cr-ink-2,#cbd5e1); font-size:0.9rem; cursor:pointer;">استفاده از ساعت پیش‌فرض تیم (بدون شیفت اختصاصی)</label>
                 </div>
                 <div style="display:flex; gap:10px; justify-content:flex-end;">
                     <button onclick="resetExpertShiftToDefault()" class="btn btn-danger" style="padding:10px 18px;"><i class="fas fa-undo"></i> بازنشانی به پیش‌فرض</button>
@@ -909,18 +909,18 @@
 
         <!-- Access Management Modal -->
         <div id="accessManagementModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:99999; overflow-y:auto; padding:40px 20px;">
-            <div style="background:#1e2937; border:2px solid #8b5cf6; border-radius:24px; max-width:880px; margin:0 auto; padding:30px; box-shadow:0 25px 60px rgba(0,0,0,0.85); direction:rtl;">
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:15px; margin-bottom:20px;">
+            <div style="background:var(--cr-panel,#1e2937); border:2px solid #8b5cf6; border-radius:24px; max-width:880px; margin:0 auto; padding:30px; box-shadow:0 25px 60px rgba(0,0,0,0.85); direction:rtl;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--cr-line,#334155); padding-bottom:15px; margin-bottom:20px;">
                     <div style="display:flex; align-items:center; gap:12px;">
                         <div style="width:44px; height:44px; border-radius:12px; background:rgba(139,92,246,0.15); display:flex; align-items:center; justify-content:center; color:#a78bfa; font-size:1.3rem;">
                             <i class="fas fa-key"></i>
                         </div>
                         <div>
                             <h3 style="margin:0; color:#f3e8ff; font-size:1.3rem; font-weight:900;">مدیریت دسترسی‌های اختصاصی تیم‌ها و تعیین رمز عبور</h3>
-                            <span style="font-size:0.84rem; color:#94a3b8;">ایجاد دسترسی سفارشی با قابلیت محدودیت مشاهده فقط به تیم انتخاب شده</span>
+                            <span style="font-size:0.84rem; color:var(--cr-muted,#94a3b8);">ایجاد دسترسی سفارشی با قابلیت محدودیت مشاهده فقط به تیم انتخاب شده</span>
                         </div>
                     </div>
-                    <button onclick="closeAccessManagementModal()" style="background:none; border:none; color:#94a3b8; font-size:1.6rem; cursor:pointer;">✕</button>
+                    <button onclick="closeAccessManagementModal()" style="background:none; border:none; color:var(--cr-muted,#94a3b8); font-size:1.6rem; cursor:pointer;">✕</button>
                 </div>
                 
                 <div style="background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.3); border-radius:14px; padding:14px 18px; margin-bottom:22px; font-size:0.88rem; color:#ddd6fe; line-height:1.7;">
@@ -929,13 +929,13 @@
                 </div>
 
                 <!-- Add New / Auto-Generate Bar -->
-                <div style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; padding:14px 18px; border-radius:14px; border:1px solid #334155; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--cr-bg-deep,#0f172a); padding:14px 18px; border-radius:14px; border:1px solid var(--cr-line,#334155); margin-bottom:20px; flex-wrap:wrap; gap:12px;">
                     <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                         <label style="color:#bae6fd; font-weight:700; font-size:0.9rem;"><i class="fas fa-plus-circle" style="color:#a78bfa;"></i> افزودن دسترسی تیم جدید:</label>
-                        <select id="newAccessTeamSelect" style="background:#1e2937; border:1px solid #475569; color:#f8fafc; padding:8px 12px; border-radius:10px; font-size:0.88rem; outline:none; min-width:180px;">
+                        <select id="newAccessTeamSelect" style="background:var(--cr-panel,#1e2937); border:1px solid #475569; color:var(--cr-ink-strong,#f8fafc); padding:8px 12px; border-radius:10px; font-size:0.88rem; outline:none; min-width:180px;">
                             <option value="">-- انتخاب تیم --</option>
                         </select>
-                        <input type="text" id="newAccessPasswordInput" placeholder="رمز عبور (اختیاری)" style="background:#1e2937; border:1px solid #475569; color:#fef08a; padding:8px 12px; border-radius:10px; font-size:0.88rem; outline:none; width:150px; text-align:center;">
+                        <input type="text" id="newAccessPasswordInput" placeholder="رمز عبور (اختیاری)" style="background:var(--cr-panel,#1e2937); border:1px solid #475569; color:#fef08a; padding:8px 12px; border-radius:10px; font-size:0.88rem; outline:none; width:150px; text-align:center;">
                         <button onclick="createNewTeamAccessProfile()" class="btn btn-primary" style="padding:8px 16px; background:linear-gradient(90deg, #7c3aed, #4f46e5);"><i class="fas fa-plus"></i> ایجاد دسترسی</button>
                     </div>
                     <div>
@@ -944,7 +944,7 @@
                 </div>
 
                 <!-- Table of Profiles -->
-                <div style="max-height:380px; overflow-y:auto; border:1px solid #334155; border-radius:14px; background:#0f172a; margin-bottom:24px;">
+                <div style="max-height:380px; overflow-y:auto; border:1px solid var(--cr-line,#334155); border-radius:14px; background:var(--cr-bg-deep,#0f172a); margin-bottom:24px;">
                     <table style="width:100%; text-align:right;">
                         <thead>
                             <tr>
@@ -974,15 +974,15 @@
 
         <!-- Team Password Login Modal -->
         <div id="teamLoginModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:100000; align-items:center; justify-content:center; padding:20px;">
-            <div style="background:#1e2937; border:2px solid #3b82f6; border-radius:24px; max-width:420px; width:100%; padding:35px 30px; text-align:center; box-shadow:0 25px 60px rgba(0,0,0,0.9); direction:rtl;">
+            <div style="background:var(--cr-panel,#1e2937); border:2px solid #3b82f6; border-radius:24px; max-width:420px; width:100%; padding:35px 30px; text-align:center; box-shadow:0 25px 60px rgba(0,0,0,0.9); direction:rtl;">
                 <div style="width:65px; height:65px; border-radius:20px; background:rgba(59,130,246,0.15); border:1px solid #3b82f6; display:flex; align-items:center; justify-content:center; margin:0 auto 18px auto; color:#60a5fa; font-size:2rem;">
                     <i class="fas fa-shield-alt"></i>
                 </div>
-                <h3 style="margin:0 0 8px 0; color:#f8fafc; font-size:1.35rem; font-weight:900;" id="teamLoginTitle">ورود به دسترسی اختصاصی تیم</h3>
-                <p style="color:#94a3b8; font-size:0.88rem; margin:0 0 22px 0; line-height:1.6;" id="teamLoginSub">لطفاً جهت مشاهده گزارشات و آمار این تیم، رمز عبور تعیین‌شده را وارد نمایید.</p>
+                <h3 style="margin:0 0 8px 0; color:var(--cr-ink-strong,#f8fafc); font-size:1.35rem; font-weight:900;" id="teamLoginTitle">ورود به دسترسی اختصاصی تیم</h3>
+                <p style="color:var(--cr-muted,#94a3b8); font-size:0.88rem; margin:0 0 22px 0; line-height:1.6;" id="teamLoginSub">لطفاً جهت مشاهده گزارشات و آمار این تیم، رمز عبور تعیین‌شده را وارد نمایید.</p>
                 
                 <div style="position:relative; margin-bottom:20px;">
-                    <input type="password" id="teamLoginPasswordInput" placeholder="رمز عبور تیم را وارد کنید..." style="width:100%; background:#0f172a; border:1px solid #475569; color:#fef08a; padding:12px 16px; border-radius:12px; font-family:inherit; font-size:1.05rem; font-weight:700; text-align:center; outline:none; transition:all 0.2s;" onkeypress="if(event.key==='Enter') verifyTeamAccessPassword()">
+                    <input type="password" id="teamLoginPasswordInput" placeholder="رمز عبور تیم را وارد کنید..." style="width:100%; background:var(--cr-bg-deep,#0f172a); border:1px solid #475569; color:#fef08a; padding:12px 16px; border-radius:12px; font-family:inherit; font-size:1.05rem; font-weight:700; text-align:center; outline:none; transition:all 0.2s;" onkeypress="if(event.key==='Enter') verifyTeamAccessPassword()">
                 </div>
                 <div id="teamLoginError" style="color:#f87171; font-size:0.84rem; margin-top:-10px; margin-bottom:15px; display:none;"><i class="fas fa-exclamation-triangle"></i> رمز عبور اشتباه است. لطفاً مجدد تلاش کنید.</div>
                 
@@ -1007,12 +1007,12 @@
         <!-- Quick Menu Panel -->
         <div id="quickMenuPanel">
             <!-- Header -->
-            <div style="background:#0f172a; padding:14px 18px; border-bottom:1px solid #334155; display:flex; justify-content:space-between; align-items:center;">
+            <div style="background:var(--cr-bg-deep,#0f172a); padding:14px 18px; border-bottom:1px solid var(--cr-line,#334155); display:flex; justify-content:space-between; align-items:center;">
                 <div style="display:flex; align-items:center; gap:8px;">
                     <i class="fas fa-rocket" style="color:#38bdf8; font-size:1rem;"></i>
-                    <h4 style="margin:0; color:#f8fafc; font-size:0.9rem; font-weight:900;">منوی دسترسی سریع</h4>
+                    <h4 style="margin:0; color:var(--cr-ink-strong,#f8fafc); font-size:0.9rem; font-weight:900;">منوی دسترسی سریع</h4>
                 </div>
-                <button onclick="toggleQuickMenu()" style="background:none; border:none; color:#94a3b8; cursor:pointer; font-size:1.05rem; padding:0; display:flex; align-items:center; justify-content:center; transition:color 0.2s;" onmouseover="this.style.color='#f8fafc';" onmouseout="this.style.color='#94a3b8';">✕</button>
+                <button onclick="toggleQuickMenu()" style="background:none; border:none; color:var(--cr-muted,#94a3b8); cursor:pointer; font-size:1.05rem; padding:0; display:flex; align-items:center; justify-content:center; transition:color 0.2s;" onmouseover="this.style.color='var(--cr-ink-strong,#f8fafc)';" onmouseout="this.style.color='var(--cr-muted,#94a3b8)';">✕</button>
             </div>
             <!-- Menu Navigation Tabs -->
             <div style="display:flex; gap:6px; background:rgba(15,23,42,0.4); padding:6px; border-radius:12px; margin:12px 14px; border:1px solid rgba(255,255,255,0.05); justify-content:space-between; align-items:center;">
@@ -1024,7 +1024,7 @@
                 
                 <!-- Tab 1: Downloads -->
                 <div id="menu-tab-downloads" class="menu-tab-content" style="display:block;">
-                    <p style="color:#94a3b8; font-size:0.75rem; margin:0 0 10px 0; text-align:center; line-height:1.5;">گزارش‌های قابل دانلود برای خروجی فعال:</p>
+                    <p style="color:var(--cr-muted,#94a3b8); font-size:0.75rem; margin:0 0 10px 0; text-align:center; line-height:1.5;">گزارش‌های قابل دانلود برای خروجی فعال:</p>
                     <div style="display:flex; flex-direction:column; gap:6px;">
                         <!-- Excel Jari -->
                         <button onclick="downloadFilteredExcel()" class="btn btn-secondary" style="border-color:#22c55e !important; color:#4ade80 !important;">
@@ -1065,7 +1065,7 @@
                 </div>
                 <!-- Tab 2: Group Outputs -->
                 <div id="menu-tab-group" class="menu-tab-content" style="display:none;">
-                    <p style="color:#94a3b8; font-size:0.75rem; margin:0 0 10px 0; text-align:center; line-height:1.5;">خروجی‌های پیشرفته گروهی و پرزنت مدیریت:</p>
+                    <p style="color:var(--cr-muted,#94a3b8); font-size:0.75rem; margin:0 0 10px 0; text-align:center; line-height:1.5;">خروجی‌های پیشرفته گروهی و پرزنت مدیریت:</p>
                     <div style="display:flex; flex-direction:column; gap:6px;">
                         <button onclick="openAccessManagementModal()" id="btnQuickMenuAccessManage" class="btn btn-purple" style="background:linear-gradient(90deg, #7c3aed, #4f46e5) !important; border-right: 4px solid #8b5cf6 !important;">
                             <i class="fas fa-key" style="color:#e9d5ff;"></i>
@@ -1088,22 +1088,22 @@
     <!-- Default Shift Modal (Beautiful Popup Dialog) -->
     <!-- Profile Permissions Customization Modal -->
     <div id="profilePermissionsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:100001; overflow-y:auto; padding:40px 20px;">
-        <div style="background:#1e2937; border:2px solid #a855f7; border-radius:24px; max-width:680px; margin:0 auto; padding:30px; box-shadow:0 25px 60px rgba(0,0,0,0.9); direction:rtl;">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:15px; margin-bottom:20px;">
+        <div style="background:var(--cr-panel,#1e2937); border:2px solid #a855f7; border-radius:24px; max-width:680px; margin:0 auto; padding:30px; box-shadow:0 25px 60px rgba(0,0,0,0.9); direction:rtl;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--cr-line,#334155); padding-bottom:15px; margin-bottom:20px;">
                 <div style="display:flex; align-items:center; gap:12px;">
                     <div style="width:44px; height:44px; border-radius:12px; background:rgba(168,85,247,0.15); display:flex; align-items:center; justify-content:center; color:#c084fc; font-size:1.3rem;">
                         <i class="fas fa-sliders-h"></i>
                     </div>
                     <div>
                         <h3 style="margin:0; color:#f3e8ff; font-size:1.25rem; font-weight:900;" id="permModalTitle">سفارشی‌سازی فیچرهای دسترسی</h3>
-                        <span style="font-size:0.82rem; color:#94a3b8;" id="permModalSub">تعیین کنید کدام قابلیت‌ها و ستون‌ها برای این تیم روشن یا خاموش باشد</span>
+                        <span style="font-size:0.82rem; color:var(--cr-muted,#94a3b8);" id="permModalSub">تعیین کنید کدام قابلیت‌ها و ستون‌ها برای این تیم روشن یا خاموش باشد</span>
                     </div>
                 </div>
-                <button onclick="closeProfilePermissionsModal()" style="background:none; border:none; color:#94a3b8; font-size:1.6rem; cursor:pointer;">✕</button>
+                <button onclick="closeProfilePermissionsModal()" style="background:none; border:none; color:var(--cr-muted,#94a3b8); font-size:1.6rem; cursor:pointer;">✕</button>
             </div>
 
             <!-- Quick Presets -->
-            <div style="background:#0f172a; border:1px solid #334155; border-radius:14px; padding:12px 16px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+            <div style="background:var(--cr-bg-deep,#0f172a); border:1px solid var(--cr-line,#334155); border-radius:14px; padding:12px 16px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
                 <span style="font-size:0.84rem; color:#bae6fd; font-weight:700;"><i class="fas fa-magic" style="color:#a855f7;"></i> تنظیمات سریع:</span>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
                     <button onclick="applyPermPreset('all_on')" class="btn btn-secondary" style="padding:6px 12px; font-size:0.78rem; border-color:#22c55e; color:#4ade80;">💡 همه روشن (کامل)</button>
@@ -1114,68 +1114,68 @@
 
             <!-- Permissions Checkboxes Grid -->
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:12px; max-height:360px; overflow-y:auto; padding-right:4px; margin-bottom:24px;" id="permCheckboxesGrid">
-                <label class="checkbox-item" style="background:#0f172a; padding:12px 14px; border-radius:12px; border:1px solid #334155;">
+                <label class="checkbox-item" style="background:var(--cr-bg-deep,#0f172a); padding:12px 14px; border-radius:12px; border:1px solid var(--cr-line,#334155);">
                     <input type="checkbox" id="perm_allowExcelUpload" checked>
                     <div>
-                        <strong style="color:#f8fafc; display:block;">آپلود اکسل گزارش تماس جدید</strong>
-                        <span style="color:#94a3b8; font-size:0.75rem;">اجازه آپلود فایل اکسل جدید جهت محاسبه مجدد برای تیم</span>
+                        <strong style="color:var(--cr-ink-strong,#f8fafc); display:block;">آپلود اکسل گزارش تماس جدید</strong>
+                        <span style="color:var(--cr-muted,#94a3b8); font-size:0.75rem;">اجازه آپلود فایل اکسل جدید جهت محاسبه مجدد برای تیم</span>
                     </div>
                 </label>
 
-                <label class="checkbox-item" style="background:#0f172a; padding:12px 14px; border-radius:12px; border:1px solid #334155;">
+                <label class="checkbox-item" style="background:var(--cr-bg-deep,#0f172a); padding:12px 14px; border-radius:12px; border:1px solid var(--cr-line,#334155);">
                     <input type="checkbox" id="perm_showCharts" checked>
                     <div>
-                        <strong style="color:#f8fafc; display:block;">نمایش نمودارهای تحلیلی</strong>
-                        <span style="color:#94a3b8; font-size:0.75rem;">نمایش نمودار دایره‌ای بالای ۶۰ ثانیه و روند زمانی</span>
+                        <strong style="color:var(--cr-ink-strong,#f8fafc); display:block;">نمایش نمودارهای تحلیلی</strong>
+                        <span style="color:var(--cr-muted,#94a3b8); font-size:0.75rem;">نمایش نمودار دایره‌ای بالای ۶۰ ثانیه و روند زمانی</span>
                     </div>
                 </label>
-                <label class="checkbox-item" style="background:#0f172a; padding:12px 14px; border-radius:12px; border:1px solid #334155;">
+                <label class="checkbox-item" style="background:var(--cr-bg-deep,#0f172a); padding:12px 14px; border-radius:12px; border:1px solid var(--cr-line,#334155);">
                     <input type="checkbox" id="perm_showFirstCallCol" checked>
                     <div>
-                        <strong style="color:#f8fafc; display:block;">نمایش ستون «شروع به کار / حضور»</strong>
-                        <span style="color:#94a3b8; font-size:0.75rem;">نمایش ساعت اولین تماس یا وضعیت غایب/مرخصی</span>
+                        <strong style="color:var(--cr-ink-strong,#f8fafc); display:block;">نمایش ستون «شروع به کار / حضور»</strong>
+                        <span style="color:var(--cr-muted,#94a3b8); font-size:0.75rem;">نمایش ساعت اولین تماس یا وضعیت غایب/مرخصی</span>
                     </div>
                 </label>
-                <label class="checkbox-item" style="background:#0f172a; padding:12px 14px; border-radius:12px; border:1px solid #334155;">
+                <label class="checkbox-item" style="background:var(--cr-bg-deep,#0f172a); padding:12px 14px; border-radius:12px; border:1px solid var(--cr-line,#334155);">
                     <input type="checkbox" id="perm_showReasonCol" checked>
                     <div>
-                        <strong style="color:#f8fafc; display:block;">نمایش ستون «علت تاخیر / وضعیت»</strong>
-                        <span style="color:#94a3b8; font-size:0.75rem;">نمایش میزان تاخیر، منوی علت تاخیر و دانلود اکسل تاخیرها</span>
+                        <strong style="color:var(--cr-ink-strong,#f8fafc); display:block;">نمایش ستون «علت تاخیر / وضعیت»</strong>
+                        <span style="color:var(--cr-muted,#94a3b8); font-size:0.75rem;">نمایش میزان تاخیر، منوی علت تاخیر و دانلود اکسل تاخیرها</span>
                     </div>
                 </label>
-                <label class="checkbox-item" style="background:#0f172a; padding:12px 14px; border-radius:12px; border:1px solid #334155;">
+                <label class="checkbox-item" style="background:var(--cr-bg-deep,#0f172a); padding:12px 14px; border-radius:12px; border:1px solid var(--cr-line,#334155);">
                     <input type="checkbox" id="perm_showShiftCol" checked>
                     <div>
-                        <strong style="color:#f8fafc; display:block;">نمایش ستون «شیفت کارشناس»</strong>
-                        <span style="color:#94a3b8; font-size:0.75rem;">نمایش ساعت شیفت و قابلیت تنظیم شیفت اختصاصی</span>
+                        <strong style="color:var(--cr-ink-strong,#f8fafc); display:block;">نمایش ستون «شیفت کارشناس»</strong>
+                        <span style="color:var(--cr-muted,#94a3b8); font-size:0.75rem;">نمایش ساعت شیفت و قابلیت تنظیم شیفت اختصاصی</span>
                     </div>
                 </label>
-                <label class="checkbox-item" style="background:#0f172a; padding:12px 14px; border-radius:12px; border:1px solid #334155;">
+                <label class="checkbox-item" style="background:var(--cr-bg-deep,#0f172a); padding:12px 14px; border-radius:12px; border:1px solid var(--cr-line,#334155);">
                     <input type="checkbox" id="perm_showTaskCol" checked>
                     <div>
-                        <strong style="color:#f8fafc; display:block;">نمایش ستون «تسک / پیگیری»</strong>
-                        <span style="color:#94a3b8; font-size:0.75rem;">نمایش و ویرایش تسک‌ها و یادداشت‌های اختصاصی</span>
+                        <strong style="color:var(--cr-ink-strong,#f8fafc); display:block;">نمایش ستون «تسک / پیگیری»</strong>
+                        <span style="color:var(--cr-muted,#94a3b8); font-size:0.75rem;">نمایش و ویرایش تسک‌ها و یادداشت‌های اختصاصی</span>
                     </div>
                 </label>
-                <label class="checkbox-item" style="background:#0f172a; padding:12px 14px; border-radius:12px; border:1px solid #334155;">
+                <label class="checkbox-item" style="background:var(--cr-bg-deep,#0f172a); padding:12px 14px; border-radius:12px; border:1px solid var(--cr-line,#334155);">
                     <input type="checkbox" id="perm_allowExcelDownload" checked>
                     <div>
-                        <strong style="color:#f8fafc; display:block;">دانلود خروجی اکسل</strong>
-                        <span style="color:#94a3b8; font-size:0.75rem;">اجازه دانلود اکسل جاری و اکسل آماری تاخیرها</span>
+                        <strong style="color:var(--cr-ink-strong,#f8fafc); display:block;">دانلود خروجی اکسل</strong>
+                        <span style="color:var(--cr-muted,#94a3b8); font-size:0.75rem;">اجازه دانلود اکسل جاری و اکسل آماری تاخیرها</span>
                     </div>
                 </label>
-                <label class="checkbox-item" style="background:#0f172a; padding:12px 14px; border-radius:12px; border:1px solid #334155;">
+                <label class="checkbox-item" style="background:var(--cr-bg-deep,#0f172a); padding:12px 14px; border-radius:12px; border:1px solid var(--cr-line,#334155);">
                     <input type="checkbox" id="perm_allowImageDownload" checked>
                     <div>
-                        <strong style="color:#f8fafc; display:block;">دانلود تصاویر گزارش و ZIP</strong>
-                        <span style="color:#94a3b8; font-size:0.75rem;">اجازه دانلود تصویر داشبورد، جدول و عکس‌های گروهی</span>
+                        <strong style="color:var(--cr-ink-strong,#f8fafc); display:block;">دانلود تصاویر گزارش و ZIP</strong>
+                        <span style="color:var(--cr-muted,#94a3b8); font-size:0.75rem;">اجازه دانلود تصویر داشبورد، جدول و عکس‌های گروهی</span>
                     </div>
                 </label>
-                <label class="checkbox-item" style="background:#0f172a; padding:12px 14px; border-radius:12px; border:1px solid #334155;">
+                <label class="checkbox-item" style="background:var(--cr-bg-deep,#0f172a); padding:12px 14px; border-radius:12px; border:1px solid var(--cr-line,#334155);">
                     <input type="checkbox" id="perm_allowPdfDownload" checked>
                     <div>
-                        <strong style="color:#f8fafc; display:block;">دانلود گزارش رسمی PDF</strong>
-                        <span style="color:#94a3b8; font-size:0.75rem;">اجازه دریافت خروجی پی‌دی‌اف چندصفحه‌ای</span>
+                        <strong style="color:var(--cr-ink-strong,#f8fafc); display:block;">دانلود گزارش رسمی PDF</strong>
+                        <span style="color:var(--cr-muted,#94a3b8); font-size:0.75rem;">اجازه دریافت خروجی پی‌دی‌اف چندصفحه‌ای</span>
                     </div>
                 </label>
             </div>
@@ -1188,17 +1188,17 @@
     </div>
 
     <div id="defaultShiftModal">
-        <div style="background:#1e2937; border:2px solid #f59e0b; border-radius:24px; max-width:440px; width:100%; padding:28px; box-shadow:0 25px 60px rgba(0,0,0,0.85); position:relative; font-family:'Vazirmatn', Tahoma, sans-serif; direction:rtl;">
-            <button onclick="closeDefaultShiftModal()" style="position:absolute; top:18px; left:18px; background:none; border:none; color:#94a3b8; font-size:1.4rem; cursor:pointer; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:50%; transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'; this.style.color='#f8fafc';" onmouseout="this.style.background='none'; this.style.color='#94a3b8';">✕</button>
+        <div style="background:var(--cr-panel,#1e2937); border:2px solid #f59e0b; border-radius:24px; max-width:440px; width:100%; padding:28px; box-shadow:0 25px 60px rgba(0,0,0,0.85); position:relative; font-family:'Vazirmatn', Tahoma, sans-serif; direction:rtl;">
+            <button onclick="closeDefaultShiftModal()" style="position:absolute; top:18px; left:18px; background:none; border:none; color:var(--cr-muted,#94a3b8); font-size:1.4rem; cursor:pointer; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:50%; transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'; this.style.color='var(--cr-ink-strong,#f8fafc)';" onmouseout="this.style.background='none'; this.style.color='var(--cr-muted,#94a3b8)';">✕</button>
             
-            <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px; border-bottom:1px solid #334155; padding-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px; border-bottom:1px solid var(--cr-line,#334155); padding-bottom:12px;">
                 <div style="width:40px; height:40px; border-radius:10px; background:rgba(245,158,11,0.15); display:flex; align-items:center; justify-content:center; color:#f59e0b; font-size:1.2rem;">
                     <i class="fas fa-business-time"></i>
                 </div>
                 <h3 style="margin:0; color:#fef08a; font-size:1.15rem; font-weight:800;">تنظیم ساعت شیفت پیش‌فرض</h3>
             </div>
             
-            <p style="color:#cbd5e1; font-size:0.86rem; line-height:1.7; margin-top:0; margin-bottom:20px;">
+            <p style="color:var(--cr-ink-2,#cbd5e1); font-size:0.86rem; line-height:1.7; margin-top:0; margin-bottom:20px;">
                 ساعت شروع و پایان شیفت پیش‌فرض را تعیین کنید. اولین تماس کارشناسان پس از ساعت شروع به عنوان دیرکرد و تاخیر ثبت خواهد شد.
             </p>
             
@@ -1206,11 +1206,11 @@
             <div class="start-time-control" id="shiftStartTimeControl" style="display:grid !important; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:22px; background:none; border:none; padding:0; width:100%;">
                 <div>
                     <label for="shiftStartTimeInput" style="display:block; color:#fcd34d; font-weight:700; font-size:0.86rem; margin-bottom:8px;"><i class="fas fa-play" style="font-size:0.75rem;"></i> شروع شیفت پیش‌فرض:</label>
-                    <input type="time" id="shiftStartTimeInput" value="09:00" onchange="onShiftStartTimeChange(this.value)" style="width:100%; background:#0f172a; border:1px solid #f59e0b; color:#fef08a; padding:10px; border-radius:10px; font-family:inherit; font-size:1rem; font-weight:700; direction:ltr; text-align:center; outline:none; box-shadow:0 4px 10px rgba(0,0,0,0.25);">
+                    <input type="time" id="shiftStartTimeInput" value="09:00" onchange="onShiftStartTimeChange(this.value)" style="width:100%; background:var(--cr-bg-deep,#0f172a); border:1px solid #f59e0b; color:#fef08a; padding:10px; border-radius:10px; font-family:inherit; font-size:1rem; font-weight:700; direction:ltr; text-align:center; outline:none; box-shadow:0 4px 10px rgba(0,0,0,0.25);">
                 </div>
                 <div>
                     <label for="shiftEndTimeInput" style="display:block; color:#a7f3d0; font-weight:700; font-size:0.86rem; margin-bottom:8px;"><i class="fas fa-stop" style="font-size:0.75rem;"></i> اتمام شیفت:</label>
-                    <input type="time" id="shiftEndTimeInput" value="18:00" onchange="onShiftEndTimeChange(this.value)" style="width:100%; background:#0f172a; border:1px solid #22c55e; color:#bbf7d0; padding:10px; border-radius:10px; font-family:inherit; font-size:1rem; font-weight:700; direction:ltr; text-align:center; outline:none; box-shadow:0 4px 10px rgba(0,0,0,0.25);">
+                    <input type="time" id="shiftEndTimeInput" value="18:00" onchange="onShiftEndTimeChange(this.value)" style="width:100%; background:var(--cr-bg-deep,#0f172a); border:1px solid #22c55e; color:#bbf7d0; padding:10px; border-radius:10px; font-family:inherit; font-size:1rem; font-weight:700; direction:ltr; text-align:center; outline:none; box-shadow:0 4px 10px rgba(0,0,0,0.25);">
                 </div>
             </div>
             <div style="text-align:center; margin-bottom:22px;">
@@ -1226,14 +1226,14 @@
     
     <!-- Excel Processing Loading Bar & Overlay -->
     <div id="excelLoadingOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:999999; align-items:center; justify-content:center; flex-direction:column; padding:20px; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);">
-        <div style="background:#1e2937; border:2px solid #38bdf8; border-radius:26px; padding:38px 45px; max-width:540px; width:100%; text-align:center; box-shadow:0 30px 70px rgba(0,0,0,0.9); direction:rtl; position:relative;">
+        <div style="background:var(--cr-panel,#1e2937); border:2px solid #38bdf8; border-radius:26px; padding:38px 45px; max-width:540px; width:100%; text-align:center; box-shadow:0 30px 70px rgba(0,0,0,0.9); direction:rtl; position:relative;">
             <div style="width:75px; height:75px; border-radius:22px; background:rgba(56,189,248,0.15); border:1px solid #38bdf8; display:flex; align-items:center; justify-content:center; margin:0 auto 20px auto; color:#38bdf8; font-size:2.3rem; box-shadow:0 0 25px rgba(56,189,248,0.3);">
                 <i class="fas fa-file-excel fa-bounce" style="--fa-animation-duration: 2s;"></i>
             </div>
-            <h3 id="excelLoadingTitle" style="margin:0 0 10px 0; color:#f8fafc; font-size:1.35rem; font-weight:900;">در حال بارگذاری و تحلیل هوشمند فایل...</h3>
-            <p id="excelLoadingDetail" style="color:#94a3b8; font-size:0.92rem; margin:0 0 24px 0; line-height:1.6;">لطفاً چند لحظه شکیبا باشید، سیستم در حال پردازش ساختار و ردیف‌های اکسل است...</p>
+            <h3 id="excelLoadingTitle" style="margin:0 0 10px 0; color:var(--cr-ink-strong,#f8fafc); font-size:1.35rem; font-weight:900;">در حال بارگذاری و تحلیل هوشمند فایل...</h3>
+            <p id="excelLoadingDetail" style="color:var(--cr-muted,#94a3b8); font-size:0.92rem; margin:0 0 24px 0; line-height:1.6;">لطفاً چند لحظه شکیبا باشید، سیستم در حال پردازش ساختار و ردیف‌های اکسل است...</p>
             
-            <div style="background:#0f172a; border:1px solid #334155; border-radius:14px; height:18px; width:100%; overflow:hidden; position:relative; margin-bottom:12px; box-shadow:inset 0 2px 4px rgba(0,0,0,0.6);">
+            <div style="background:var(--cr-bg-deep,#0f172a); border:1px solid var(--cr-line,#334155); border-radius:14px; height:18px; width:100%; overflow:hidden; position:relative; margin-bottom:12px; box-shadow:inset 0 2px 4px rgba(0,0,0,0.6);">
                 <div id="excelLoadingBarFill" style="background:linear-gradient(90deg, #38bdf8, #2563eb, #60a5fa); height:100%; width:15%; transition:width 0.3s ease; border-radius:14px; position:relative;">
                     <div style="position:absolute; inset:0; background:linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%); animation:shimmer 1.5s infinite;"></div>
                 </div>
@@ -2227,7 +2227,7 @@
             const info = document.getElementById('shiftModalExpertInfo');
             info.innerHTML = `
                 <div style="color:#67e8f9; font-weight:700; font-size:1rem;"><i class="fas fa-user-tie" style="margin-left:6px;"></i>${op.name}</div>
-                <div style="color:#94a3b8; font-size:0.86rem; margin-top:4px;">داخلی: <code style="color:#60a5fa;">${op.callerId}</code> | تیم: <span class="badge-team">${op.team}</span> <span class="badge-subteam" style="margin-right:4px;">${op.subTeam}</span></div>
+                <div style="color:var(--cr-muted,#94a3b8); font-size:0.86rem; margin-top:4px;">داخلی: <code style="color:#60a5fa;">${op.callerId}</code> | تیم: <span class="badge-team">${op.team}</span> <span class="badge-subteam" style="margin-right:4px;">${op.subTeam}</span></div>
             `;
             const startIn = document.getElementById('shiftModalStart');
             const endIn = document.getElementById('shiftModalEnd');
@@ -2906,7 +2906,7 @@
                 }
                 let reasonCellHtml = '—';
                 if (r.totalCalls === 0) {
-                    reasonCellHtml = `<span style="color:#94a3b8; font-size:0.82rem;">${r.statusNote}</span>`;
+                    reasonCellHtml = `<span style="color:var(--cr-muted,#94a3b8); font-size:0.82rem;">${r.statusNote}</span>`;
                 } else if (r.firstCallMin > expShiftStart) {
                     const lateMin = Math.round(r.firstCallMin - expShiftStart);
                     const lateH = Math.floor(lateMin / 60);
@@ -2945,7 +2945,7 @@
                 tr.innerHTML = `
                     <td><strong>${idx + 1}</strong></td>
                     <td><code style="color:#60a5fa; font-size:0.90rem; font-weight:700;">${r.callerId}</code></td>
-                    <td><strong style="color:#f8fafc;">${r.name}</strong></td>
+                    <td><strong style="color:var(--cr-ink-strong,#f8fafc);">${r.name}</strong></td>
                     <td><span class="badge-team">${r.team}</span></td>
                     <td><span class="badge-subteam">${r.subTeam}</span></td>
                     <td>${r.totalCalls}</td>
@@ -4067,7 +4067,7 @@
             tbody.innerHTML = '';
             
             if (teamAccessProfiles.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8; padding:25px;">هیچ دسترسی اختصاصی ساخته نشده است. می‌توانید با دکمه «ساخت خودکار» برای تمام تیم‌ها دسترسی بسازید.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--cr-muted,#94a3b8); padding:25px;">هیچ دسترسی اختصاصی ساخته نشده است. می‌توانید با دکمه «ساخت خودکار» برای تمام تیم‌ها دسترسی بسازید.</td></tr>';
                 return;
             }
             
@@ -4076,12 +4076,12 @@
                 const displayName = (p.teamName && p.subTeamName) ? `${p.teamName} -> ${p.subTeamName}` : (p.teamName || p.subTeamName || 'تیم عمومی');
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td style="font-weight:bold; color:#f8fafc;">
+                    <td style="font-weight:bold; color:var(--cr-ink-strong,#f8fafc);">
                         <i class="fas fa-users" style="color:#a78bfa; margin-left:6px;"></i>${displayName}
                         ${p.subTeamName && p.teamName ? `<br><small style="color:#c084fc;">زیرمجموعه: ${p.subTeamName}</small>` : ''}
                     </td>
                     <td style="text-align:center;">
-                        ${p.password ? `<span style="color:#fcd34d; font-weight:bold;"><i class="fas fa-lock"></i> تعیین شده (${p.password})</span>` : `<span style="color:#94a3b8;">بدون رمز</span>`}
+                        ${p.password ? `<span style="color:#fcd34d; font-weight:bold;"><i class="fas fa-lock"></i> تعیین شده (${p.password})</span>` : `<span style="color:var(--cr-muted,#94a3b8);">بدون رمز</span>`}
                     </td>
                     <td style="text-align:center; color:#38bdf8; font-weight:bold;">${count} نفر</td>
                     <td style="text-align:center;">
@@ -4577,7 +4577,7 @@
             tbody.innerHTML = '';
             const teamExperts = expertsList.filter(e => profileMatches(e, managingExpertsProfile)); // strictly THIS access's team experts
             if (teamExperts.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8; padding:22px;">هنوز کارشناسی برای این تیم ثبت نشده است.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--cr-muted,#94a3b8); padding:22px;">هنوز کارشناسی برای این تیم ثبت نشده است.</td></tr>';
                 return;
             }
             teamExperts.forEach(exp => {
