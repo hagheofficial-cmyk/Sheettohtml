@@ -15,6 +15,7 @@ const P = require('./shared/parseQc.js');
 const CallWatcher = require('./callWatcher.js');
 const Registry = require('./shared/registry.js');
 const ImportData = require('./shared/importData.js');
+const ExpertRef = require('./shared/expertRef.js');
 const crypto = require('crypto');
 
 const ROOT = __dirname;
@@ -55,6 +56,7 @@ function loadStore() {
   if (!db.seq) db.seq = { ticket: 1, social: 1, agent: 1, action: 1 };
   if (!db.seq.action) db.seq.action = 1;
   if (!Array.isArray(db.callFeedbacks)) db.callFeedbacks = [];
+  ExpertRef.ensure(db); // نوع اقدام‌ها، یادآورها و شمارنده‌ها
 }
 
 function saveStore(sync) {
@@ -250,7 +252,7 @@ async function handleApi(req, res, pathname, query) {
 
   // تاریخ اشتباه نباید به‌صورت بی‌صدا گزارش خالی یا پاک‌سازی/بک‌اپ کامل بسازد.
   const datedPath = ['/api/dashboard', '/api/reports', '/api/portfolio', '/api/portfolio/agents',
-    '/api/tickets', '/api/socials', '/api/data/status', '/api/calls/analysis', '/api/backup', '/api/calls'].includes(pathname) || parts[1] === 'portfolio';
+    '/api/tickets', '/api/socials', '/api/data/status', '/api/calls/analysis', '/api/backup', '/api/calls', '/api/expert-ref'].includes(pathname) || parts[1] === 'portfolio' || parts[1] === 'expert-ref';
   if (datedPath && (method === 'GET' || method === 'DELETE')) {
     const error = QCReports.validateRange(query);
     if (error) return bad(res, error);
@@ -287,6 +289,8 @@ async function handleApi(req, res, pathname, query) {
       agents: db.agents,
       qcAgents: db.qcAgents,
       agentActions: db.agentActions || {},
+      actionTypes: ExpertRef.actionTypes(db),
+      reminders: ExpertRef.reminderList(db),
       tickets: db.tickets.filter((r) => inRange(r.reviewDate)),
       socials: db.socials.filter((r) => inRange(r.reviewDate)),
       callFeedbacks: (db.callFeedbacks || []).filter((r) => inRange(r.reviewDate)),
@@ -296,6 +300,7 @@ async function handleApi(req, res, pathname, query) {
   }
   if (pathname === '/api/backup' && method === 'POST') {
     const result = ImportData.restore(db, body.backup || body, body.mode);
+    ExpertRef.ensure(db);
     saveStore(); return ok(res, result);
   }
 
@@ -651,54 +656,46 @@ async function handleApi(req, res, pathname, query) {
     return notFound(res);
   }
 
-  /* اقدامات اصلاحی (native system) — ثبت/لیست/وضعیت‌گیری */
+  /* مرجع کارشناسان: کارت‌ها، جزئیات/ماتریس/تاریخچه هر کارشناس (منطق در shared/expertRef.js) */
+  if (pathname === '/api/expert-ref' && method === 'GET') return ok(res, ExpertRef.overview(db, query));
+  if (parts[1] === 'expert-ref' && parts.length === 3 && method === 'GET') {
+    return ok(res, ExpertRef.detail(db, parts[2], query));
+  }
+
+  /* نوع اقدام‌ها (مدیریت از پاپ‌آپ «ثبت اکشن») */
+  if (pathname === '/api/action-types') {
+    if (method === 'GET') return ok(res, { items: ExpertRef.actionTypes(db) });
+    if (method === 'POST') { const items = ExpertRef.addActionType(db, body.label); saveStore(); return ok(res, { items }); }
+    if (method === 'DELETE') { const items = ExpertRef.deleteActionType(db, body.label); saveStore(); return ok(res, { items }); }
+  }
+
+  /* اقدامات اصلاحی — ثبت/لیست/وضعیت/نتیجه */
   if (parts[1] === 'actions') {
-    if (!db.agentActions) db.agentActions = {};
-    if (!db.seq.action) db.seq.action = 1;
+    ExpertRef.ensure(db);
     if (parts.length === 2 && method === 'GET') {
       const name = query.agent || null;
       if (name) return ok(res, db.agentActions[name] || []);
       return ok(res, db.agentActions);
     }
     if (parts.length === 2 && method === 'POST') {
-      const agent = str(body.agent), title = str(body.title);
-      if (!agent || !title) return bad(res, 'عنوان اقدام و نام کارشناس الزامی است');
-      const it = {
-        id: db.seq.action++, agent,
-        title, date: str(body.date) || (C.formatJalali(C.todayJalali())),
-        status: str(body.status) || 'انجام نشده',
-        note: str(body.note),
-        createdAt: new Date().toISOString()
-      };
-      if (!db.agentActions[agent]) db.agentActions[agent] = [];
-      db.agentActions[agent].push(it);
-      saveStore();
-      return ok(res, it);
+      const it = ExpertRef.saveAction(db, body); saveStore(); return ok(res, it);
     }
     if (parts.length === 3 && method === 'PUT') {
-      const aid = +parts[2];
-      for (const nm of Object.keys(db.agentActions)) {
-        const it = (db.agentActions[nm] || []).find((x) => x.id === aid);
-        if (it) {
-          if (body.title != null) it.title = str(body.title);
-          if (body.status != null) it.status = str(body.status);
-          if (body.date != null) it.date = str(body.date);
-          if (body.note != null) it.note = str(body.note);
-          saveStore();
-          return ok(res, it);
-        }
-      }
-      return notFound(res);
+      const it = ExpertRef.updateAction(db, +parts[2], body); saveStore(); return ok(res, it);
     }
     if (parts.length === 3 && method === 'DELETE') {
-      const aid = +parts[2];
-      for (const nm of Object.keys(db.agentActions)) {
-        const arr = db.agentActions[nm];
-        const i = arr.findIndex((x) => x.id === aid);
-        if (i >= 0) { arr.splice(i, 1); saveStore(); return ok(res, { ok: true }); }
-      }
-      return notFound(res);
+      const result = ExpertRef.deleteAction(db, +parts[2]); saveStore(); return ok(res, result);
     }
+    return notFound(res);
+  }
+
+  /* یادآورهای کارشناس (با تاریخ جلالی از پاپ‌آپ تقویم) */
+  if (parts[1] === 'reminders') {
+    ExpertRef.ensure(db);
+    if (parts.length === 2 && method === 'GET') return ok(res, ExpertRef.reminderList(db, query.agent || null));
+    if (parts.length === 2 && method === 'POST') { const r = ExpertRef.saveReminder(db, body); saveStore(); return ok(res, r); }
+    if (parts.length === 3 && method === 'PUT') { const r = ExpertRef.updateReminder(db, +parts[2], body); saveStore(); return ok(res, r); }
+    if (parts.length === 3 && method === 'DELETE') { const result = ExpertRef.deleteReminder(db, +parts[2]); saveStore(); return ok(res, result); }
     return notFound(res);
   }
   if (parts[1] === 'agents') {

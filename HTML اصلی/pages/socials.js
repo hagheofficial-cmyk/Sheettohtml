@@ -238,23 +238,9 @@ async function listPage(root) {
 
   const wrap = $('#tblWrap', root);
   let loadId = 0;
-  async function load() {
-    const request = ++loadId;
-    if (!wrap.isConnected) return;
-    wrap.innerHTML = `<div class="loading-page"><div class="spinner"></div></div>`;
-    let data;
-    try { data = await api.get('/api/socials?' + query()); }
-    catch (e) { if (request === loadId && wrap.isConnected) wrap.innerHTML = emptyState('fa-triangle-exclamation', 'خطا', e.message); return; }
-    if (request !== loadId || !wrap.isConnected) return;
-
-    let rows = data.rows;
-
-    if (!rows.length) {
-      wrap.innerHTML = emptyState('fa-comments', 'رکوردی یافت نشد', 'فیلترها را تغییر دهید یا ارزیابی جدیدی ثبت کنید.', `<a class="btn primary sm" href="#/socials/new"><i class="fa-solid fa-plus"></i>ثبت ارزیابی</a>`);
-      $('#pager').innerHTML = '';
-      return;
-    }
-    wrap.innerHTML = `<table class="tbl"><thead><tr>
+  // جدول فهرست (فقط تابع داده‌ی ورودی): برای نمایش صفحه و خروجی کامل جدول (QCTables) استفاده می‌شود.
+  function socialsTable(rows) {
+    return `<table class="tbl"><thead><tr>
       <th>#</th><th>کارشناس</th><th>تیم</th><th>پیامرسان</th><th>دریافت</th><th>پاسخ</th><th>مدت (کاری)</th><th>وضعیت پاسخ</th><th>SLA</th>
       <th title="رعایت SLA">SLA‌المان</th><th title="پیگیری">پیگیری</th><th title="پایان‌بندی">پایان‌بندی</th><th title="لحن">لحن</th>
       <th>نمره</th><th style="width:120px"></th></tr></thead>
@@ -277,8 +263,33 @@ async function listPage(root) {
           <button class="btn danger-soft sm icon" data-act="del" title="حذف"><i class="fa-solid fa-trash"></i></button>
         </td></tr>`).join('')}
     </tbody></table>`;
+  }
+
+  async function load() {
+    const request = ++loadId;
+    if (!wrap.isConnected) return;
+    wrap.innerHTML = `<div class="loading-page"><div class="spinner"></div></div>`;
+    let data;
+    try { data = await api.get('/api/socials?' + query()); }
+    catch (e) { if (request === loadId && wrap.isConnected) wrap.innerHTML = emptyState('fa-triangle-exclamation', 'خطا', e.message); return; }
+    if (request !== loadId || !wrap.isConnected) return;
+
+    let rows = data.rows;
+
+    if (!rows.length) {
+      wrap.innerHTML = emptyState('fa-comments', 'رکوردی یافت نشد', 'فیلترها را تغییر دهید یا ارزیابی جدیدی ثبت کنید.', `<a class="btn primary sm" href="#/socials/new"><i class="fa-solid fa-plus"></i>ثبت ارزیابی</a>`);
+      $('#pager').innerHTML = '';
+      return;
+    }
+    wrap.innerHTML = socialsTable(rows);
 
     pager($('#pager'), data, (p) => { F.page = p; load(); });
+    if (window.QCTables) QCTables.setSource(wrap.querySelector('table.tbl'), async () => {
+      const all = await QCTables.fetchAll('/api/socials', query());
+      const holder = document.createElement('div');
+      holder.innerHTML = socialsTable(all);
+      return holder.querySelector('table');
+    });
 
     $$('button[data-act]', wrap).forEach((b) => b.addEventListener('click', async () => {
       const id = b.closest('tr').dataset.id;

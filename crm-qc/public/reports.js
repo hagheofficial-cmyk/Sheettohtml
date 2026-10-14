@@ -624,6 +624,7 @@
     avgScore: avgScore, hasRedline: hasRedline, criteriaKeys: criteriaKeys, criterionStats: criterionStats, dataStatus: dataStatus, portfolioAgents: portfolioAgents,
     monthlyBreakdown: monthlyBreakdown, combinedAgentReport: combinedAgentReport, agentByIdent: agentByIdent, agentProfile: agentProfile,
     ticketReport: ticketReport, socialReport: socialReport, callReport: callReport, elementRates: elementRates, dashboard: dashboard,
-    callAnalysis: callAnalysis
+    callAnalysis: callAnalysis,
+    configuredCriteria: configuredCriteria, criterionLabel: criterionLabel
   };
 });

@@ -154,10 +154,10 @@ test('golden workbook: 81 independent ratings, 39 reviews on 1405/06/20 (not 9 a
 });
 
 test('server/public/offline shared files and page mirrors cannot drift', () => {
-  for (const file of ['calc.js', 'parseQc.js', 'reports.js', 'registry.js', 'importData.js']) {
+  for (const file of ['calc.js', 'parseQc.js', 'reports.js', 'expertRef.js', 'registry.js', 'importData.js']) {
     assert.equal(fs.readFileSync(path.join(ROOT, 'public', file), 'utf8'), fs.readFileSync(path.join(ROOT, 'shared', file), 'utf8'));
   }
-  for (const file of ['app.js', 'calc.js', 'parseQc.js', 'reports.js', 'storage.js', 'index.html', 'styles.css', 'export.js', 'seed-data.js', 'jcal.js', 'callReportRange.js', 'call-admin-report.html', 'registry.js', 'importData.js', 'capture.js', 'enhancements.css', 'session.js', 'fonts.css', 'manifest.webmanifest', 'callReportTheme.css',
+  for (const file of ['app.js', 'calc.js', 'parseQc.js', 'reports.js', 'expertRef.js', 'storage.js', 'index.html', 'styles.css', 'export.js', 'seed-data.js', 'jcal.js', 'callReportRange.js', 'call-admin-report.html', 'registry.js', 'importData.js', 'capture.js', 'enhancements.css', 'session.js', 'fonts.css', 'manifest.webmanifest', 'callReportTheme.css',
     ...fs.readdirSync(path.join(ROOT, 'public/pages')).map((file) => 'pages/' + file)]) {
     assert.equal(fs.readFileSync(path.join(ROOT, 'public', file), 'utf8'), fs.readFileSync(path.join(ROOT, '..', 'HTML اصلی', file), 'utf8'), file);
   }

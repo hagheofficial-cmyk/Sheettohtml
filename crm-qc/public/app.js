@@ -519,7 +519,7 @@ const App = {
     if (method !== 'GET') return url; // ثبت، حذف و بک‌اپ کامل به‌صورت پنهان محدود نشوند.
     const [pathname, query] = url.split('?');
     if (!['/api/dashboard', '/api/reports', '/api/portfolio', '/api/portfolio/agents', '/api/tickets',
-      '/api/socials', '/api/data/status', '/api/calls/analysis'].includes(pathname) && !pathname.startsWith('/api/portfolio/')) return url;
+      '/api/socials', '/api/data/status', '/api/calls/analysis', '/api/expert-ref'].includes(pathname) && !pathname.startsWith('/api/portfolio/') && !pathname.startsWith('/api/expert-ref/')) return url;
     const p = new URLSearchParams(query || '');
     p.delete('from'); p.delete('to');
     if (this.dateRange.from) p.set('from', this.dateRange.from);

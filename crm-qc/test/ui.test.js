@@ -171,7 +171,7 @@ for (const build of ['public', 'offline']) {
     });
 
     await t.test('all existing routes still render without JavaScript/chart lifecycle errors', async () => {
-      for (const route of ['dashboard', 'reports', 'portfolio', 'data', 'call-analysis', 'callreport', 'tickets', 'socials', 'tickets/new', 'socials/new', 'directory', 'agents']) {
+      for (const route of ['dashboard', 'reports', 'portfolio', 'data', 'call-analysis', 'callreport', 'tickets', 'socials', 'tickets/new', 'socials/new', 'directory', 'agents', 'expert-ref']) {
         await go(w, route);
         assert.equal(text('#content').includes('خطا در بارگذاری بخش'), false, route);
         assert.ok($('#globalRange'), route);

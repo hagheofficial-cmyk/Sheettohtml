@@ -83,6 +83,8 @@ function restore(db, backup, mode) {
     if (b.datasetId) db.datasetId = b.datasetId;
     db.qcAgents = Array.isArray(b.qcAgents) ? b.qcAgents : db.qcAgents;
     db.agentActions = b.agentActions || {};
+    db.actionTypes = Array.isArray(b.actionTypes) ? b.actionTypes.slice() : null; // null ⇒ پیش‌فرض‌ها در ensure
+    db.reminders = Array.isArray(b.reminders) ? b.reminders : [];
     db.callImport = b.callImport || null; db.callRaw = null;
   } else {
     ['tickets','socials','callFeedbacks'].forEach(field=>b[field].forEach(row=>{const nameField=field==='callFeedbacks'?'expertName':'agentName';const person=P.resolveExpert(db.agents||[],row[nameField]).agent;if(person&&person.name!==row[nameField]){row[field==='callFeedbacks'?'sourceExpertName':'sourceAgentName']=row[nameField];row[nameField]=person.name;}}));
@@ -105,6 +107,13 @@ function restore(db, backup, mode) {
         const sig = stable([x.title,x.date,x.note,x.status]); if (seen.has(sig)) return false; seen.add(sig); return true;
       }));
     });
+    // نوع اقدام‌ها: اجتماع فهرست فعلی و بک‌اپ؛ یادآورها بدون تکرار (نشانه: کارشناس+تاریخ+متن+زمان ثبت).
+    if (Array.isArray(b.actionTypes)) db.actionTypes = Array.from(new Set((db.actionTypes || []).concat(b.actionTypes.map(String))));
+    const remSig = (x) => stable([x.agent, x.date, x.text, x.createdAt]);
+    const remSeen = new Set((db.reminders || []).map(remSig));
+    db.reminders = (db.reminders || []).concat((Array.isArray(b.reminders) ? b.reminders : []).filter((x) => {
+      const sig = remSig(x); if (remSeen.has(sig)) return false; remSeen.add(sig); return true;
+    }));
     // ادغام ماهانه تنظیمات و تیم/داخلی موجود را تغییر نمی‌دهد.
   }
   db.seq = db.seq || {};
@@ -112,6 +121,8 @@ function restore(db, backup, mode) {
   db.seq.social = resequence(db.socials, db.seq.social);
   db.seq.agent = resequence(db.agents, db.seq.agent);
   const actions = Object.values(db.agentActions || {}).flat(); db.seq.action = resequence(actions, db.seq.action);
+  db.reminders = db.reminders || [];
+  db.seq.reminder = resequence(db.reminders, db.seq.reminder);
   db.registryCleared = db.agents.length === 0;
   return { ok: true, mode, changes: counts, restored: { agents: db.agents.length, tickets: db.tickets.length, socials: db.socials.length, calls: db.callFeedbacks.length } };
 }

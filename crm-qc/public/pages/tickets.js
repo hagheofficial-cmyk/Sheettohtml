@@ -214,26 +214,14 @@ async function listPage(root) {
 
   const wrap = $('#tblWrap', root);
   let loadId = 0;
-  async function load() {
-    const request = ++loadId;
-    if (!wrap.isConnected) return;
-    wrap.innerHTML = `<div class="loading-page"><div class="spinner"></div></div>`;
-    let data;
-    try { data = await api.get('/api/tickets?' + query()); }
-    catch (e) { if (request === loadId && wrap.isConnected) wrap.innerHTML = emptyState('fa-triangle-exclamation', 'خطا', e.message); return; }
-    if (request !== loadId || !wrap.isConnected) return;
-
-    if (!data.rows.length) {
-      wrap.innerHTML = emptyState('fa-ticket', 'رکوردی یافت نشد', 'فیلترها را تغییر دهید یا ارزیابی جدیدی ثبت کنید.', `<a class="btn primary sm" href="#/tickets/new"><i class="fa-solid fa-plus"></i>ثبت ارزیابی</a>`);
-      $('#pager').innerHTML = '';
-      return;
-    }
-    wrap.innerHTML = `<table class="tbl"><thead><tr>
+  // جدول فهرست (فقط تابع داده‌ی ورودی): برای نمایش صفحه و خروجی کامل جدول (QCTables) استفاده می‌شود.
+  function ticketsTable(rows) {
+    return `<table class="tbl"><thead><tr>
       <th>#</th><th>QC</th><th>تاریخ بررسی</th><th>تاریخ تیکت</th><th>کارشناس</th><th>تیم</th><th>کد تیکت</th>
       <th title="پیگیری صحیح">پیگیری</th><th title="ثبت یادداشت">یادداشت</th><th title="دلیل بستن">دلیل بستن</th><th title="اکشن CRM">اکشن</th>
       <th title="عدم تماس با شریک — ردلاین">ردلاین</th><th>نمره</th><th style="width:120px"></th></tr></thead>
     <tbody>
-      ${data.rows.map((t) => `<tr data-id="${t.id}">
+      ${rows.map((t) => `<tr data-id="${t.id}">
         <td style="color:var(--muted)">${fa(t.id)}</td>
         <td>${esc(t.qcAgent)}</td>
         <td>${fa(t.reviewDate)}</td>
@@ -250,8 +238,31 @@ async function listPage(root) {
           <button class="btn danger-soft sm icon" data-act="del" title="حذف"><i class="fa-solid fa-trash"></i></button>
         </td></tr>`).join('')}
     </tbody></table>`;
+  }
+
+  async function load() {
+    const request = ++loadId;
+    if (!wrap.isConnected) return;
+    wrap.innerHTML = `<div class="loading-page"><div class="spinner"></div></div>`;
+    let data;
+    try { data = await api.get('/api/tickets?' + query()); }
+    catch (e) { if (request === loadId && wrap.isConnected) wrap.innerHTML = emptyState('fa-triangle-exclamation', 'خطا', e.message); return; }
+    if (request !== loadId || !wrap.isConnected) return;
+
+    if (!data.rows.length) {
+      wrap.innerHTML = emptyState('fa-ticket', 'رکوردی یافت نشد', 'فیلترها را تغییر دهید یا ارزیابی جدیدی ثبت کنید.', `<a class="btn primary sm" href="#/tickets/new"><i class="fa-solid fa-plus"></i>ثبت ارزیابی</a>`);
+      $('#pager').innerHTML = '';
+      return;
+    }
+    wrap.innerHTML = ticketsTable(data.rows);
 
     pager($('#pager'), data, (p) => { F.page = p; load(); });
+    if (window.QCTables) QCTables.setSource(wrap.querySelector('table.tbl'), async () => {
+      const all = await QCTables.fetchAll('/api/tickets', query());
+      const holder = document.createElement('div');
+      holder.innerHTML = ticketsTable(all);
+      return holder.querySelector('table');
+    });
 
     $$('button[data-act]', wrap).forEach((b) => b.addEventListener('click', async () => {
       const id = b.closest('tr').dataset.id;

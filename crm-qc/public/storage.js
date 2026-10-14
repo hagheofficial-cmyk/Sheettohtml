@@ -3,7 +3,7 @@
 (function () {
 'use strict';
 const C = window.QCCalc, R = window.QCReports, KEY = 'crmqc.db.v1';
-const Registry = window.QCRegistry, ImportData = window.QCImport;
+const Registry = window.QCRegistry, ImportData = window.QCImport, X = window.QCExpertRef;
 let db = null, saveTimer = null;
 
 function loadDb() {
@@ -28,6 +28,7 @@ function loadDb() {
   if (!db.agentActions) db.agentActions = {};
   if (!db.seq.action) db.seq.action = 1;
   if (!Array.isArray(db.callFeedbacks)) db.callFeedbacks = [];
+  X.ensure(db);
   if (!db.settings.scoreBands) db.settings.scoreBands = [90, 75, 50];
   if (!db.settings.defaultPreset) db.settings.defaultPreset = 'cur';
 }
@@ -133,7 +134,7 @@ function route(method, url, body) {
   let id = null;
   if (parts[2] != null) id = decodeURIComponent(parts[2]);
 
-  const datedPath = ['dashboard', 'reports', 'portfolio', 'tickets', 'socials', 'backup'].includes(name)
+  const datedPath = ['dashboard', 'reports', 'portfolio', 'tickets', 'socials', 'backup', 'expert-ref'].includes(name)
     || (name === 'data' && id === 'status') || (name === 'calls' && (id == null || id === 'analysis'));
   if (datedPath && (method === 'GET' || method === 'DELETE')) {
     const error = R.validateRange(q);
@@ -346,6 +347,8 @@ function route(method, url, body) {
       range: { from: from || null, to: to || null },
       settings: db.settings, agents: db.agents, qcAgents: db.qcAgents,
       agentActions: db.agentActions || {},
+      actionTypes: X.actionTypes(db),
+      reminders: X.reminderList(db),
       tickets: db.tickets.filter((r) => inRange(r.reviewDate)),
       socials: db.socials.filter((r) => inRange(r.reviewDate)),
       callFeedbacks: (db.callFeedbacks || []).filter((r) => inRange(r.reviewDate)),
@@ -354,6 +357,7 @@ function route(method, url, body) {
   }
   if (name === 'backup' && method === 'POST') {
     const result = ImportData.restore(db, body.backup || body, body.mode);
+    X.ensure(db);
     saveDb(); return clone(result);
   }
   /* APIManager calls subrouts — standlone mirror of server:
@@ -403,51 +407,34 @@ function route(method, url, body) {
     if (id === 'rescan' && method === 'POST') return { ok: true, changed: false, delta: {}, status: dirstatusLocal() };
     if (id === 'dirstatus' && method === 'GET') return dirstatusLocal();
   }
-  /* اقدامات اصلاحی (native) */
+  /* مرجع کارشناسان — همان منطق سرور (shared/expertRef.js) */
+  if (name === 'expert-ref' && method === 'GET') {
+    if (id == null) return clone(X.overview(db, q));
+    return clone(X.detail(db, id, q));
+  }
+  if (name === 'action-types') {
+    if (method === 'GET') return { items: X.actionTypes(db) };
+    if (method === 'POST') { const items = X.addActionType(db, body.label); saveDb(); return { items }; }
+    if (method === 'DELETE') { const items = X.deleteActionType(db, body.label); saveDb(); return { items }; }
+  }
+  /* اقدامات اصلاحی (native) — ثبت/لیست/وضعیت/نتیجه */
   if (name === 'actions') {
-    if (!db.agentActions) db.agentActions = {};
-    if (!db.seq.action) db.seq.action = 1;
+    X.ensure(db);
     if (id == null && method === 'GET') {
       const agent = q.agent || null;
       return agent ? clone(db.agentActions[agent] || []) : clone(db.agentActions);
     }
-    if (id == null && method === 'POST') {
-      const agent = str(body.agent), title = str(body.title);
-      if (!agent || !title) throw new Error('عنوان اقدام و نام کارشناس الزامی است');
-      const it = {
-        id: db.seq.action++, agent,
-        title, date: str(body.date) || C.formatJalali(C.todayJalali()),
-        status: str(body.status) || 'انجام نشده',
-        note: str(body.note), createdAt: new Date().toISOString()
-      };
-      if (!db.agentActions[agent]) db.agentActions[agent] = [];
-      db.agentActions[agent].push(it);
-      saveDb();
-      return clone(it);
-    }
-    if (id != null && method === 'PUT') {
-      const aid = +id;
-      for (const nm of Object.keys(db.agentActions)) {
-        const it = (db.agentActions[nm] || []).find((x) => x.id === aid);
-        if (it) {
-          if (body.title != null) it.title = str(body.title);
-          if (body.status != null) it.status = str(body.status);
-          if (body.date != null) it.date = str(body.date);
-          if (body.note != null) it.note = str(body.note);
-          saveDb(); return clone(it);
-        }
-      }
-      throw new Error('اقدام یافت نشد');
-    }
-    if (id != null && method === 'DELETE') {
-      const aid = +id;
-      for (const nm of Object.keys(db.agentActions)) {
-        const arr = db.agentActions[nm];
-        const i = arr.findIndex((x) => x.id === aid);
-        if (i >= 0) { arr.splice(i, 1); saveDb(); return { ok: true }; }
-      }
-      throw new Error('اقدام یافت نشد');
-    }
+    if (id == null && method === 'POST') { const it = X.saveAction(db, body); saveDb(); return clone(it); }
+    if (id != null && method === 'PUT') { const it = X.updateAction(db, +id, body); saveDb(); return clone(it); }
+    if (id != null && method === 'DELETE') { const result = X.deleteAction(db, +id); saveDb(); return result; }
+  }
+  /* یادآورهای کارشناس */
+  if (name === 'reminders') {
+    X.ensure(db);
+    if (id == null && method === 'GET') return clone(X.reminderList(db, q.agent || null));
+    if (id == null && method === 'POST') { const r = X.saveReminder(db, body); saveDb(); return clone(r); }
+    if (id != null && method === 'PUT') { const r = X.updateReminder(db, +id, body); saveDb(); return clone(r); }
+    if (id != null && method === 'DELETE') { const result = X.deleteReminder(db, +id); saveDb(); return result; }
   }
   function dirstatusLocal() {
     const countsByFile = {};

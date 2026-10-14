@@ -61,9 +61,9 @@ function browser(build = 'public', data = fixture(), fetchImpl) {
   const workbooks = [];
   const X = require('xlsx');
   w.XLSX = { ...X, writeFile: (wb, name) => workbooks.push({ wb, name }) };
-  for (const file of ['calc.js', 'parseQc.js', 'reports.js']) w.eval(fs.readFileSync(path.join(dir, file), 'utf8'));
+  for (const file of ['calc.js', 'parseQc.js', 'reports.js', 'expertRef.js']) w.eval(fs.readFileSync(path.join(dir, file), 'utf8'));
   w.QC_SEED = clone(data);
-  for (const file of ['registry.js', 'importData.js', 'storage.js', 'jcal.js', 'export.js', 'app.js', 'session.js', 'capture.js']) w.eval(fs.readFileSync(path.join(dir, file), 'utf8'));
+  for (const file of ['registry.js', 'importData.js', 'storage.js', 'jcal.js', 'export.js', 'app.js', 'session.js', 'capture.js', 'tableTools.js']) w.eval(fs.readFileSync(path.join(dir, file), 'utf8'));
   for (const file of fs.readdirSync(path.join(dir, 'pages')).filter((f) => f.endsWith('.js'))) {
     w.eval(fs.readFileSync(path.join(dir, 'pages', file), 'utf8'));
   }
