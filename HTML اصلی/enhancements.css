@@ -299,3 +299,69 @@
 #erRemF, #erChgF, #erActF, #erSort { min-width: 150px; }
 .er-team-row { margin: -4px 0 12px; overflow-x: auto; }
 .er-team-tabs { max-width: 100%; flex-wrap: wrap; }
+
+/* ===================== انیمیشن نرم (Motion) =====================
+   فقط transform و opacity تا روان بماند؛ برای کاربران با «کاهش حرکت» غیرفعال می‌شود. */
+@keyframes moRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes moFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes moSlide { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+@keyframes moPop { 0% { transform: scale(.96); } 60% { transform: scale(1.02); } 100% { transform: none; } }
+@keyframes moPulse { 0% { box-shadow: 0 0 0 0 rgba(56,189,248,.28); } 100% { box-shadow: 0 0 0 10px rgba(56,189,248,0); } }
+
+/* ورود صفحه: هر بخش با تأخیر کوتاه و پشت‌سرهم می‌آید */
+.route-view { animation: moFade .28s ease both; }
+.route-view > * { animation: moRise .42s cubic-bezier(.2,.7,.2,1) both; }
+.route-view > *:nth-child(2) { animation-delay: .03s; }
+.route-view > *:nth-child(3) { animation-delay: .06s; }
+.route-view > *:nth-child(4) { animation-delay: .09s; }
+.route-view > *:nth-child(n+5) { animation-delay: .12s; }
+.page-head { animation: moSlide .36s cubic-bezier(.2,.7,.2,1) both; }
+
+/* کارت‌ها و کارت‌های مرجع کارشناس: بلند شدن ملایم هنگام هاور */
+.card, .kpi, .ex-card, .criteria-team { transition: transform .22s ease, box-shadow .22s ease, border-color .2s ease, background .2s ease; }
+.ex-card:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(2,8,23,.35); }
+.kpi:hover { transform: translateY(-2px); }
+.criteria-team:hover { transform: translateX(-2px); }
+
+/* دکمه‌ها: بازخورد فشردن و هاور */
+.btn { transition: transform .15s ease, background .2s ease, border-color .2s ease, box-shadow .2s ease, color .2s ease, opacity .2s ease; }
+.btn:hover:not(:disabled) { transform: translateY(-1px); }
+.btn:active:not(:disabled) { transform: scale(.97); transition-duration: .08s; }
+.btn.primary:focus-visible { animation: moPulse 1s ease-out 1; }
+
+/* نوار تب‌ها و زبانه‌ها */
+.tabs button, .er-tabs button, .er-team-tabs button { transition: background .2s ease, color .2s ease, box-shadow .2s ease, transform .15s ease; }
+.tabs button:active, .er-tabs button:active, .er-team-tabs button:active { transform: scale(.97); }
+.tabs button.active, .er-tabs button.active, .er-team-tabs button.active { animation: moPop .28s ease; }
+
+/* ورودی‌ها و فیلترها */
+.input { transition: border-color .2s ease, box-shadow .2s ease, background .2s ease; }
+.input:focus { box-shadow: 0 0 0 3px rgba(56,189,248,.16); }
+
+/* ناوبری کناری */
+.nav-item { transition: background .2s ease, color .2s ease, border-color .2s ease, transform .18s ease; }
+.nav-item:active { transform: scale(.98); }
+.nav-item.active { animation: moSlide .3s ease both; }
+
+/* ردیف‌های جدول: ورود نرم هنگام رندر یا فیلتر */
+.tbl tbody tr { animation: moFade .32s ease both; }
+
+/* چیپ‌ها و نشان‌ها */
+.badge, .chip, .xc-chip, .tag-team { transition: transform .15s ease, background .2s ease, color .2s ease; }
+.badge:hover, .chip:hover, .xc-chip:hover, .tag-team:hover { transform: translateY(-1px); }
+
+/* پنجره‌ها و منوها */
+.modal-back { animation: moFade .2s ease both; }
+.ms-menu, .menu, .jcal-pop { animation: moRise .2s cubic-bezier(.2,.7,.2,1) both; transform-origin: top center; }
+.menu-item { transition: background .15s ease, padding-inline-start .15s ease; }
+.menu-item:hover { padding-inline-start: 14px; }
+
+/* کاهش حرکت برای کاربرانی که آن را فعال کرده‌اند */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
