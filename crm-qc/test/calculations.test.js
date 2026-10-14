@@ -162,3 +162,12 @@ test('server/public/offline shared files and page mirrors cannot drift', () => {
     assert.equal(fs.readFileSync(path.join(ROOT, 'public', file), 'utf8'), fs.readFileSync(path.join(ROOT, '..', 'HTML اصلی', file), 'utf8'), file);
   }
 });
+
+test('نوع فرم از نام فایل فارسی و انگلیسی تشخیص داده می‌شود؛ تیم مقصد نوع فرم را تغییر نمی‌دهد', () => {
+  const P = require('../shared/parseQc.js');
+  assert.equal(P.formTypeOfFileName('فرم اکانت.xlsx'), 'account');
+  assert.equal(P.formTypeOfFileName('QC Account.xlsx'), 'account');
+  assert.equal(P.formTypeOfFileName('QC MLM.xlsx'), 'mlm');
+  assert.equal(P.formTypeOfFileName('تلفنی ۱۴۰۵.xlsx'), 'tele');
+  assert.equal(P.formTypeOfFileName('نامشخص.xlsx'), null);
+});

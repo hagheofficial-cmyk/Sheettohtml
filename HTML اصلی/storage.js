@@ -377,7 +377,7 @@ function route(method, url, body) {
       for (const f of files.slice(0, 200)) {
         const fname = str(f.name) || 'unnamed.xlsx';
         const rows = Array.isArray(f.rows) ? f.rows : [];
-        const ftype = QP ? (QP.formTypeOfFileName(fname) || QP.teamForm(str(body.team)) || QP.sniffFormType(rows, db.settings.callCriteria)) : null;
+        const ftype = QP ? (QP.formTypeOfFileName(fname) || QP.sniffFormType(rows, db.settings.callCriteria)) : null;
         if (!ftype) { results.push({ name: fname, ok: false, reason: 'نوع فرم تشخیص داده نشد' }); continue; }
         const parsed = QP.parseRows(rows, ftype, { agents: db.agents, criteria: db.settings.callCriteria, team: str(body.team) });
         if (!parsed.length) { results.push({ name: fname, ok: false, reason: 'ردیفی یافت نشد', type: ftype }); continue; }

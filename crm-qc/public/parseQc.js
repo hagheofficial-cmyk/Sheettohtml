@@ -180,7 +180,7 @@ function callRowKey(row) {
 function formTypeOfFileName(name) {
   const n = String(name || '').toLowerCase();
   if (n.includes('mlm') || n.includes('bnpl')) return 'mlm';
-  if (n.includes('account') || n.includes('acc')) return 'account';
+  if (n.includes('account') || n.includes('acc') || n.includes('اکانت')) return 'account';
   if (n.includes('tele') || n.includes('telesales') || n.includes('تلفن')) return 'tele';
   return null;
 }
