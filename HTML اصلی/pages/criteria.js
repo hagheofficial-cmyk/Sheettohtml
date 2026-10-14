@@ -4,12 +4,19 @@
 const { $, $$, api, esc, fa, toast, confirmDlg } = UI;
 const P = window.QCParse;
 const LABEL = { tele:'Telesales', account:'Account', mlm:'MLM / BNPL' };
+/* فقط این چهار تیم؛ هر تیم تنظیم المان‌های اختصاصی خودش را دارد. */
+const TEAMS = [
+  { team:'Account', title:'اکانت' },
+  { team:'Tele sales', title:'تله' },
+  { team:'BNPL', title:'بی ان پی ال' },
+  { team:'MLM', title:'ام ال ام' }
+];
+const TEAM_TITLE = Object.fromEntries(TEAMS.map(t => [t.team, t.title]));
 async function render(root) {
   const response = await api.get('/api/criteria');
   if (!root.isConnected) return;
-  let config = response.config, selected = { form:'tele', team:'' }, dirty = false, definitions = [];
-  const options = ['tele','account','mlm'].map(form => ({ form, team:'', title:LABEL[form], sub:'پیش‌فرض فرم تماس' }));
-  (response.teams || []).forEach(team => options.push({ team, form:P.teamForm(team) || 'tele', title:P.displayTeam(team), sub:'تنظیم اختصاصی تیم' }));
+  let config = response.config, selected = { form:'account', team:'Account' }, dirty = false, definitions = [];
+  const options = TEAMS.map(t => ({ team:t.team, form:P.teamForm(t.team) || 'tele', title:t.title, sub:t.team }));
   root.innerHTML = `<div class="page-head"><div class="ph-ic"><i class="fa-solid fa-sliders"></i></div>
     <div><h2>تغییر المان‌ها</h2><p>نام نمایشی، ستون اکسل و المان‌های فعال ریت تماس هر تیم</p></div></div>
     <div class="note"><i class="fa-solid fa-shield-halved"></i><span>مقادیر واقعی فرم <b>1 / 0 / -</b> مبنای نرخ‌ها هستند. «-» در مخرج نرخ نیست و سلول خالی صفر محسوب نمی‌شود. نمره‌ی کلیِ اصلی اکسل و ریت‌های قبلی بازنویسی نمی‌شوند.</span></div>
@@ -31,7 +38,7 @@ async function render(root) {
     if(definition){definition.label=$('[data-label]',row).value;definition.excelKey=$('[data-column]',row).value;}
   }); }
   function paint(){
-    $('#criteriaTitle',root).textContent = selected.team ? P.displayTeam(selected.team) : LABEL[selected.form];
+    $('#criteriaTitle',root).textContent = TEAM_TITLE[selected.team] || P.displayTeam(selected.team);
     $('#criteriaCaption',root).textContent = 'نسخه '+fa(config.version||0)+' · '+fa(definitions.filter(d=>d.active!==false).length)+' المان فعال · تغییر نام ستون برای ورودی‌های بعدی؛ نام قبلی نیز شناخته می‌شود';
     $('#criteriaForm',root).value=selected.form; $('#criteriaFormSlot',root).hidden=!selected.team;
     $$('#criteriaTeams button',root).forEach(button=>{const o=options[Number(button.dataset.option)];button.classList.toggle('active',o.team===selected.team&&(!o.team?o.form===selected.form:true));});
@@ -71,5 +78,6 @@ async function render(root) {
   });
   choose(options[0]);
 }
+
 App.register('criteria',{title:'تغییر المان‌ها',render});
 })();
