@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f8fb">
+  <meta name="description" content="نمایش فشرده و فقط‌خواندنی داده‌های کنترل کیفیت CRM">
+  <title>QC Lite | کنترل کیفیت CRM</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="منوی اصلی">
+      <div class="brand">
+        <div class="brand-mark"><img src="/assets/logo.png" alt="" width="38" height="38"></div>
+        <div class="brand-copy"><strong>کنترل کیفیت</strong><span>نمای فشرده CRM</span></div>
+        <button class="icon-button sidebar-close" id="sidebarClose" data-icon="x" type="button" aria-label="بستن منو"></button>
+      </div>
+
+      <div class="workspace-label">نمای کلی</div>
+      <nav class="side-nav">
+        <a class="nav-link is-active" href="#/dashboard" data-route="dashboard">
+          <span class="nav-icon" data-icon="home"></span><span>داشبورد</span>
+        </a>
+        <a class="nav-link" href="#/evaluations" data-route="evaluations">
+          <span class="nav-icon" data-icon="list"></span><span>ارزیابی‌ها</span><span class="nav-count" id="navEvalCount">—</span>
+        </a>
+        <a class="nav-link" href="#/agents" data-route="agents">
+          <span class="nav-icon" data-icon="users"></span><span>کارشناسان</span><span class="nav-count" id="navAgentCount">—</span>
+        </a>
+        <a class="nav-link" href="#/reports" data-route="reports">
+          <span class="nav-icon" data-icon="chart"></span><span>گزارش‌های سریع</span>
+        </a>
+      </nav>
+
+      <div class="workspace-label source-label">منابع</div>
+      <nav class="side-nav">
+        <a class="nav-link" href="#/data" data-route="data">
+          <span class="nav-icon" data-icon="database"></span><span>فایل‌های داده</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="safe-note">
+          <span class="safe-icon" data-icon="lock"></span>
+          <div><strong>نسخهٔ فقط‌خواندنی</strong><span>فایل‌های مرجع تغییر نمی‌کنند.</span></div>
+        </div>
+        <div class="sidebar-foot"><span class="pulse-dot"></span><span>متصل به داده‌های این ریپو</span></div>
+      </div>
+    </aside>
+
+    <div class="sidebar-scrim" id="sidebarScrim"></div>
+
+    <div class="main-shell">
+      <header class="topbar">
+        <button class="icon-button mobile-menu" id="mobileMenu" data-icon="list" type="button" aria-label="بازکردن منو"></button>
+        <div class="breadcrumbs"><span>سامانه QC</span><span class="crumb-divider">/</span><strong id="topTitle">داشبورد</strong></div>
+        <div class="topbar-actions">
+          <div class="read-only-badge"><span class="badge-dot"></span><span>فقط مشاهده</span></div>
+          <button class="refresh-button" id="refreshButton" type="button"><span class="refresh-icon" data-icon="refresh"></span><span>به‌روزرسانی</span></button>
+        </div>
+      </header>
+
+      <main class="page-wrap">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow" id="pageEyebrow">مرور سریع عملکرد</p>
+            <h1 id="pageTitle">داشبورد</h1>
+            <p class="page-subtitle" id="pageSubtitle">نمایی روشن از ارزیابی‌ها و وضعیت تیم، بدون دست‌کاری فایل‌های اصلی.</p>
+          </div>
+          <div class="snapshot-chip" id="snapshotChip"><span class="snapshot-mark" data-icon="shield"></span><span>دادهٔ مرجع</span></div>
+        </div>
+
+        <section class="global-filters" aria-label="فیلترهای سراسری">
+          <div class="filter-intro"><span class="filter-mark" data-icon="filter"></span><div><strong>فیلتر نمایش</strong><small>فقط روی گزارش‌های همین صفحه اثر دارد</small></div></div>
+          <label class="filter-field"><span>تیم</span><select id="teamFilter" aria-label="فیلتر بر اساس تیم"><option value="all">همهٔ تیم‌ها</option></select></label>
+          <label class="filter-field month-filter"><span>ماه بررسی</span><select id="monthFilter" aria-label="فیلتر بر اساس ماه"><option value="all">همهٔ ماه‌ها</option></select></label>
+          <button class="clear-filter" id="clearFilters" type="button" title="پاک‌کردن فیلترها"><span data-icon="x"></span><span>پاک‌کردن</span></button>
+        </section>
+
+        <div class="source-banner" role="note">
+          <span class="banner-icon" data-icon="info"></span>
+          <p><strong>داده‌ها فقط خوانده می‌شوند.</strong> امتیازها همان مقادیر فایل‌های اصلی‌اند؛ فایل‌های تیکت و سوشالِ موجود ردیف کامل ندارند و در آمار امتیازدهی نمی‌شوند.</p>
+          <button type="button" class="banner-dismiss" id="dismissBanner" aria-label="بستن پیام"><span data-icon="x"></span></button>
+        </div>
+
+        <div id="pageContent" aria-live="polite" aria-busy="true">
+          <div class="loading-card"><span class="spinner"></span><span>در حال خواندن داده‌های مرجع…</span></div>
+        </div>
+        <footer class="page-footer"><span>QC Lite · نسخهٔ فشردهٔ سامانه کنترل کیفیت</span><span id="footerNote">ساخته‌شده بر پایهٔ داده‌های همین ریپو</span></footer>
+      </main>
+    </div>
+
+    <nav class="mobile-nav" aria-label="منوی پایین">
+      <a href="#/dashboard" data-route="dashboard"><span data-icon="home"></span><small>خانه</small></a>
+      <a href="#/evaluations" data-route="evaluations"><span data-icon="list"></span><small>ارزیابی‌ها</small></a>
+      <a href="#/agents" data-route="agents"><span data-icon="users"></span><small>کارشناسان</small></a>
+      <a href="#/data" data-route="data"><span data-icon="database"></span><small>داده‌ها</small></a>
+    </nav>
+  </div>
+
+  <div class="modal-root" id="modalRoot"></div>
+  <div class="toast-zone" id="toastZone" aria-live="polite"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
