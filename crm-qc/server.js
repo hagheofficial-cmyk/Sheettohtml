@@ -16,6 +16,7 @@ const CallWatcher = require('./callWatcher.js');
 const Registry = require('./shared/registry.js');
 const ImportData = require('./shared/importData.js');
 const ExpertRef = require('./shared/expertRef.js');
+const Sheets = require('./googleSheets.js');
 const crypto = require('crypto');
 
 const ROOT = __dirname;
@@ -56,7 +57,9 @@ function loadStore() {
   if (!db.seq) db.seq = { ticket: 1, social: 1, agent: 1, action: 1 };
   if (!db.seq.action) db.seq.action = 1;
   if (!Array.isArray(db.callFeedbacks)) db.callFeedbacks = [];
+  const hadSheetIds = Sheets.ensureSyncIds(db);
   ExpertRef.ensure(db); // نوع اقدام‌ها، یادآورها و شمارنده‌ها
+  if (hadSheetIds) saveStore(true); // شناسه‌ی تماس‌ها برای همگام‌سازی پایدار بین سرور و شیت
 }
 
 function saveStore(sync) {
@@ -67,7 +70,37 @@ function saveStore(sync) {
   };
   if (sync) return write();
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(write, 400);
+  saveTimer = setTimeout(() => { write(); maybePushToSheets(); }, 400);
+}
+
+// پوش خودکار به گوگل شیت بعد هر ذخیره (debounced)
+let sheetsPushTimer = null;
+let sheetsPushRunning = false;
+let sheetsPushAgain = false;
+async function runSheetsPush() {
+  if (sheetsPushRunning) { sheetsPushAgain = true; return; }
+  sheetsPushRunning = true;
+  try {
+    const cfg = Sheets.loadConfig();
+    if (!cfg.enabled || !cfg.initialized || !cfg.pushOnWrite || cfg.mode === 'apikey') return;
+    if (Sheets.ensureSyncIds(db)) saveStore(true);
+    await Sheets.push(cfg, db);
+    Sheets.markPushed();
+    saveStore(true); // شناسه‌های تماس، حتی پس از اولین push، در مخزن محلی هم بمانند
+    console.log('[sheets] push خودکار موفق');
+  } catch(e) { Sheets.markPullError(e); console.warn('[sheets] push خودکار خطا:', e.message); }
+  finally {
+    sheetsPushRunning = false;
+    if (sheetsPushAgain) { sheetsPushAgain = false; maybePushToSheets(); }
+  }
+}
+function maybePushToSheets() {
+  try {
+    const cfg = Sheets.loadConfig();
+    if (!cfg.enabled || !cfg.initialized || !cfg.pushOnWrite || cfg.mode === 'apikey') return;
+    clearTimeout(sheetsPushTimer);
+    sheetsPushTimer = setTimeout(() => { sheetsPushTimer = null; runSheetsPush(); }, 2000);
+  } catch(e) {}
 }
 
 /* --------------------------------------------------------------- helpers */
@@ -263,6 +296,108 @@ async function handleApi(req, res, pathname, query) {
 
   // نسخه کامل تأیید مرورگر مستقل از هر فیلتر؛ شامل seq، لیست‌ها و داده خام.
   if(pathname === '/api/session-snapshot' && method === 'GET')return ok(res, clone(db));
+
+  /* ---- Google Sheets (شیت به‌عنوان بستر داده) ---- */
+  if (pathname.startsWith('/api/sheets')) {
+    if (pathname === '/api/sheets/status' && method === 'GET') return ok(res, Sheets.status());
+    if (pathname === '/api/sheets/config' && method === 'GET') return ok(res, Sheets.safeConfig());
+
+    if (pathname === '/api/sheets/config' && method === 'PUT') {
+      try {
+        const cur = Sheets.loadConfig();
+        const next = Object.assign({}, cur, body, { sheets: Object.assign({}, cur.sheets, body.sheets || {}) });
+        // secrets خالی یعنی «همان قبلی»؛ مقدارهای واقعی هیچ‌وقت از GET بازگردانده نمی‌شوند.
+        if (!body.webAppToken) next.webAppToken = cur.webAppToken;
+        if (!body.apiKey) next.apiKey = cur.apiKey;
+        // اتصال به Spreadsheet یا endpoint تازه به معنی شروع همگام‌سازی از نو است.
+        const targetChanged = cur.mode !== next.mode || cur.spreadsheetId !== next.spreadsheetId || cur.webAppUrl !== next.webAppUrl;
+        if (targetChanged) next.initialized = false;
+        clearTimeout(sheetsPushTimer); sheetsPushTimer = null;
+        const saved = Sheets.saveConfig(next);
+        Sheets.stopPolling();
+        if (saved.enabled && saved.initialized) Sheets.startPolling(db, () => saveStore());
+        return ok(res, { ok: true, config: Sheets.safeConfig(), status: Sheets.status() });
+      } catch (e) { return bad(res, e.message); }
+    }
+
+    if (pathname === '/api/sheets/pull' && method === 'POST') {
+      try {
+        const cfg = Sheets.loadConfig();
+        const pulled = await Sheets.pull(cfg);
+        // اولین Pull فقط پس از انتخاب صریح «ادغام» یا «شیت مرجع» همگام‌سازی را فعال می‌کند.
+        const initialPolicy = body.initialPolicy === 'sheet' ? 'sheet' : 'merge';
+        const policy = body.initialize === true ? initialPolicy : (cfg.initialized ? cfg.syncPolicy : 'merge');
+        const result = Sheets.mergePullIntoDb(db, pulled, policy);
+        if (result.changed) saveStore();
+        let initialized = cfg.initialized;
+        if (body.initialize === true && !initialized) {
+          const saved = Sheets.saveConfig(Object.assign({}, cfg, { initialized: true, syncPolicy: policy }));
+          initialized = saved.initialized;
+          Sheets.stopPolling(); Sheets.startPolling(db, () => saveStore());
+        }
+        Sheets.markPullError(null);
+        return ok(res, {
+          ok: true, changed: result.changed, initialized, policy, counts: result.counts,
+          pulled: { agents: (pulled.agents || []).length, tickets: (pulled.tickets || []).length,
+            socials: (pulled.socials || []).length, calls: (pulled.calls || []).length }
+        });
+      } catch (e) { Sheets.markPullError(e); return bad(res, 'خطا در خواندن شیت: ' + e.message); }
+    }
+
+    if (pathname === '/api/sheets/push' && method === 'POST') {
+      try {
+        const cfg = Sheets.loadConfig();
+        if (Sheets.ensureSyncIds(db)) saveStore(true);
+        const result = await Sheets.push(cfg, db);
+        Sheets.markPushed();
+        saveStore(true);
+        if (!cfg.initialized) {
+          const saved = Sheets.saveConfig(Object.assign({}, cfg, { initialized: true }));
+          Sheets.stopPolling(); Sheets.startPolling(db, () => saveStore());
+          return ok(res, Object.assign({}, result, { initialized: saved.initialized, pushed: result.pushed || {} }));
+        }
+        return ok(res, Object.assign({}, result, { initialized: true }));
+      } catch (e) { Sheets.markPullError(e); return bad(res, 'خطا در نوشتن شیت: ' + e.message); }
+    }
+
+    if (pathname === '/api/sheets/report' && method === 'POST') {
+      try {
+        const cfg = Sheets.loadConfig();
+        let reportData = body;
+        if (!Array.isArray(body.rows)) {
+          const q = Object.assign({ from: '', to: '', team: '', agent: '', qc: '', form: '' }, body.filters || {});
+          const type = body.type || 'combined';
+          const level = body.level === 'team' ? 'team' : 'agent';
+          let rows;
+          if (type === 'ticket') rows = QCReports.ticketReport(db, level, q);
+          else if (type === 'social') rows = QCReports.socialReport(db, level, q);
+          else if (type === 'call') rows = QCReports.callReport(db, level, q, P.resolver(db.settings.callCriteria)).rows;
+          else rows = QCReports.combinedAgentReport(db, q);
+          if (!rows.length) rows = [{ پیام: 'در بازه انتخاب‌شده داده‌ای برای گزارش وجود ندارد' }];
+          reportData = {
+            title: body.title || ('QC_Report_' + new Date().toISOString().slice(0, 10)),
+            headers: Object.keys(rows[0]), rows
+          };
+        }
+        const result = await Sheets.pushReport(cfg, reportData);
+        Sheets.markPushed();
+        return ok(res, result);
+      } catch (e) { Sheets.markPullError(e); return bad(res, 'خطا در ارسال گزارش: ' + e.message); }
+    }
+
+    if (pathname === '/api/sheets/preview' && method === 'GET') {
+      try {
+        const pulled = await Sheets.pull(Sheets.loadConfig());
+        return ok(res, { ok: true, preview: {
+          agents: (pulled.agents || []).slice(0, 5), tickets: (pulled.tickets || []).slice(0, 5),
+          socials: (pulled.socials || []).slice(0, 5), calls: (pulled.calls || []).slice(0, 5),
+          totals: { agents: (pulled.agents || []).length, tickets: (pulled.tickets || []).length,
+            socials: (pulled.socials || []).length, calls: (pulled.calls || []).length }
+        } });
+      } catch (e) { Sheets.markPullError(e); return bad(res, 'پیش‌نمایش ناموفق: ' + e.message); }
+    }
+    return notFound(res);
+  }
 
   /* bootstrap: همه داده‌های مرجع */
   if (pathname === '/api/bootstrap' && method === 'GET') {
@@ -813,6 +948,8 @@ server.listen(PORT, '0.0.0.0', () => {
     }
   } catch (e) { console.warn('[calls] seed-calls:', e.message); }
   CallWatcher.start(db, () => saveStore());
+  // راه‌اندازی همگام‌سازی گوگل شیت (اگر فعال باشد)
+  try { Sheets.startPolling(db, () => saveStore()); } catch(e) { console.warn('[sheets] start:', e.message); }
 });
 
 process.on('SIGINT', () => { saveStore(true); process.exit(0); });

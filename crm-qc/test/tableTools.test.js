@@ -59,9 +59,15 @@ test('image export captures every filtered row without buttons or toolbars', asy
 
 test('expert reference filters: nearest reminder, last change, action status, sort and team tabs', async (t) => {
   const data = fixture();
+  const C = require('../shared/calc.js');
+  const addDays = (j, delta) => {
+    const date = C.jalaliToDate(j); date.setDate(date.getDate() + delta);
+    return C.formatJalali(C.toJalaali(date.getFullYear(), date.getMonth() + 1, date.getDate()));
+  };
+  const today = C.todayJalali();
   data.reminders = [
-    { id: 1, agent: 'کارشناس الف', date: '1405/07/22', text: 'امروز', done: false, createdAt: '2026-10-01T10:00:00Z' },
-    { id: 2, agent: 'کارشناس ب', date: '1405/07/19', text: 'معوق', done: false, createdAt: '2026-10-10T08:00:00Z' }
+    { id: 1, agent: 'کارشناس الف', date: addDays(today, 2), text: 'امروز', done: false, createdAt: '2026-10-01T10:00:00Z' },
+    { id: 2, agent: 'کارشناس ب', date: addDays(today, -1), text: 'معوق', done: false, createdAt: '2026-10-10T08:00:00Z' }
   ];
   data.seq = { ...(data.seq || {}), reminder: 10 };
   const { w, dom, errors } = browser('public', data); t.after(() => dom.window.close());

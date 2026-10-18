@@ -23,7 +23,7 @@ function loadDb() {
     db.createdAt = new Date().toISOString();
     saveDb(true);
   }
-  if (!db.datasetId) db.datasetId = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : 'browser-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  if (!db.datasetId) db.datasetId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : 'browser-' + Date.now() + '-' + Math.random().toString(36).slice(2);
   /* میگریشن ساختاری */
   if (!db.agentActions) db.agentActions = {};
   if (!db.seq.action) db.seq.action = 1;
@@ -34,6 +34,11 @@ function loadDb() {
 }
 function saveDb(sync) {
   const w = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {} };
+  if (window.APP_SCRIPT_SERVER) {
+    if (sync) return w();
+    window.__GAS_DB_DIRTY__ = true;
+    return;
+  }
   if (sync) return w();
   clearTimeout(saveTimer); saveTimer = setTimeout(w, 300);
 }
@@ -512,6 +517,8 @@ function route(method, url, body) {
 }
 
 window.LocalApi = {
+  // Apps Script uses the same tested route logic on its server-side bundle.
+  run(method, url, body) { return route(method, url, body); },
   get(url) { return Promise.resolve().then(() => route('GET', url)); },
   post(url, b) { return Promise.resolve().then(() => route('POST', url, b)); },
   put(url, b) { return Promise.resolve().then(() => route('PUT', url, b)); },
@@ -521,7 +528,7 @@ window.LocalApi = {
   replaceSnapshot(value) {
     const next=clone(value);
     if(!next||!Array.isArray(next.agents)||!Array.isArray(next.tickets)||!Array.isArray(next.socials)||!Array.isArray(next.callFeedbacks)||!next.settings||!next.seq||!next.lists)bad('نسخه مرورگر ناقص است');
-    clearTimeout(saveTimer);saveTimer=null;db=next;
+    if(!window.APP_SCRIPT_SERVER)clearTimeout(saveTimer);saveTimer=null;db=next;
   },
   backupSize() { try { return (localStorage.getItem(KEY) || '').length; } catch (e) { return 0; } },
   importBackup(b) {

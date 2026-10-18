@@ -6,6 +6,7 @@
   "scripts": {
     "test": "node --test test/*.test.js",
     "start": "node server.js",
+    "build:apps-script": "node scripts/build-apps-script.js",
     "test:unit": "node --test test/calculations.test.js",
     "test:browser": "node test/browser-check.cjs",
     "test:session:browser": "node test/session-browser-check.cjs"
@@ -18,6 +19,7 @@
     "@fortawesome/fontawesome-free": "^7.3.1",
     "chart.js": "^4.5.1",
     "exceljs": "^4.4.0",
+    "googleapis": "^144.0.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
     "jszip": "^3.10.1",

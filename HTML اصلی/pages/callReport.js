@@ -6,7 +6,9 @@
 'use strict';
 const { $, esc } = UI;
 
-const SRC = 'call-admin-report.html';
+const SRC = window.APP_SCRIPT_MODE && window.APP_SCRIPT_URL
+  ? window.APP_SCRIPT_URL + '?page=call-report'
+  : 'call-admin-report.html';
 
 function rangeSource() {
   const params = new URLSearchParams();
@@ -14,7 +16,7 @@ function rangeSource() {
   if (App.dateRange.to) params.set('qcTo', App.dateRange.to);
   params.set('qcTheme',App.theme);
   const qs = params.toString();
-  return SRC + (qs ? '?' + qs : '');
+  return SRC + (qs ? (SRC.includes('?') ? '&' : '?') + qs : '');
 }
 function render(root) {
   const src = rangeSource();

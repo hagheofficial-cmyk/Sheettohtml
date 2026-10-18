@@ -1,0 +1,21 @@
+{
+  "enabled": false,
+  "initialized": false,
+  "mode": "webapp",
+  "syncPolicy": "merge",
+  "spreadsheetId": "PASTE_SPREADSHEET_ID_HERE",
+  "webAppUrl": "https://script.google.com/macros/s/PASTE_DEPLOYMENT_ID/exec",
+  "webAppToken": "",
+  "apiKey": "",
+  "credentialsFile": "data/sheets-credentials.json",
+  "syncIntervalSec": 60,
+  "pushOnWrite": true,
+  "sheets": {
+    "agents": "Agents",
+    "tickets": "Tickets",
+    "socials": "Socials",
+    "calls": "Calls",
+    "actions": "Actions",
+    "settings": "Settings"
+  }
+}

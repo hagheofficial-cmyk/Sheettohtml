@@ -691,7 +691,7 @@ const App = {
     this.applyTheme(document.documentElement.dataset.theme || 'dark');
     this.initDateRange();
     await this.refreshCounts();
-    $('#dataSourceBadge').textContent=api.browserPinned?'نسخه مرورگر':api.offline?'آفلاین':'سرور';
+    $('#dataSourceBadge').textContent=window.APP_SCRIPT_MODE?'Google Sheets':api.browserPinned?'نسخه مرورگر':api.offline?'آفلاین':'سرور';
     if(api.browserPinned){const badge=$('#dataSourceBadge');badge.title='نسخه ذخیره‌شده در این مرورگر؛ تغییرات محلی خودکار به سرور ارسال نمی‌شوند.';}
     if(window.BrowserSession)BrowserSession.status();
   },

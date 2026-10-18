@@ -335,7 +335,7 @@ async function render(root, arg) {
 
     body.innerHTML = `
       <div class="capture-title no-capture"></div>
-      <div class="profile-system-brand"><img src="logo.png" width="30" height="30" alt="لوگوی سامانه"><span>سامانه کنترل کیفیت CRM · گزارش عملکرد</span></div>
+      <div class="profile-system-brand"><img src="${esc(window.APP_SCRIPT_MODE && window.APP_SCRIPT_LOGO_DATA ? window.APP_SCRIPT_LOGO_DATA : 'logo.png')}" width="30" height="30" alt="لوگوی سامانه"><span>سامانه کنترل کیفیت CRM · گزارش عملکرد</span></div>
       <!-- شناسنامه -->
       <div class="card" style="margin-bottom:16px">
         <div class="card-pad" style="display:flex;flex-wrap:wrap;gap:14px;align-items:center">

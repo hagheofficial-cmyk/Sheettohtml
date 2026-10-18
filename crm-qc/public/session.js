@@ -1,6 +1,10 @@
 /* تأیید اطلاعات: نسخه کامل مرورگر، ذخیره اتمیک IndexedDB و بازیابی بدون نمره‌دهی مجدد. */
 (function(){
 'use strict';
+if(window.APP_SCRIPT_MODE){
+  window.BrowserSession={initialize:async()=>false,bind(){const el=document.querySelector('.confirm-control');if(el)el.hidden=true;const button=document.getElementById('useServerData');if(button)button.hidden=true;},markChanged(){},status(){},restorePage:async()=>{},async waitForWrites(){},get saving(){return false;}};
+  return;
+}
 const NAME='crmqc.confirmed-session.v1', KEY='current', FALLBACK='crmqc.confirmed-session.v1';
 let database=null, record=null, saving=false, restoring=false, timer=null;
 const copy=x=>JSON.parse(JSON.stringify(x));

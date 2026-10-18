@@ -13,7 +13,7 @@ async function startServer() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'crmqc-test-'));
   fs.mkdirSync(path.join(dir, 'data'));
   fs.cpSync(path.join(ROOT, 'shared'), path.join(dir, 'shared'), { recursive: true });
-  for (const file of ['server.js', 'callWatcher.js']) fs.copyFileSync(path.join(ROOT, file), path.join(dir, file));
+  for (const file of ['server.js', 'callWatcher.js', 'googleSheets.js']) fs.copyFileSync(path.join(ROOT, file), path.join(dir, file));
   fs.writeFileSync(path.join(dir, 'data/seed.json'), JSON.stringify(fixture()));
   fs.symlinkSync(path.join(ROOT, 'node_modules'), path.join(dir, 'node_modules'), 'dir');
   fs.symlinkSync(path.join(ROOT, 'public'), path.join(dir, 'public'), 'dir');
@@ -73,6 +73,20 @@ test('real HTTP API and LocalApi agree on review dates, counts, scores and indep
     for(const key of ['agents','qcAgents','settings','lists','seq','agentActions','tickets','socials','callFeedbacks'])assert.deepEqual(online[key],offline[key],key);
     assert.equal(online.tickets.length,3);assert.equal(online.socials.length,3);assert.equal(online.callFeedbacks.length,7);assert.equal(online.agents.length,4);
     assert.equal(online.callFeedbacks[1].score,0);assert.equal(online.callFeedbacks[2].score,null);
+  });
+
+  await t.test('Google Sheets settings hide credentials and require a valid Apps Script URL/token',async()=>{
+    const initial=(await http('GET','/api/sheets/status')).data;
+    assert.equal(initial.enabled,false); assert.equal(initial.initialized,false);
+    const saved=await http('PUT','/api/sheets/config',{enabled:true,mode:'webapp',spreadsheetId:'test-sheet',
+      webAppUrl:'https://script.google.com/macros/s/test-deployment/exec',webAppToken:'secret-token-12345678901234567890',
+      syncPolicy:'merge',syncIntervalSec:60,pushOnWrite:true});
+    assert.equal(saved.status,200); assert.equal(saved.data.status.needsInitialization,true);
+    assert.equal(saved.data.config.webAppToken,''); assert.equal(saved.data.config.webAppTokenSet,true);
+    assert.equal((await http('GET','/api/sheets/config')).data.webAppToken,'');
+    const invalid=await http('PUT','/api/sheets/config',{enabled:true,mode:'webapp',webAppUrl:'https://example.com/app',webAppToken:'secret-token-12345678901234567890'});
+    assert.equal(invalid.status,400);
+    await http('PUT','/api/sheets/config',{enabled:false,mode:'webapp',webAppUrl:'',webAppToken:''});
   });
 
   await t.test('invalid or reversed date ranges return 400 rather than all/empty data', async () => {

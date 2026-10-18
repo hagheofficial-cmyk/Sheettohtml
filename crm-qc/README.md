@@ -85,3 +85,17 @@ GET    /feedback-panel                فایل HTML اصلی پروژه (بدو�
 ```
 
 دیتای نمونه دمو: `node scripts/demo-seed.js`
+
+## اتصال Google Sheets
+
+از مسیر `#/sheets` می‌توانید Apps Script Web App (دوسویه)، Service Account یا API Key (فقط خواندن) را تنظیم کنید. جهت اولین همگام‌سازی باید صریحاً انتخاب شود؛ تا آن زمان داده‌ای به شیت یا از شیت به‌طور خودکار منتقل نمی‌شود. راهنمای کامل، کد Apps Script و نکات پشتیبان‌گیری/امنیت در [`apps-script/README.md`](apps-script/README.md) است. تنظیمات و کلیدها در `data/sheets-config.json` و `data/sheets-credentials.json` روی سرور نگهداری و از Git مستثنا شده‌اند.
+
+## نسخه‌ی مستقل روی شیت (بدون سرور Node)
+
+`apps-script-full/` یک Web App کامل Apps Script است: لینک اختصاصی، رابط کامل سامانه و دیتابیس روی تب‌های خودِ شیت (تیکت، سوشال و ریت تماس هرکدام تب جدا). ساخت خروجی:
+
+```bash
+npm --prefix crm-qc run build:apps-script    # Code.gs + Index.html + CallReport.html
+```
+
+راهنمای نصب، اجرای `setupStandaloneApp`، انتشار Web App و استقرار با `clasp` در [`apps-script-full/README.md`](apps-script-full/README.md). تست اجرایی بک‌اند مستقل با شبیه‌ساز شیت: `test/appsScriptStandalone.test.js`.
