@@ -5,6 +5,15 @@
  *
  * The browser UI is hosted by HtmlService. All business records are read from
  * and written to their own tabs in the bound Google Spreadsheet.
+ *
+ * Latency budget (SpreadsheetApp calls dominate, ~13 tabs):
+ *   - reads  → served from CacheService keyed by a revision stamp, so a normal
+ *              page load costs a properties read plus one cache round trip
+ *              instead of ~27 spreadsheet calls;
+ *   - writes → always read the sheet fresh under LockService, then patch only
+ *              the changed rows/ranges and refresh the cache for later reads;
+ *   - direct sheet edits → an installed onChange trigger bumps the revision, so
+ *              the next read reloads instead of serving a stale snapshot.
  */
 
 var QC_GAS_SHEETS = {
@@ -43,20 +52,32 @@ var QC_GAS_SCHEMAS = {
   Call_Report_Access: ['json']
 };
 
-var QC_GAS_KV_SHEETS = {
-  Settings: true, Lists: true, Criteria: true, Meta: true, Call_Metadata: true
-};
-
 var QC_GAS_CALL_REPORT_KEYS = {
   bimeh_bazar_experts_v2: 'Call_Report_Experts',
   bimeh_bazar_team_access_profiles_v1: 'Call_Report_Access'
 };
+
+/* Identity / cache keys. Revision changes on every app write and on any direct
+ * spreadsheet edit (onChange trigger), which is what invalidates cached reads. */
+var QC_GAS_ID_KEY = 'QC_GAS_SPREADSHEET_ID';
+var QC_GAS_REV_KEY = 'QC_GAS_REV';
+var QC_GAS_CACHE_PREFIX = 'qcdb@';
+var QC_GAS_SELF_WRITE_KEY = 'qcselfwrite';
+var QC_GAS_CACHE_TTL_SEC = 600;
+/* CacheService rejects values over 100 KB; 24k chars stays under that even when
+ * every character is a 4-byte UTF-8 sequence. */
+var QC_GAS_CACHE_CHUNK_CHARS = 24000;
+/* Above this size the snapshot is read from the sheet every time instead. */
+var QC_GAS_CACHE_MAX_CHARS = 4000000;
+var QC_GAS_CHANGE_HANDLER = 'crmqcOnSheetChange';
 
 function onOpen() {
   try {
     SpreadsheetApp.getUi()
       .createMenu('سامانه QC مستقل')
       .addItem('راه‌اندازی / بررسی تب‌های سامانه', 'setupStandaloneApp')
+      .addSeparator()
+      .addItem('خواندن تازه از شیت (پاک‌کردن کش)', 'refreshFromSheet')
       .addToUi();
   } catch (err) {
     // onOpen may also run outside the spreadsheet editor.
@@ -65,7 +86,8 @@ function onOpen() {
 
 /**
  * Run once from the bound spreadsheet's Apps Script editor.
- * Creates separate database tabs and seeds only a genuinely empty workbook.
+ * Creates separate database tabs, seeds only a genuinely empty workbook and
+ * installs the onChange trigger that keeps cached reads honest.
  */
 function setupStandaloneApp() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -74,31 +96,34 @@ function setupStandaloneApp() {
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    PropertiesService.getScriptProperties().setProperty('QC_GAS_SPREADSHEET_ID', ss.getId());
+    PropertiesService.getScriptProperties().setProperty(QC_GAS_ID_KEY, ss.getId());
+    var sheets = {};
     Object.keys(QC_GAS_SCHEMAS).forEach(function (name) {
       var sheet = ss.getSheetByName(name) || ss.insertSheet(name);
+      sheets[name] = sheet;
       ensureHeader_(sheet, QC_GAS_SCHEMAS[name]);
     });
 
-    var meta = readKeyValueSheet_(ss.getSheetByName(QC_GAS_SHEETS.meta));
+    var meta = readKeyValueGrid_(gridValues_(sheets[QC_GAS_SHEETS.meta]));
     var hasData = ['Agents', 'Tickets', 'Socials', 'Calls', 'Actions', 'Reminders']
-      .some(function (name) { var sh = ss.getSheetByName(name); return sh && sh.getLastRow() > 1; });
+      .some(function (name) { return gridRows_(sheets[name]) > 1; });
 
     var db;
     if (meta.datasetId) {
-      db = readDatabase_(ss);
-      normalizeDatabase_(db);
+      db = normalizeDatabase_(readDatabase_(ss));
       writeDatabaseDiff_(ss, db, db, true);
     } else if (hasData) {
       // Respect pre-existing tabs and data; do not replace them with sample data.
-      db = readDatabase_(ss);
-      normalizeDatabase_(db);
+      db = normalizeDatabase_(readDatabase_(ss));
       if (!db.datasetId) db.datasetId = Utilities.getUuid();
       writeDatabaseDiff_(ss, {}, db, true);
     } else {
-      db = makeSeedDatabase_();
+      db = normalizeDatabase_(makeSeedDatabase_());
       writeDatabaseDiff_(ss, {}, db, true);
     }
+
+    installChangeTrigger_(ss);
+    publishRevision_(bumpRevision_(), db);
 
     return {
       ok: true,
@@ -112,9 +137,33 @@ function setupStandaloneApp() {
   }
 }
 
+/** Menu item: drop the cached snapshot so the next read comes straight from the tabs. */
+function refreshFromSheet() {
+  var ss = getDatabaseSpreadsheet_();
+  var db = normalizeDatabase_(readDatabase_(ss));
+  publishRevision_(bumpRevision_(), db);
+  return { ok: true, counts: databaseCounts_(db) };
+}
+
+/**
+ * Installed onChange trigger. Spreadsheet edits made outside the app (a user
+ * typing in a tab) bump the revision, so cached reads are not stale. Writes
+ * made by crmqcApi mark themselves and are skipped: they publish their own
+ * revision together with the fresh snapshot.
+ */
+function crmqcOnSheetChange() {
+  try {
+    var cache = CacheService.getScriptCache();
+    if (cache.get(QC_GAS_SELF_WRITE_KEY)) return;
+    bumpRevision_();
+  } catch (err) {
+    // Never let a trigger failure break editing the spreadsheet.
+  }
+}
+
 /** Public URL: `.../exec`; `?page=call-report` serves the legacy call report tool. */
 function doGet(e) {
-  var id = PropertiesService.getScriptProperties().getProperty('QC_GAS_SPREADSHEET_ID');
+  var id = PropertiesService.getScriptProperties().getProperty(QC_GAS_ID_KEY);
   if (!id) {
     return HtmlService.createHtmlOutput(
       '<meta charset="utf-8"><div dir="rtl" style="font:16px sans-serif;padding:32px">' +
@@ -145,33 +194,54 @@ function doGet(e) {
 
 /**
  * Apps Script RPC endpoint used by the SPA's fetch-compatible bridge.
- * Each request reads the current spreadsheet state; writes are serialized by
- * LockService and only the tabs changed by the operation are rewritten.
+ *
+ * GET requests never take the write lock and are served from the cached
+ * snapshot when the revision still matches. Anything else reads the tabs fresh
+ * under LockService, writes only the rows that changed and republishes the
+ * cache for the next read.
  */
 function crmqcApi(method, requestUrl, body) {
   method = String(method || 'GET').toUpperCase();
   requestUrl = String(requestUrl || '/');
   body = body && typeof body === 'object' ? body : {};
 
-  var ss;
-  try {
-    ss = getDatabaseSpreadsheet_();
-  } catch (error) {
-    return { status: 503, data: { error: error.message || 'شیت دیتابیس پیدا نشد.' } };
-  }
-
+  var isRead = method === 'GET';
   var lock = LockService.getScriptLock();
+  var locked = false;
   try {
-    lock.waitLock(30000);
-    var before = readDatabase_(ss);
-    normalizeDatabase_(before);
+    var ss;
+    if (!isRead) { lock.waitLock(30000); locked = true; }
+    try {
+      ss = getDatabaseSpreadsheet_();
+    } catch (error) {
+      return { status: 503, data: { error: error.message || 'شیت دیتابیس پیدا نشد.' } };
+    }
+
+    var revision = currentRevision_();
+    var before = isRead ? readCachedDatabase_(revision) : null;
+    if (!before) {
+      before = normalizeDatabase_(readDatabase_(ss));
+      // Write the snapshot back under the revision it was read at. A concurrent
+      // write publishes under a newer revision, so this can never clobber it.
+      if (isRead) publishRevision_(revision, before);
+    }
+
     window.LocalApi.replaceSnapshot(before);
     window.__GAS_DB_DIRTY__ = false;
 
     var result = window.LocalApi.run(method, requestUrl, body);
+
+    if (isRead) {
+      // Reads must not persist: a GET only re-derives in-memory defaults, and
+      // writing from a cached snapshot could clobber a concurrent edit.
+      return { status: 200, data: jsonSafe_(result) };
+    }
+
     var after = window.LocalApi.backup();
     if (window.__GAS_DB_DIRTY__ || JSON.stringify(before) !== JSON.stringify(after)) {
+      markSelfWrite_();
       writeDatabaseDiff_(ss, before, after, false);
+      publishRevision_(bumpRevision_(), after);
     }
     return { status: 200, data: jsonSafe_(result) };
   } catch (error) {
@@ -180,7 +250,7 @@ function crmqcApi(method, requestUrl, body) {
       data: { error: String(error && error.message || 'خطای Apps Script') }
     };
   } finally {
-    try { lock.releaseLock(); } catch (ignored) {}
+    if (locked) { try { lock.releaseLock(); } catch (ignored) {} }
   }
 }
 
@@ -199,11 +269,16 @@ function saveCallReportSetting(key, jsonValue) {
     var ss = getDatabaseSpreadsheet_();
     var text = String(jsonValue == null ? '' : jsonValue);
     if (text) JSON.parse(text); // reject malformed JSON rather than corrupt the settings tab
+    markSelfWrite_();
     var sheet = ss.getSheetByName(sheetName);
-    ensureHeader_(sheet, ['json']);
-    sheet.clearContents();
-    sheet.getRange(1, 1, 1, 1).setValues([['json']]);
-    if (text) sheet.getRange(2, 1, 1, 1).setValues([[text]]);
+    var values = text ? [['json'], [text]] : [['json']];
+    if (sheet.getLastRow() === values.length) {
+      sheet.getRange(1, 1, values.length, 1).setValues(values);
+    } else {
+      sheet.clearContents();
+      sheet.getRange(1, 1, values.length, 1).setValues(values);
+      styleHeader_(sheet, 1);
+    }
     return { ok: true };
   } finally {
     lock.releaseLock();
@@ -211,15 +286,90 @@ function saveCallReportSetting(key, jsonValue) {
 }
 
 function getDatabaseSpreadsheet_() {
-  var id = PropertiesService.getScriptProperties().getProperty('QC_GAS_SPREADSHEET_ID');
+  var id = PropertiesService.getScriptProperties().getProperty(QC_GAS_ID_KEY);
   if (!id) throw new Error('ابتدا تابع setupStandaloneApp را از شیت مقصد اجرا کنید.');
   return SpreadsheetApp.openById(id);
 }
 
+function installChangeTrigger_(ss) {
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var i = 0; i < triggers.length; i++) {
+      if (triggers[i].getHandlerFunction() === QC_GAS_CHANGE_HANDLER) ScriptApp.deleteTrigger(triggers[i]);
+    }
+    ScriptApp.newTrigger(QC_GAS_CHANGE_HANDLER).forSpreadsheet(ss).onChange().create();
+  } catch (err) {
+    // Without the trigger, cached reads still expire through their TTL.
+  }
+}
+
+/* ------------------------------------------------------- revision + cache */
+
+function currentRevision_() {
+  var props = PropertiesService.getScriptProperties();
+  var revision = props.getProperty(QC_GAS_REV_KEY);
+  if (!revision) {
+    revision = String(Date.now());
+    props.setProperty(QC_GAS_REV_KEY, revision);
+  }
+  return revision;
+}
+
+function bumpRevision_() {
+  var revision = String(Date.now()) + '-' + Math.floor(Math.random() * 1000000);
+  PropertiesService.getScriptProperties().setProperty(QC_GAS_REV_KEY, revision);
+  return revision;
+}
+
+/* Marks the next few seconds as "our own write" so the onChange trigger does
+ * not invalidate the snapshot we are about to publish. */
+function markSelfWrite_() {
+  try { CacheService.getScriptCache().put(QC_GAS_SELF_WRITE_KEY, '1', 30); } catch (ignored) {}
+}
+
+function readCachedDatabase_(revision) {
+  try {
+    var cache = CacheService.getScriptCache();
+    var meta = cache.get(QC_GAS_CACHE_PREFIX + revision + '#meta');
+    if (!meta) return null;
+    var info = JSON.parse(meta);
+    var keys = [];
+    for (var i = 0; i < info.chunks; i++) keys.push(QC_GAS_CACHE_PREFIX + revision + '#' + i);
+    var parts = cache.getAll(keys);
+    var json = '';
+    for (var c = 0; c < keys.length; c++) {
+      if (parts[keys[c]] == null) return null; // partially expired → read the sheet
+      json += parts[keys[c]];
+    }
+    return normalizeDatabase_(JSON.parse(json));
+  } catch (err) {
+    return null;
+  }
+}
+
+function publishRevision_(revision, db) {
+  try {
+    var json = JSON.stringify(db);
+    if (json.length > QC_GAS_CACHE_MAX_CHARS) return;
+    var cache = CacheService.getScriptCache();
+    var chunks = Math.max(1, Math.ceil(json.length / QC_GAS_CACHE_CHUNK_CHARS));
+    var values = {};
+    for (var i = 0; i < chunks; i++) {
+      values[QC_GAS_CACHE_PREFIX + revision + '#' + i] = json.substr(i * QC_GAS_CACHE_CHUNK_CHARS, QC_GAS_CACHE_CHUNK_CHARS);
+    }
+    values[QC_GAS_CACHE_PREFIX + revision + '#meta'] = JSON.stringify({ chunks: chunks, at: new Date().toISOString() });
+    cache.putAll(values, QC_GAS_CACHE_TTL_SEC);
+  } catch (err) {
+    // Caching is an optimization; reads fall back to the spreadsheet.
+  }
+}
+
+/* ------------------------------------------------------------ seed / shape */
+
 function makeSeedDatabase_() {
   var seed = JSON.parse(JSON.stringify(window.QC_SEED || {}));
   var maxAgentId = Math.max(0, ...(seed.agents || []).map(function (agent) { return Number(agent.id) || 0; }));
-  var db = Object.assign({}, seed, {
+  return Object.assign({}, seed, {
     tickets: [],
     socials: [],
     callFeedbacks: [],
@@ -234,8 +384,6 @@ function makeSeedDatabase_() {
     reminders: [],
     registryCleared: false
   });
-  window.QCExpertRef.ensure(db);
-  return db;
 }
 
 function normalizeDatabase_(db) {
@@ -273,15 +421,33 @@ function nextId_(rows) {
   return Math.max(0, ...(rows || []).map(function (row) { return Number(row && row.id) || 0; })) + 1;
 }
 
+/* -------------------------------------------------------------- read tabs */
+
+function sheetMap_(ss) {
+  var map = {};
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) map[sheets[i].getName()] = sheets[i];
+  return map;
+}
+
+function gridValues_(sheet) {
+  return sheet ? sheet.getDataRange().getValues() : [];
+}
+
+function gridRows_(sheet) {
+  return sheet ? sheet.getLastRow() : 0;
+}
+
 function readDatabase_(ss) {
-  var meta = readKeyValueSheet_(ss.getSheetByName(QC_GAS_SHEETS.meta));
-  var settings = readKeyValueSheet_(ss.getSheetByName(QC_GAS_SHEETS.settings));
-  var lists = readKeyValueSheet_(ss.getSheetByName(QC_GAS_SHEETS.lists));
-  var criteria = readKeyValueSheet_(ss.getSheetByName(QC_GAS_SHEETS.criteria));
-  var callMeta = readKeyValueSheet_(ss.getSheetByName(QC_GAS_SHEETS.callMeta));
-  var actions = readRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.actions));
+  var sheets = sheetMap_(ss);
+  var meta = readKeyValueGrid_(gridValues_(sheets[QC_GAS_SHEETS.meta]));
+  var settings = readKeyValueGrid_(gridValues_(sheets[QC_GAS_SHEETS.settings]));
+  var lists = readKeyValueGrid_(gridValues_(sheets[QC_GAS_SHEETS.lists]));
+  var criteria = readKeyValueGrid_(gridValues_(sheets[QC_GAS_SHEETS.criteria]));
+  var callMeta = readKeyValueGrid_(gridValues_(sheets[QC_GAS_SHEETS.callMeta]));
+
   var agentActions = {};
-  actions.forEach(function (action) {
+  readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.actions])).forEach(function (action) {
     var name = String(action.agent || '').trim();
     if (!name) return;
     if (!agentActions[name]) agentActions[name] = [];
@@ -289,7 +455,7 @@ function readDatabase_(ss) {
     agentActions[name].push(action);
   });
 
-  var actionTypes = readRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.actionTypes))
+  var actionTypes = readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.actionTypes]))
     .map(function (row) { return String(row.label || '').trim(); }).filter(Boolean);
 
   var db = {
@@ -298,17 +464,18 @@ function readDatabase_(ss) {
     createdAt: meta.createdAt || '',
     registryCleared: !!meta.registryCleared,
     seq: meta.seq || {},
-    agents: readRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.agents)),
-    qcAgents: readRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.qcAgents)).map(function (row) { return String(row.name || '').trim(); }).filter(Boolean),
-    tickets: readRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.tickets)),
-    socials: readRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.socials)),
-    callFeedbacks: readRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.calls)),
+    agents: readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.agents])),
+    qcAgents: readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.qcAgents]))
+      .map(function (row) { return String(row.name || '').trim(); }).filter(Boolean),
+    tickets: readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.tickets])),
+    socials: readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.socials])),
+    callFeedbacks: readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.calls])),
     callImport: callMeta.callImport || null,
     callRaw: callMeta.callRaw || null,
     callSync: callMeta.callSync || { files: {}, syncedAt: null },
     agentActions: agentActions,
     actionTypes: actionTypes.length ? actionTypes : undefined,
-    reminders: readRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.reminders)),
+    reminders: readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.reminders])),
     settings: settings,
     lists: lists
   };
@@ -316,37 +483,90 @@ function readDatabase_(ss) {
   return db;
 }
 
+function readRowsGrid_(grid) {
+  if (!grid || grid.length < 2) return [];
+  var headers = grid[0].map(function (header) { return String(header == null ? '' : header).trim(); });
+  var out = [];
+  for (var r = 1; r < grid.length; r++) {
+    var row = {}, populated = false;
+    for (var c = 0; c < headers.length; c++) {
+      var key = headers[c];
+      if (!key) continue;
+      var value = decodeCell_(grid[r][c], key);
+      if (value !== '' && value != null) populated = true;
+      row[key] = value;
+    }
+    if (populated) out.push(row);
+  }
+  return out;
+}
+
+function readKeyValueGrid_(grid) {
+  var out = {};
+  if (!grid || grid.length < 2) return out;
+  for (var i = 1; i < grid.length; i++) {
+    var key = String(grid[i][0] == null ? '' : grid[i][0]).trim();
+    if (!key) continue;
+    out[key] = decodeCell_(grid[i][1], key);
+  }
+  return out;
+}
+
+function readCallReportSettings_() {
+  var sheets = sheetMap_(getDatabaseSpreadsheet_());
+  return {
+    bimeh_bazar_experts_v2: readSingleJsonGrid_(gridValues_(sheets[QC_GAS_SHEETS.callReportExperts]), '[]'),
+    bimeh_bazar_team_access_profiles_v1: readSingleJsonGrid_(gridValues_(sheets[QC_GAS_SHEETS.callReportAccess]), '[]')
+  };
+}
+
+function readSingleJsonGrid_(grid, fallback) {
+  if (!grid || grid.length < 2) return fallback;
+  var raw = grid[1][0];
+  return raw == null || raw === '' ? fallback : String(raw);
+}
+
+/* ------------------------------------------------------------- write tabs */
+
 function writeDatabaseDiff_(ss, before, after, forceAll) {
   before = before || {};
   after = normalizeDatabase_(JSON.parse(JSON.stringify(after || {})));
-  var changed = function (key) { return forceAll || JSON.stringify(before[key] == null ? null : before[key]) !== JSON.stringify(after[key] == null ? null : after[key]); };
-  if (changed('agents')) writeRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.agents), after.agents, 'Agents');
-  if (changed('tickets')) writeRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.tickets), after.tickets, 'Tickets');
-  if (changed('socials')) writeRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.socials), after.socials, 'Socials');
-  if (changed('callFeedbacks')) writeRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.calls), after.callFeedbacks, 'Calls');
-  if (changed('qcAgents')) writeRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.qcAgents), (after.qcAgents || []).map(function (name) { return { name: name }; }), 'QC_Agents');
+  var sheets = sheetMap_(ss);
+  var changed = function (key) {
+    return forceAll || JSON.stringify(before[key] == null ? null : before[key]) !== JSON.stringify(after[key] == null ? null : after[key]);
+  };
 
-  var beforeActions = before.agentActions || {};
-  var afterActions = after.agentActions || {};
-  if (forceAll || JSON.stringify(beforeActions) !== JSON.stringify(afterActions)) {
-    var flatActions = [];
-    Object.keys(afterActions).forEach(function (name) {
-      (afterActions[name] || []).forEach(function (row) { flatActions.push(Object.assign({}, row, { agent: name })); });
-    });
-    writeRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.actions), flatActions, 'Actions');
+  if (changed('agents')) writeRowsSheet_(sheets[QC_GAS_SHEETS.agents], before.agents, after.agents, 'Agents');
+  if (changed('tickets')) writeRowsSheet_(sheets[QC_GAS_SHEETS.tickets], before.tickets, after.tickets, 'Tickets');
+  if (changed('socials')) writeRowsSheet_(sheets[QC_GAS_SHEETS.socials], before.socials, after.socials, 'Socials');
+  if (changed('callFeedbacks')) writeRowsSheet_(sheets[QC_GAS_SHEETS.calls], before.callFeedbacks, after.callFeedbacks, 'Calls');
+  if (changed('qcAgents')) {
+    writeRowsSheet_(sheets[QC_GAS_SHEETS.qcAgents],
+      (before.qcAgents || []).map(function (name) { return { name: name }; }),
+      (after.qcAgents || []).map(function (name) { return { name: name }; }), 'QC_Agents');
   }
-  if (changed('reminders')) writeRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.reminders), after.reminders, 'Reminders');
-  if (changed('actionTypes')) writeRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.actionTypes), (after.actionTypes || []).map(function (label) { return { label: label }; }), 'Action_Types');
+
+  if (forceAll || JSON.stringify(before.agentActions || {}) !== JSON.stringify(after.agentActions || {})) {
+    writeRowsSheet_(sheets[QC_GAS_SHEETS.actions], flatActions_(before.agentActions), flatActions_(after.agentActions), 'Actions');
+  }
+  if (changed('reminders')) writeRowsSheet_(sheets[QC_GAS_SHEETS.reminders], before.reminders, after.reminders, 'Reminders');
+  if (changed('actionTypes')) {
+    writeRowsSheet_(sheets[QC_GAS_SHEETS.actionTypes],
+      (before.actionTypes || []).map(function (label) { return { label: label }; }),
+      (after.actionTypes || []).map(function (label) { return { label: label }; }), 'Action_Types');
+  }
 
   var beforeSettings = Object.assign({}, before.settings || {});
   var afterSettings = Object.assign({}, after.settings || {});
   delete beforeSettings.callCriteria;
   delete afterSettings.callCriteria;
-  if (forceAll || JSON.stringify(beforeSettings) !== JSON.stringify(afterSettings)) writeKeyValueSheet_(ss.getSheetByName(QC_GAS_SHEETS.settings), beforeSettings, afterSettings);
-  if (forceAll || JSON.stringify((before.settings || {}).callCriteria || null) !== JSON.stringify((after.settings || {}).callCriteria || null)) {
-    writeKeyValueSheet_(ss.getSheetByName(QC_GAS_SHEETS.criteria), {}, { callCriteria: (after.settings || {}).callCriteria || {} });
+  if (forceAll || JSON.stringify(beforeSettings) !== JSON.stringify(afterSettings)) {
+    writeKeyValueSheet_(sheets[QC_GAS_SHEETS.settings], beforeSettings, afterSettings);
   }
-  if (changed('lists')) writeKeyValueSheet_(ss.getSheetByName(QC_GAS_SHEETS.lists), before.lists || {}, after.lists || {});
+  if (forceAll || JSON.stringify((before.settings || {}).callCriteria || null) !== JSON.stringify((after.settings || {}).callCriteria || null)) {
+    writeKeyValueSheet_(sheets[QC_GAS_SHEETS.criteria], {}, { callCriteria: (after.settings || {}).callCriteria || {} });
+  }
+  if (changed('lists')) writeKeyValueSheet_(sheets[QC_GAS_SHEETS.lists], before.lists || {}, after.lists || {});
 
   var beforeMeta = {
     version: before.version || after.version,
@@ -363,104 +583,170 @@ function writeDatabaseDiff_(ss, before, after, forceAll) {
     seq: after.seq
   };
   if (forceAll || JSON.stringify(beforeMeta) !== JSON.stringify(afterMeta)) {
-    writeKeyValueSheet_(ss.getSheetByName(QC_GAS_SHEETS.meta), beforeMeta, afterMeta);
+    writeKeyValueSheet_(sheets[QC_GAS_SHEETS.meta], beforeMeta, afterMeta);
   }
 
   var beforeCallMeta = { callImport: before.callImport || null, callRaw: before.callRaw || null, callSync: before.callSync || null };
   var afterCallMeta = { callImport: after.callImport || null, callRaw: after.callRaw || null, callSync: after.callSync || null };
   if (forceAll || JSON.stringify(beforeCallMeta) !== JSON.stringify(afterCallMeta)) {
-    writeKeyValueSheet_(ss.getSheetByName(QC_GAS_SHEETS.callMeta), beforeCallMeta, afterCallMeta);
+    writeKeyValueSheet_(sheets[QC_GAS_SHEETS.callMeta], beforeCallMeta, afterCallMeta);
   }
 }
 
-function writeRowsSheet_(sheet, rows, schemaName) {
-  if (!sheet) throw new Error('تب موردنیاز ایجاد نشده است: ' + schemaName);
-  rows = Array.isArray(rows) ? rows : [];
-  var schema = QC_GAS_SCHEMAS[schemaName] || [];
-  var keys = schema.slice();
-  rows.forEach(function (row) {
-    Object.keys(row || {}).forEach(function (key) { if (keys.indexOf(key) < 0) keys.push(key); });
+function flatActions_(agentActions) {
+  var flat = [];
+  Object.keys(agentActions || {}).forEach(function (name) {
+    (agentActions[name] || []).forEach(function (row) { flat.push(Object.assign({}, row, { agent: name })); });
   });
+  return flat;
+}
+
+/**
+ * Writes one tab with the fewest spreadsheet calls possible:
+ * unchanged → none, appended rows → one range write, contiguous deletion →
+ * deleteRows, a handful of edited rows → those ranges, otherwise one body write
+ * (or a full rewrite when the column set itself changed).
+ */
+function writeRowsSheet_(sheet, beforeRows, afterRows, schemaName) {
+  if (!sheet) throw new Error('تب موردنیاز ایجاد نشده است: ' + schemaName);
+  var schema = QC_GAS_SCHEMAS[schemaName] || [];
+  var beforeKeys = columnKeys_(schema, beforeRows);
+  var afterKeys = columnKeys_(schema, afterRows);
+  var beforeValues = encodeRows_(beforeRows, beforeKeys);
+  var afterValues = encodeRows_(afterRows, afterKeys);
+  var sameKeys = beforeKeys.length === afterKeys.length && beforeKeys.every(function (key, i) { return key === afterKeys[i]; });
+
+  if (sameKeys && gridEqual_(beforeValues, afterValues)) return;
+  if (!sameKeys || (beforeValues.length === 0 && gridRows_(sheet) < 1)) {
+    fullRewrite_(sheet, afterKeys, afterValues);
+    return;
+  }
+
+  // Appended rows: the common case for every new ticket/social/call import.
+  if (afterValues.length > beforeValues.length && prefixEqual_(beforeValues, afterValues)) {
+    var tail = afterValues.slice(beforeValues.length);
+    sheet.getRange(beforeValues.length + 2, 1, tail.length, afterKeys.length).setValues(tail);
+    return;
+  }
+
+  // Contiguous deletion (single record delete, range clear, demo cleanup).
+  if (afterValues.length < beforeValues.length) {
+    var at = firstDifference_(beforeValues, afterValues);
+    var removed = beforeValues.length - afterValues.length;
+    if (at + removed <= beforeValues.length && suffixEqual_(beforeValues, at + removed, afterValues, at)) {
+      sheet.deleteRows(at + 2, removed);
+      return;
+    }
+  }
+
+  // Same row count: patch only the edited rows when they are few and clustered.
+  if (afterValues.length === beforeValues.length) {
+    var ranges = changedRanges_(beforeValues, afterValues);
+    if (ranges.length && ranges.length <= 6) {
+      ranges.forEach(function (range) {
+        sheet.getRange(range[0] + 2, 1, range[1] - range[0] + 1, afterKeys.length)
+          .setValues(afterValues.slice(range[0], range[1] + 1));
+      });
+      return;
+    }
+    if (afterValues.length) {
+      sheet.getRange(2, 1, afterValues.length, afterKeys.length).setValues(afterValues);
+      return;
+    }
+  }
+
+  fullRewrite_(sheet, afterKeys, afterValues);
+}
+
+function fullRewrite_(sheet, keys, values) {
   if (!keys.length) keys = ['id'];
-  var values = [keys].concat(rows.map(function (row) {
-    return keys.map(function (key) { return encodeCell_(row && row[key]); });
-  }));
+  var grid = [keys].concat(values.map(function (row) { return row.slice(0, keys.length); }));
   sheet.clearContents();
-  sheet.getRange(1, 1, values.length, keys.length).setValues(values);
-  styleHeader_(sheet, keys.length);
+  sheet.getRange(1, 1, grid.length, keys.length).setValues(grid);
+  if (values.length === 0) styleHeader_(sheet, keys.length);
 }
 
 function writeKeyValueSheet_(sheet, before, after) {
   if (!sheet) throw new Error('تب تنظیمات ایجاد نشده است.');
-  var rows = [['key', 'value']];
-  Object.keys(after || {}).sort().forEach(function (key) { rows.push([key, encodeCell_(after[key])]); });
+  var keys = Object.keys(after || {}).sort();
+  var beforeKeys = Object.keys(before || {}).sort();
+  if (keys.join('\u0001') === beforeKeys.join('\u0001') &&
+      keys.every(function (key) { return JSON.stringify(before[key] == null ? null : before[key]) === JSON.stringify(after[key] == null ? null : after[key]); })) return;
+  var rows = [['key', 'value']].concat(keys.map(function (key) { return [key, encodeCell_(after[key])]; }));
+  if (gridRows_(sheet) === rows.length) {
+    sheet.getRange(1, 1, rows.length, 2).setValues(rows);
+    return;
+  }
   sheet.clearContents();
   sheet.getRange(1, 1, rows.length, 2).setValues(rows);
   styleHeader_(sheet, 2);
 }
 
-function readRowsSheet_(sheet) {
-  if (!sheet || sheet.getLastRow() < 2 || sheet.getLastColumn() < 1) return [];
-  var values = sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn()).getValues();
-  var headers = values[0].map(function (header) { return String(header == null ? '' : header).trim(); });
-  var out = [];
-  for (var r = 1; r < values.length; r++) {
-    var row = {}, populated = false;
-    for (var c = 0; c < headers.length; c++) {
-      var key = headers[c];
-      if (!key) continue;
-      var value = decodeCell_(values[r][c], key);
-      if (value !== '' && value != null) populated = true;
-      row[key] = value;
-    }
-    if (populated) out.push(row);
+function columnKeys_(schema, rows) {
+  var keys = (schema || []).slice();
+  (rows || []).forEach(function (row) {
+    Object.keys(row || {}).forEach(function (key) { if (keys.indexOf(key) < 0) keys.push(key); });
+  });
+  return keys.length ? keys : ['id'];
+}
+
+function encodeRows_(rows, keys) {
+  return (rows || []).map(function (row) {
+    return keys.map(function (key) { return encodeCell_(row && row[key]); });
+  });
+}
+
+function rowEqual_(a, b) {
+  if (a.length !== b.length) return false;
+  for (var i = 0; i < a.length; i++) if (!cellEqual_(a[i], b[i])) return false;
+  return true;
+}
+
+function cellEqual_(a, b) {
+  if (typeof a === 'object' || typeof b === 'object') return JSON.stringify(a) === JSON.stringify(b);
+  return a === b;
+}
+
+function gridEqual_(a, b) {
+  if (a.length !== b.length) return false;
+  for (var i = 0; i < a.length; i++) if (!rowEqual_(a[i], b[i])) return false;
+  return true;
+}
+
+function prefixEqual_(before, after) {
+  for (var i = 0; i < before.length; i++) if (!rowEqual_(before[i], after[i])) return false;
+  return true;
+}
+
+function suffixEqual_(before, fromBefore, after, fromAfter) {
+  var length = before.length - fromBefore;
+  if (length !== after.length - fromAfter) return false;
+  for (var i = 0; i < length; i++) if (!rowEqual_(before[fromBefore + i], after[fromAfter + i])) return false;
+  return true;
+}
+
+function firstDifference_(before, after) {
+  var limit = Math.min(before.length, after.length);
+  for (var i = 0; i < limit; i++) if (!rowEqual_(before[i], after[i])) return i;
+  return limit;
+}
+
+function changedRanges_(before, after) {
+  var ranges = [], start = -1;
+  for (var i = 0; i < before.length; i++) {
+    var differs = !rowEqual_(before[i], after[i]);
+    if (differs && start < 0) start = i;
+    else if (!differs && start >= 0) { ranges.push([start, i - 1]); start = -1; }
   }
-  return out;
+  if (start >= 0) ranges.push([start, before.length - 1]);
+  return ranges;
 }
 
-function readKeyValueSheet_(sheet) {
-  if (!sheet || sheet.getLastRow() < 2) return {};
-  var rows = sheet.getRange(1, 1, sheet.getLastRow(), Math.max(2, sheet.getLastColumn())).getValues();
-  var out = {};
-  for (var i = 1; i < rows.length; i++) {
-    var key = String(rows[i][0] == null ? '' : rows[i][0]).trim();
-    if (!key) continue;
-    out[key] = decodeCell_(rows[i][1], key);
-  }
-  return out;
-}
-
-function writeSingleJsonSheet_(sheetName, value) {
-  var ss = getDatabaseSpreadsheet_();
-  var sheet = ss.getSheetByName(sheetName);
-  if (!sheet) throw new Error('تب گزارش تماس پیدا نشد: ' + sheetName);
-  ensureHeader_(sheet, ['json']);
-  sheet.clearContents();
-  sheet.getRange(1, 1, 1, 1).setValues([['json']]);
-  if (value != null && value !== '') sheet.getRange(2, 1, 1, 1).setValue(String(value));
-}
-
-function readSingleJsonSheet_(ss, sheetName, fallback) {
-  var sheet = ss.getSheetByName(sheetName);
-  if (!sheet || sheet.getLastRow() < 2) return fallback;
-  var raw = sheet.getRange(2, 1).getValue();
-  if (raw == null || raw === '') return fallback;
-  return String(raw);
-}
-
-function readCallReportSettings_() {
-  var ss = getDatabaseSpreadsheet_();
-  return {
-    bimeh_bazar_experts_v2: readSingleJsonSheet_(ss, QC_GAS_SHEETS.callReportExperts, '[]'),
-    bimeh_bazar_team_access_profiles_v1: readSingleJsonSheet_(ss, QC_GAS_SHEETS.callReportAccess, '[]')
-  };
-}
+/* ------------------------------------------------------------ cell coding */
 
 function ensureHeader_(sheet, headers) {
-  if (sheet.getLastRow() === 0) {
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    styleHeader_(sheet, headers.length);
-  } else if (sheet.getLastColumn() === 0) {
+  if (!sheet) return;
+  if (gridRows_(sheet) < 1 || sheet.getLastColumn() < 1) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     styleHeader_(sheet, headers.length);
   } else {
@@ -474,7 +760,6 @@ function styleHeader_(sheet, width) {
     .setFontWeight('bold')
     .setBackground('#0b6da8')
     .setFontColor('#ffffff');
-  sheet.autoResizeColumns(1, Math.min(width, 20));
 }
 
 function encodeCell_(value) {

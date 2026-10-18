@@ -10132,6 +10132,30 @@ document.addEventListener('DOMContentLoaded', function () {
       json: function () { return Promise.resolve(payload); },
       text: function () { return Promise.resolve(JSON.stringify(payload)); } };
   }
+
+  /* Every google.script.run round trip costs a few hundred milliseconds, so
+   * identical GETs are deduplicated while in flight and their answers are
+   * reused for a moment. Any write drops the cache immediately. */
+  var GET_TTL_MS = 4000;
+  var answered = {};
+  var pending = {};
+  function dropGetCache() { answered = {}; }
+
+  function send(method, requestUrl, body) {
+    return new Promise(function (resolve) {
+      if (!window.google || !google.script || !google.script.run) {
+        resolve({ status: 503, data: { error: 'این سامانه باید از لینک Web App در Google Apps Script باز شود.' } });
+        return;
+      }
+      google.script.run
+        .withSuccessHandler(function (packet) { resolve(packet); })
+        .withFailureHandler(function (error) {
+          resolve({ status: 500, data: { error: String(error && error.message || error || 'خطای Apps Script') } });
+        })
+        .crmqcApi(method, requestUrl, body);
+    });
+  }
+
   window.fetch = function (input, init) {
     var requestUrl = typeof input === 'string' ? input : (input && input.url) || '';
     if (!/^\/api\//.test(requestUrl)) return nativeFetch ? nativeFetch(input, init) : Promise.resolve(response({status:503,data:{error:'درخواست شبکه در دسترس نیست.'}}));
@@ -10142,16 +10166,26 @@ document.addEventListener('DOMContentLoaded', function () {
       try { body = typeof init.body === 'string' ? JSON.parse(init.body) : init.body; }
       catch (error) { return Promise.resolve(response({status:400,data:{error:'JSON درخواست نامعتبر است.'}})); }
     }
-    return new Promise(function (resolve) {
-      if (!window.google || !google.script || !google.script.run) {
-        resolve(response({status:503,data:{error:'این سامانه باید از لینک Web App در Google Apps Script باز شود.'}}));
-        return;
-      }
-      google.script.run
-        .withSuccessHandler(function (packet) { resolve(response(packet)); })
-        .withFailureHandler(function (error) { resolve(response({status:500,data:{error:String(error && error.message || error || 'خطای Apps Script')}})); })
-        .crmqcApi(method, requestUrl, body);
+
+    if (method !== 'GET') {
+      dropGetCache();
+      return send(method, requestUrl, body).then(function (packet) {
+        dropGetCache();
+        return response(packet);
+      });
+    }
+
+    var hit = answered[requestUrl];
+    if (hit && Date.now() - hit.at < GET_TTL_MS) return Promise.resolve(response(hit.packet));
+    if (pending[requestUrl]) return pending[requestUrl];
+
+    var request = send(method, requestUrl, body).then(function (packet) {
+      delete pending[requestUrl];
+      if (packet && Number(packet.status) === 200) answered[requestUrl] = { at: Date.now(), packet: packet };
+      return response(packet);
     });
+    pending[requestUrl] = request;
+    return request;
   };
 })();
 </script>
