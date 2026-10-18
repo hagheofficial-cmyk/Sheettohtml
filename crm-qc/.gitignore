@@ -13,3 +13,5 @@ node_modules
 data/calls/*
 !data/calls/.gitkeep
 !data/calls/README.md
+# خروجی بزرگ build آفلاین (همه‌چیز inline) — با npm run build:apps-script:offline ساخته می‌شود
+apps-script-full/offline/

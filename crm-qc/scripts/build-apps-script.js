@@ -6,11 +6,44 @@ const path = require('path');
 
 const CRM = path.resolve(__dirname, '..');
 const PUBLIC = path.join(CRM, 'public');
-const OUT = path.join(CRM, 'apps-script-full');
 const SHARED = path.join(CRM, 'shared');
-const FONT_AWESOME = path.join(CRM, 'node_modules', '@fortawesome', 'fontawesome-free');
+const MODULES = path.join(CRM, 'node_modules');
+
+/* Two deployment flavours:
+ *   cdn     (default) — vendor libraries/fonts stay on jsDelivr, so the HTML files
+ *                       are small enough to paste into the Apps Script editor.
+ *   --offline          — everything inlined; no external request, but multi-MB files
+ *                       that realistically need `clasp push`. */
+const MODE = process.argv.includes('--offline') ? 'offline' : 'cdn';
+const OUT = MODE === 'offline' ? path.join(CRM, 'apps-script-full', 'offline') : path.join(CRM, 'apps-script-full');
+const SERVER_SOURCE = path.join(CRM, 'apps-script-full', 'Server.gs');
+
+/* public/vendor/* → npm package + published file. Versions come from the
+ * installed packages, and each mapped file must exist locally so a wrong path
+ * fails the build instead of shipping a dead CDN link. */
+const VENDOR_CDN = {
+  'vendor/chart.umd.min.js': ['chart.js', 'dist/chart.umd.min.js'],
+  'vendor/xlsx.full.min.js': ['xlsx', 'dist/xlsx.full.min.js'],
+  'vendor/exceljs.min.js': ['exceljs', 'dist/exceljs.min.js'],
+  'vendor/html2canvas.min.js': ['html2canvas', 'dist/html2canvas.min.js'],
+  'vendor/jspdf.umd.min.js': ['jspdf', 'dist/jspdf.umd.min.js'],
+  'vendor/jszip.min.js': ['jszip', 'dist/jszip.min.js']
+};
+const FONT_AWESOME_PKG = '@fortawesome/fontawesome-free';
+const VAZIR_PKG = '@fontsource/vazirmatn';
 
 function read(file) { return fs.readFileSync(file, 'utf8'); }
+function installedVersion(pkg) {
+  const manifest = path.join(MODULES, ...pkg.split('/'), 'package.json');
+  if (!fs.existsSync(manifest)) throw new Error(`Missing dependency ${pkg}. Run: npm --prefix crm-qc ci`);
+  return JSON.parse(read(manifest)).version;
+}
+function jsDelivr(pkg, file) {
+  if (!fs.existsSync(path.join(MODULES, ...pkg.split('/'), file))) {
+    throw new Error(`CDN mapping is stale: ${pkg}@…/${file} is not in node_modules`);
+  }
+  return `https://cdn.jsdelivr.net/npm/${pkg}@${installedVersion(pkg)}/${file}`;
+}
 function dataUri(file) {
   const ext = path.extname(file).toLowerCase();
   const mime = ({
@@ -44,13 +77,35 @@ function scriptTag(source, label) {
   return `\n<script>/* ${label} */\n${safeInlineScript(source)}\n</script>\n`;
 }
 function fontAwesomeCss() {
-  const file = path.join(FONT_AWESOME, 'css', 'all.min.css');
+  const file = path.join(MODULES, ...FONT_AWESOME_PKG.split('/'), 'css', 'all.min.css');
   if (!fs.existsSync(file)) throw new Error('Font Awesome dependency is missing. Run npm ci first.');
   return inlineCss(read(file), path.dirname(file));
 }
+function fontAwesomeTag() {
+  if (MODE === 'cdn') return `\n<link rel="stylesheet" href="${jsDelivr(FONT_AWESOME_PKG, 'css/all.min.css')}">\n`;
+  return styleTag(fontAwesomeCss(), 'bundled Font Awesome');
+}
 function vazirCss() {
   const file = path.join(PUBLIC, 'fonts.css');
+  if (MODE === 'cdn') {
+    // fonts.css points at ./vendor/vazirmatn/*.woff2 — serve those from jsDelivr.
+    return read(file).replace(/url\(\.\/vendor\/vazirmatn\/([^)]+)\)/g, (whole, name) => {
+      const cleaned = name.replace(/["']/g, '').trim();
+      return `url(${jsDelivr(VAZIR_PKG, 'files/' + cleaned)})`;
+    });
+  }
   return inlineCss(read(file), PUBLIC);
+}
+/* Vendor libraries: either an external CDN tag (small file) or inlined (offline). */
+function vendorScriptTag(cleanPath) {
+  const mapping = VENDOR_CDN[cleanPath];
+  if (MODE === 'cdn') {
+    if (!mapping) throw new Error(`No CDN mapping for ${cleanPath}`);
+    return `\n<script src="${jsDelivr(mapping[0], mapping[1])}"></script>\n`;
+  }
+  const file = mapping ? path.join(MODULES, ...mapping[0].split('/'), mapping[1]) : path.join(PUBLIC, cleanPath);
+  if (!fs.existsSync(file)) throw new Error(`Cannot bundle vendor script ${cleanPath}`);
+  return scriptTag(read(file), cleanPath);
 }
 
 function buildCode() {
@@ -89,13 +144,12 @@ URLSearchParams.prototype.forEach = function (callback, context) {
   let storage = read(path.join(PUBLIC, 'storage.js'));
   if (!storage.includes('run(method, url, body)')) throw new Error('LocalApi.run() is missing from public/storage.js');
   storage = storage.replace(/typeof self !== 'undefined' \? self : this/g, 'globalThis');
-  const server = read(path.join(OUT, 'Server.gs'));
+  const server = read(SERVER_SOURCE);
   return runtime + shared + seedCode + '\n/* ---- Shared API router adapted from public/storage.js ---- */\n' + storage + '\n' + server;
 }
 
 function makeIndex() {
   let html = read(path.join(PUBLIC, 'index.html'));
-  const fa = fontAwesomeCss();
   const vazir = vazirCss();
 
   // The full Sheets app is already connected directly to the workbook, so hide
@@ -108,7 +162,7 @@ function makeIndex() {
     'enhancements.css': inlineCss(read(path.join(PUBLIC, 'enhancements.css')), PUBLIC)
   };
   html = html.replace(/<link\b[^>]*href=["']([^"']+)["'][^>]*>/gi, (tag, href) => {
-    if (/vendor\/fontawesome\/css\/all\.min\.css/i.test(href)) return styleTag(fa, 'bundled Font Awesome');
+    if (/vendor\/fontawesome\/css\/all\.min\.css/i.test(href)) return fontAwesomeTag();
     const key = href.split(/[?#]/)[0];
     if (key === 'styles.css' || key === 'enhancements.css') return styleTag(inlineStyles[key], `bundled ${key}`);
     if (/^(?:vendor\/|fonts\.css)/i.test(key)) return '';
@@ -165,6 +219,7 @@ document.addEventListener('DOMContentLoaded', function () {
   html = html.replace(/<script\b[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi, (tag, src) => {
     const clean = src.split(/[?#]/)[0].replace(/^\/+/, '');
     if (clean === 'pages/sheets.js') return '';
+    if (clean.startsWith('vendor/')) return vendorScriptTag(clean);
     const file = path.resolve(PUBLIC, clean);
     if (!file.startsWith(PUBLIC + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
       throw new Error(`Cannot bundle script ${src} referenced by public/index.html`);
@@ -176,7 +231,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function makeCallReport() {
   let html = read(path.join(PUBLIC, 'call-admin-report.html'));
-  const fa = fontAwesomeCss();
   const vazir = vazirCss();
   const logo = dataUri(path.join(PUBLIC, 'icon-192.png'));
 
@@ -184,12 +238,13 @@ function makeCallReport() {
   html = html.replace(/<script\b[^>]*>[\s\S]*?__CF\$cv\.params[\s\S]*?<\/script>/gi, '');
   html = html.replace(/<link\b[^>]*href=["'][^"']*(?:favicon|apple-touch-icon)[^"']*["'][^>]*>/gi, '');
   html = html.replace(/src=(["'])logo\.png(?:\?[^"']*)?\1/g, 'data-app-logo src=""');
-  html = html.replace(/<link\b[^>]*href=["']vendor\/fontawesome\/css\/all\.min\.css["'][^>]*>/gi, styleTag(fa, 'bundled Font Awesome'));
+  html = html.replace(/<link\b[^>]*href=["']vendor\/fontawesome\/css\/all\.min\.css["'][^>]*>/gi, fontAwesomeTag());
   html = html.replace(/<link\b[^>]*href=["']callReportTheme\.css["'][^>]*>/gi, styleTag(inlineCss(read(path.join(PUBLIC, 'callReportTheme.css')), PUBLIC), 'bundled call report theme'));
   html = html.replace(/@import\s+url\(["']?\.\/fonts\.css["']?\)\s*;/gi, vazir);
 
   html = html.replace(/<script\b[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi, (tag, src) => {
     const clean = src.split(/[?#]/)[0].replace(/^\/+/, '');
+    if (clean.startsWith('vendor/')) return vendorScriptTag(clean);
     const file = path.resolve(PUBLIC, clean);
     if (!file.startsWith(PUBLIC + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
       throw new Error(`Cannot bundle call-report script ${src}`);
@@ -241,12 +296,14 @@ function main() {
   const outputs = {
     'Code.gs': buildCode(),
     'Index.html': makeIndex(),
-    'CallReport.html': makeCallReport()
+    'CallReport.html': makeCallReport(),
+    'appsscript.json': read(path.join(CRM, 'apps-script-full', 'appsscript.json'))
   };
+  console.log(`build mode: ${MODE} → ${path.relative(CRM, OUT)}/`);
   for (const [name, content] of Object.entries(outputs)) {
     const file = path.join(OUT, name);
     fs.writeFileSync(file, content, 'utf8');
-    console.log(`${name}: ${Buffer.byteLength(content, 'utf8').toLocaleString()} bytes`);
+    console.log(`  ${name}: ${Buffer.byteLength(content, 'utf8').toLocaleString()} bytes`);
   }
 }
 
