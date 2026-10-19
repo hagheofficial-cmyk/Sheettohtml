@@ -420,6 +420,45 @@ test('standalone Apps Script: ورود با رمز، دسترسی هر کارش�
   assert.equal(apiSummary.status, 200);
   assert.ok(apiSummary.data.rows.length >= 1);
 
+  /* ستون qcAgents تب Agents: از اپ نوشته و از شیت خوانده می‌شود */
+  assert.ok(sheet('Agents').head.includes('qcAgents'), 'ستون qcAgents روی تب Agents ساخته می‌شود');
+
+  // الف) ذخیره‌ی کاربر QC با تیک‌ها → همان نام‌ها روی شیت می‌نشیند (متن خوانا، نه JSON)
+  const synced = api('PUT', '/api/qc-users', { id: created.data.user.id, name: 'مبینا', role: 'qc', active: true,
+    exts: '', agents: target.name, teams: '', syncColumn: true }, token2);
+  assert.equal(synced.status, 200, JSON.stringify(synced.data));
+  const written = sheet('Agents');
+  const writtenTarget = written.rows.find((row) => written.col(row, 'name') === target.name);
+  assert.equal(written.col(writtenTarget, 'qcAgents'), 'مبینا', 'ستون به‌صورت نام ساده نوشته می‌شود');
+  assert.ok(!String(written.col(writtenTarget, 'qcAgents')).includes('['), 'JSON روی شیت نمی‌نشیند');
+  const writtenOther = written.rows.find((row) => written.col(row, 'name') === other.name);
+  assert.equal(String(written.col(writtenOther, 'qcAgents') || ''), '', 'کارشناس انتخاب‌نشده ستون خالی دارد');
+
+  // ب) نوشتن مستقیم روی شیت هم دسترسی می‌دهد (دوطرفه)
+  writtenOther[written.head.indexOf('qcAgents')] = 'مبینا، هادی';
+  clock.advance(31000);
+  context.crmqcOnSheetChange();
+  const qcLogin2 = api('POST', '/api/auth/login', { name: 'مبینا', password: 'qc-1234' });
+  assert.equal(qcLogin2.status, 200, JSON.stringify(qcLogin2.data));
+  const qcBoot2 = api('GET', '/api/bootstrap', {}, qcLogin2.data.token);
+  assert.deepEqual([...qcBoot2.data.agents].map((a) => a.name).sort(), [target.name, other.name].sort(),
+    'ستون نوشته‌شده روی شیت به کارشناس QC دسترسی می‌دهد');
+
+  // پ) شیت قدیمی بدون این ستون: با اولین نوشتن، سرستون‌ها درست بازنویسی می‌شود
+  const tab = spreadsheet.getSheetByName('Agents');
+  const dropped = tab.data[0].indexOf('qcAgents');
+  tab.data = tab.data.map((row) => row.filter((cell, i) => i !== dropped));
+  clock.advance(31000);
+  context.crmqcOnSheetChange();
+  const moved = api('PUT', '/api/agents/' + target.id, { team: target.team }, token2);
+  assert.equal(moved.status, 200, JSON.stringify(moved.data));
+  const healed = sheet('Agents');
+  assert.ok(healed.head.includes('qcAgents'), 'ستون از دست‌رفته دوباره ساخته می‌شود');
+  const healedRow = healed.rows.find((row) => healed.col(row, 'id') === target.id);
+  assert.ok(healedRow, 'ردیف کارشناس بعد از بازنویسی سر جایش است');
+  assert.equal(healed.col(healedRow, 'name'), target.name, 'ستون‌ها جابه‌جا نمی‌شوند');
+  assert.equal(healed.col(healedRow, 'ext'), target.ext, 'داخلی هم در ستون خودش می‌ماند');
+
   /* ۱۱) صفحه‌ی گزارش تماس مستقل سرو می‌شود (بدون فریم تودرتو) */
   const callPage = context.doGet({ parameter: { page: 'call-report' } });
   assert.ok(callPage.content.includes('data-file="CallReport"'), 'فایل CallReport سرو می‌شود');
@@ -428,4 +467,134 @@ test('standalone Apps Script: ورود با رمز، دسترسی هر کارش�
   const indexPage = context.doGet({ parameter: {} });
   assert.ok(indexPage.content.includes('data-file="Index"'));
   assert.ok(!indexPage.content.includes('__QC_APP_SCRIPT_URL__'), 'نشانی وب‌اپ جایگزین شد');
+});
+
+/* عملکرد: کش تب‌به‌تب با نسخه‌ی هر تب + خواندن جزئی. ثبت هر ریت و گزارش‌گیری
+ * نباید کل شیت را بخواند، و نوشتنِ یک تب هرگز نباید تب‌های دیگر را پاک کند. */
+test('standalone Apps Script: کش تب‌به‌تب — ثبت ریت و گزارش بدون خواندن کل شیت', () => {
+  const { context, spreadsheet, cache, clock, properties } = createAppsScriptContext();
+  context.setupStandaloneApp();
+  const sheet = (name) => spreadsheet.getSheetByName(name);
+  const counters = () => { const o = {}; spreadsheet.getSheets().forEach((s) => { o[s.getName()] = s.calls; }); return o; };
+  const delta = (a, b) => Object.keys(b).filter((k) => b[k] !== a[k]).map((k) => k + ':' + (b[k] - a[k]));
+  const pick = (list, re) => list.filter((item) => re.test(item));
+
+  /* داده‌ی حجیم در تب‌هایی که مسیر ثبت ریت هیچ نیازی به آن‌ها ندارد */
+  const callsSheet = sheet('Calls');
+  const callHead = callsSheet.data[0];
+  for (let i = 0; i < 40; i++) {
+    callsSheet.data.push(callHead.map((key) => {
+      const row = { syncId: 'c' + i, expertName: 'کارشناس نمونه', team: 'تیم نمونه', score: 90, redline: 0,
+        reviewDate: '1405/06/10', callDate: '1405/06/10', formType: 'tele', sourceRow: i + 2, listeningTime: '30', callDuration: '120' };
+      return row[key] === undefined ? '' : row[key];
+    }));
+  }
+  clock.advance(31000);
+  context.crmqcOnSheetChange();
+
+  const bootstrap = context.crmqcApi('GET', '/api/bootstrap', {});
+  assert.equal(bootstrap.status, 200, bootstrap.data && bootstrap.data.error);
+  assert.equal(bootstrap.data.counts.calls, 40);
+  const agent = bootstrap.data.agents[0];
+
+  // ۱) GET گرم: هیچ تبی از شیت خوانده نمی‌شود
+  let c0 = counters();
+  for (let i = 0; i < 3; i++) assert.equal(context.crmqcApi('GET', '/api/bootstrap', {}).status, 200);
+  assert.deepEqual(delta(c0, counters()), [], 'GET گرم نباید هیچ تبی را از شیت بخواند');
+  assert.ok(cache.hits > 0, 'کش تب‌ها باید خواندن‌ها را سرو کند');
+
+  const rate = (code) => context.crmqcApi('POST', '/api/tickets', {
+    qcAgent: bootstrap.data.qcAgents[0], reviewDate: '1405/06/11', ticketDate: '1405/06/11',
+    agentName: agent.name, team: agent.team, ticketCode: code,
+    q1: '1', q2: '1', q3: '0', q4: '1', redline: '0', comment: 'perf'
+  });
+
+  // ۲) ثبت ریت: فقط تب تیکت (و Meta/خلاصه)؛ تماس‌ها و سوشال‌ها اصلاً خوانده نمی‌شوند
+  c0 = counters();
+  const first = rate('PERF-1');
+  assert.equal(first.status, 200, first.data && first.data.error);
+  const touched = delta(c0, counters());
+  assert.ok(pick(touched, /^Tickets:/).length, 'تب تیکت باید نوشته شود');
+  assert.deepEqual(pick(touched, /^(Calls|Socials|Agents|Actions|QC_Users|QC_Agents|Elements|Fiscal_Months|Reminders):/), [],
+    'ثبت ریت نباید تب‌های بی‌ربط را بخواند یا بنویسد: ' + touched.join(' '));
+
+  // ۳) نوشتنِ بعدی، تب خلاصه‌ی ماهانه را دوباره نمی‌سازد (throttle)
+  c0 = counters();
+  assert.equal(rate('PERF-2').status, 200);
+  const touched2 = delta(c0, counters());
+  assert.deepEqual(pick(touched2, /^Monthly_Summary:/), [], 'بازسازی خلاصه باید محدود به هر بازه‌ی زمانی باشد');
+  assert.deepEqual(pick(touched2, /^(Calls|Socials|Agents):/), [], 'خواندن جزئی نباید به تب‌های دیگر دست بزند');
+
+  // ۴) داده‌ی تب‌های دیگر سالم می‌ماند (خواندن جزئی به معنی پاک‌شدن تب نیست)
+  assert.equal(sheet('Calls').data.length, 41);
+  const status = context.crmqcApi('GET', '/api/data/status', {});
+  assert.equal(status.status, 200);
+  assert.equal(status.data.calls, 40);
+  assert.equal(status.data.tickets, 2);
+
+  // ۵) bootstrap پس از ذخیره (کاری که کلاینت می‌کند) بدون خواندن شیت، شمارش تازه دارد
+  c0 = counters();
+  const after = context.crmqcApi('GET', '/api/bootstrap', {});
+  assert.equal(after.data.counts.tickets, 2);
+  assert.equal(after.data.counts.calls, 40);
+  assert.deepEqual(delta(c0, counters()), [], 'bootstrap پس از ریت نباید شیت را بخواند (کش write-through)');
+
+  // ۶) پس از پایان بازه‌ی زمانی، نوشتنِ بعدی تب خلاصه را تازه می‌کند
+  properties.set('QC_GAS_SUMMARY_AT', String(Date.now() - 10 * 60 * 1000));
+  c0 = counters();
+  assert.equal(rate('PERF-3').status, 200);
+  assert.ok(pick(delta(c0, counters()), /^Monthly_Summary:/).length, 'پس از پایان بازه، خلاصه باید بازسازی شود');
+  assert.ok(sheet('Monthly_Summary').data.length > 1, 'تب خلاصه باید سطر داشته باشد');
+  const summary = context.crmqcApi('GET', '/api/monthly-summary', {});
+  assert.equal(summary.status, 200);
+  assert.equal(summary.data.rows.reduce((n, r) => n + (r.tickets || 0), 0), 3);
+
+  // ۷) ویرایش مستقیم روی شیت: کش باطل می‌شود و خواندن بعدی از خود شیت است
+  const agentsSheet = sheet('Agents');
+  const head = agentsSheet.data[0];
+  const manual = Array(head.length).fill('');
+  manual[head.indexOf('id')] = 950;
+  manual[head.indexOf('name')] = 'Perf Sheet Agent';
+  manual[head.indexOf('team')] = 'تیم نمونه';
+  manual[head.indexOf('active')] = true;
+  agentsSheet.data.push(manual);
+  clock.advance(31000);
+  context.crmqcOnSheetChange();
+  c0 = counters();
+  const agents = context.crmqcApi('GET', '/api/agents', {});
+  assert.equal(agents.status, 200);
+  assert.ok(agents.data.some((row) => row.name === 'Perf Sheet Agent'), 'ویرایش بیرونی باید دیده شود');
+  assert.ok(delta(c0, counters()).length > 0, 'پس از ویرایش بیرونی، خواندن باید از شیت انجام شود');
+
+  // ۸) بازخوانی دستی هم کش را دور می‌زند و داده‌ی کامل را برمی‌گرداند
+  const refreshed = context.refreshFromSheet();
+  assert.equal(refreshed.ok, true);
+  assert.equal(refreshed.counts.tickets, 3);
+  assert.equal(refreshed.counts.calls, 40);
+});
+
+/* تور ایمنی خواندن جزئی: اگر مسیری تبی را تغییر دهد که بارگذاری نشده، باید
+ * تشخیص داده شود تا درخواست با خواندن کامل تکرار شود (نه نوشتنِ تب خالی). */
+test('partial loads detect mutations of tabs they did not read', () => {
+  const { context, spreadsheet } = createAppsScriptContext();
+  context.setupStandaloneApp();
+  const partial = context.normalizeDatabase_(context.readDatabase_(spreadsheet, ['meta', 'settings', 'lists', 'tickets']));
+  const loaded = ['meta', 'settings', 'lists', 'tickets'];
+  const beforeJson = context.diffFingerprints_(partial);
+  /* آرایه‌های برگشتی از vm را بازسازی می‌کنیم تا مقایسه‌ی ساختاری معتبر باشد */
+  const missingOf = (db) => Array.from(context.missingTabs_(beforeJson, db, loaded)).sort();
+  assert.deepEqual(missingOf(partial), [], 'بدون تغییر، تبی جا نیفتاده است');
+
+  const mutated = JSON.parse(JSON.stringify(partial));
+  mutated.socials = [{ id: 1, agentName: 'کارشناس نمونه', reviewDate: '1405/06/11' }];
+  assert.deepEqual(missingOf(mutated), ['socials']);
+
+  mutated.callFeedbacks = [{ syncId: 'x', expertName: 'کارشناس نمونه' }];
+  mutated.agentActions = { 'کارشناس نمونه': [{ id: 1, date: '1405/06/11', type: 'بازخورد' }] };
+  assert.deepEqual(missingOf(mutated), ['agentActions', 'callFeedbacks', 'socials']);
+
+  /* تغییرِ تبی که بارگذاری شده، «جاافتاده» حساب نمی‌شود */
+  const okChange = JSON.parse(JSON.stringify(partial));
+  okChange.tickets = [{ id: 1, ticketCode: 'T-1', agentName: 'کارشناس نمونه' }];
+  assert.deepEqual(missingOf(okChange), []);
 });

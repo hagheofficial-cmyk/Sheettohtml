@@ -623,7 +623,8 @@ function qcUsersRoute(method, id, body) {
   if (method === 'GET' && id == null) {
     return { users: clone(A.userMask(users)), required: A.authRequired(db), mode: A.authMode(db),
       teams: [...new Set(db.agents.map((a) => a.team))].sort(),
-      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false }))) };
+      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false,
+        qcAgents: A.splitList(a.qcAgents) }))) };
   }
   if (method === 'GET' && id != null) {
     const u = users.find((x) => String(x.id) === String(id) || x.key === A.normalizeUser({ name: id }).key);
@@ -638,8 +639,12 @@ function qcUsersRoute(method, id, body) {
     if (session && A.normalizeUser({ name: session.name }).key === row.name.toLowerCase().replace(/\s/g, '')) {
       session = A.normalizeUser(row, 0); // تغییر نقش/دسترسی مدیر بلافاصله اعمال شود
     }
+    /* تیک‌ها → ستون qcAgents ردیف کارشناسان (تا از شیت/اکسل هم قابل ویرایش باشد) */
+    A.syncAgentQcColumn(db, A.normalizeUser(row, 0), body && body.syncColumn ? 'sync' : 'keep');
     saveDb();
-    return { ok: true, user: clone(A.userMask([A.normalizeUser(row, 0)])[0]), users: clone(A.userMask(A.normalizeUsers(db))) };
+    return { ok: true, user: clone(A.userMask([A.normalizeUser(row, 0)])[0]), users: clone(A.userMask(A.normalizeUsers(db))),
+      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false,
+        qcAgents: A.splitList(a.qcAgents) }))) };
   }
   if (method === 'DELETE' && id != null) {
     const target = users.find((x) => String(x.id) === String(id));
@@ -705,11 +710,21 @@ window.LocalApi = {
   put(url, b) { return Promise.resolve().then(() => route('PUT', url, b)); },
   del(url, body) { return Promise.resolve().then(() => route('DELETE', url, body)); },
   backup() { return clone(db); },
+  /* خودِ آبجکت زنده‌ی داده (بدون کپی عمیق). فقط سمت سرور Apps Script استفاده می‌شود:
+   * پیش از نوشتن، پاسخ ساخته شده و before هم کپیِ مستقل است، پس کپی سوم بیهوده است. */
+  liveDb() { return db; },
   flush() { clearTimeout(saveTimer); saveTimer=null;localStorage.setItem(KEY,JSON.stringify(db)); },
   replaceSnapshot(value) {
     const next=clone(value);
     if(!next||!Array.isArray(next.agents)||!Array.isArray(next.tickets)||!Array.isArray(next.socials)||!Array.isArray(next.callFeedbacks)||!next.settings||!next.seq||!next.lists)bad('نسخه مرورگر ناقص است');
     if(!window.APP_SCRIPT_SERVER)clearTimeout(saveTimer);saveTimer=null;db=next;
+  },
+  /* پذیرفتن داده بدون کپی عمیق: برای درخواست‌های خواندنی (GET) که هر چیزی را
+   * روی شیت ذخیره نمی‌کنند. روی دادهٔ چند هزار رکوردی، همین یک کپی حذف‌شده
+   * چند صد میلی‌ثانیه از هر گزارش می‌گیرد. */
+  adoptSnapshot(value) {
+    if(!value||!Array.isArray(value.agents)||!Array.isArray(value.tickets)||!Array.isArray(value.socials)||!Array.isArray(value.callFeedbacks)||!value.settings||!value.seq||!value.lists)bad('نسخه مرورگر ناقص است');
+    db=value; return db;
   },
   backupSize() { try { return (localStorage.getItem(KEY) || '').length; } catch (e) { return 0; } },
   importBackup(b) {

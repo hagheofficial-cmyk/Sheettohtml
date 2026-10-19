@@ -154,6 +154,56 @@ test('shared/access: دسترسی کارشناس QC از داخلی/نام/تی�
   assert.equal(Access.login(db, 'مبینا', 'x').ok, false, 'کاربر ناشناس رد می‌شود');
 });
 
+test('shared/access: ستون qcAgents ردیف کارشناس هم دسترسی می‌دهد و با ذخیره‌ی کاربر همگام می‌ماند', () => {
+  const db = fixture();
+  db.agents.forEach((a) => { a.qcAgents = []; });
+  db.agents.find((a) => a.name === 'کارشناس الف').qcAgents = 'مبینا، هادی'; // نوشته‌ی دستی روی تب Agents
+  db.agents.find((a) => a.name === 'کارشناس ب').qcAgents = ['مبینا'];
+
+  const mobina = Access.normalizeUser({ name: 'مبینا', role: 'qc' }, 0);
+  assert.deepEqual([...Access.allowedAgentNames(db, mobina)].sort(), ['کارشناس الف', 'کارشناس ب'],
+    'نام کاربر در ستون qcAgents یعنی دسترسی به همان کارشناس');
+  assert.deepEqual([...Access.allowedAgentNames(db, Access.normalizeUser({ name: 'هادی', role: 'qc' }, 1))], ['کارشناس الف'],
+    'نوشته‌ی رشته‌ای با جداکننده‌ی فارسی هم خوانده می‌شود');
+  assert.deepEqual(Access.scopeDb(db, mobina).tickets.map((r) => r.id), [1, 2, 3]);
+  assert.deepEqual(Access.scopeDb(db, Access.normalizeUser({ name: 'هادی', role: 'qc' }, 1)).tickets.map((r) => r.id), [1, 2]);
+
+  /* حالت sync (ذخیره از صفحه‌ی مدیریت QC): ستون دقیقاً برابر دسترسی اعلامی می‌شود */
+  const fromEditor = Access.normalizeUser({ name: 'مبینا', role: 'qc', agents: 'کارشناس ب' }, 0);
+  assert.equal(Access.syncAgentQcColumn(db, fromEditor, 'sync'), 1);
+  assert.deepEqual([...db.agents.find((a) => a.name === 'کارشناس الف').qcAgents], ['هادی'],
+    'تیک برداشته‌شده از ستون هم پاک می‌شود؛ نام دیگران می‌ماند');
+  assert.deepEqual([...db.agents.find((a) => a.name === 'کارشناس ب').qcAgents], ['مبینا']);
+
+  /* حالت keep (پیش‌فرض، مثل تغییر رمز): فقط اضافه می‌کند و دسترسی داده‌شده از شیت را نمی‌پَراند */
+  const shida = Access.normalizeUser({ name: 'شیدا', role: 'qc' }, 2);
+  assert.equal(Access.syncAgentQcColumn(db, shida), 0);
+  db.agents.find((a) => a.name === 'کارشناس بدون ریت').qcAgents = ['شیدا'];
+  assert.equal(Access.syncAgentQcColumn(db, shida), 0, 'ذخیره‌ی معمولی ستون نوشته‌شده روی شیت را پاک نمی‌کند');
+  assert.deepEqual([...Access.allowedAgentNames(db, shida)], ['کارشناس بدون ریت']);
+
+  /* کاربر نامحدود/مدیر در ستون نمی‌ماند چون همه را می‌بیند */
+  Access.syncAgentQcColumn(db, Access.normalizeUser({ name: 'مبینا', role: 'admin' }, 0), 'sync');
+  assert.ok(db.agents.every((a) => !(a.qcAgents || []).includes('مبینا')), 'ستون برای کاربر نامحدود خالی می‌شود');
+
+  /* تغییر نام و حذف کاربر QC، ستون را هم به‌روز می‌کند */
+  db.agents.find((a) => a.name === 'کارشناس ب').qcAgents = ['شیدا', 'هادی'];
+  assert.equal(Access.renameAgentQcColumn(db, 'شیدا', 'شیدا رحیمی'), 2, 'هر ردیفی که این نام را دارد به‌روز می‌شود');
+  assert.deepEqual([...db.agents.find((a) => a.name === 'کارشناس ب').qcAgents], ['شیدا رحیمی', 'هادی']);
+  assert.deepEqual([...db.agents.find((a) => a.name === 'کارشناس بدون ریت').qcAgents], ['شیدا رحیمی']);
+  const withUsers = { ...db, qcUsers: [{ id: 'u9', name: 'شیدا رحیمی', password: 'sha256$a$b', role: 'qc' }] };
+  Access.deleteUser(withUsers, 'شیدا رحیمی');
+  assert.ok(withUsers.agents.every((a) => !(a.qcAgents || []).includes('شیدا رحیمی')), 'با حذف کاربر نامش از ستون می‌رود');
+  assert.deepEqual([...withUsers.agents.find((a) => a.name === 'کارشناس ب').qcAgents], ['هادی']);
+
+  /* ذخیره‌ی ردیف کارشناس (سرور/مرورگر) ستون را نگه می‌دارد و نرمال می‌کند */
+  const Registry = require('../shared/registry');
+  const saved = Registry.save({ ...db, seq: { agent: 99 } }, { name: 'کارشناس الف', team: 'Tele Sales', ext: 101 }, 1);
+  assert.deepEqual([...saved.qcAgents], ['هادی'], 'ویرایش بدون اشاره به ستون، مقدار قبلی را حفظ می‌کند');
+  const typed = Registry.save({ ...db, seq: { agent: 99 } }, { name: 'کارشناس الف', team: 'Tele Sales', ext: 101, qcAgents: 'مبینا | شیدا، مبینا' }, 1);
+  assert.deepEqual([...typed.qcAgents], ['مبینا', 'شیدا'], 'جداکننده‌ها و تکراری‌ها نرمال می‌شوند');
+});
+
 test('shared/fiscal: بازه‌ی آماده‌ی ماه مالی از ردیف‌های تب Fiscal_Months ساخته می‌شود (بند ۲)', () => {
   const fx = fiscalFixture();
   const months = Fiscal.normalizeMonths([fx.previous, fx.current]);
@@ -476,6 +526,34 @@ test('real HTTP API: ورود با رمز، دسترسی مدیر/کارشناس
     /* نام کاربر QC به فهرست کارشناسان QC اضافه شده تا در فرم‌ها قابل انتخاب باشد */
     const qcAgents = await call('GET', '/api/qc-agents', undefined, adminToken);
     assert.ok(qcAgents.data.includes('مبینا'), JSON.stringify(qcAgents.data));
+
+    /* ستون qcAgents ردیف کارشناس: نوشتن از API (معادل ویرایش روی تب Agents) */
+    const rows = await call('GET', '/api/agents', undefined, adminToken);
+    const first = rows.data.find((a) => a.name === 'کارشناس الف');
+    const second = rows.data.find((a) => a.name === 'کارشناس ب');
+    assert.deepEqual(first.qcAgents, ['مبینا'], 'ذخیرهٔ کاربر QC ستون ردیف کارشناس را هم پر کرد');
+    assert.deepEqual(second.qcAgents, [], 'کارشناس انتخاب‌نشده ستون خالی دارد');
+    const column = await call('PUT', '/api/agents/' + second.id, { qcAgents: 'مبینا، هادی' }, adminToken);
+    assert.deepEqual(column.data.qcAgents, ['مبینا', 'هادی']);
+    const mobinaId = (await call('GET', '/api/qc-users', undefined, adminToken)).data.users.find((u) => u.name === 'مبینا').id;
+    const byColumn = await call('POST', '/api/auth/login', { name: 'مبینا', password: 'qc-1234' });
+    const bootColumn = await call('GET', '/api/bootstrap', undefined, byColumn.data.token);
+    assert.deepEqual(bootColumn.data.agents.map((a) => a.name).sort(), ['کارشناس الف', 'کارشناس ب'],
+      'ستون نوشته‌شده دسترسی می‌دهد');
+
+    /* ذخیره از صفحهٔ مدیریت QC با syncColumn → ستون همگام می‌شود */
+    const synced = await call('PUT', '/api/qc-users/' + mobinaId,
+      { id: mobinaId, name: 'مبینا', role: 'qc', exts: '101', agents: '', teams: '', syncColumn: true }, adminToken);
+    assert.equal(synced.status, 200);
+    const afterSync = await call('GET', '/api/agents', undefined, adminToken);
+    assert.deepEqual(afterSync.data.find((a) => a.name === 'کارشناس الف').qcAgents, ['مبینا'], 'تیک روی ستون نشست');
+    assert.deepEqual(afterSync.data.find((a) => a.name === 'کارشناس ب').qcAgents, ['هادی'],
+      'بدون تیک نام خودش پاک شد؛ نام دیگران دست‌نخورده می‌ماند');
+
+    /* تمیزکردن برای آزمون‌های بعدی */
+    await call('PUT', '/api/agents/' + rows.data.find((a) => a.name === 'کارشناس الف').id, { qcAgents: '' }, adminToken);
+    const backToNormal = await call('GET', '/api/bootstrap', undefined, byColumn.data.token);
+    assert.deepEqual(backToNormal.data.agents.map((a) => a.name), ['کارشناس الف']);
   });
 
   let qcToken = '';
@@ -828,9 +906,67 @@ for (const build of ['public', 'offline']) {
       await settle();
       assert.ok($('#quName') && $('#quRole') && $('#quPass') && $('#quActive') && $('#quSave'));
       assert.ok($('#quUnlimited'), 'گزینه‌ی «همه‌ی کارشناسان»');
-      const teams = doc.querySelectorAll('#quTeams .qc-team');
-      assert.ok(teams.length >= 2, 'کارشناسان هر تیم جدا چیده می‌شوند');
-      assert.ok(doc.querySelector('#quTeams .qc-agent'), 'هر کارشناس یک ردیف با چک‌باکس');
+      /* ساختار جدید: یک ناحیهٔ اسکرول، گروه بر اساس تیم، ردیف‌های با چک‌باکس باز */
+      const groups = doc.querySelectorAll('#quList .qc-group');
+      assert.ok(groups.length >= 2, 'کارشناسان هر تیم جدا چیده می‌شوند');
+      const rows = [...doc.querySelectorAll('#quList .qc-row')];
+      assert.ok(rows.length >= 4, 'هر کارشناس یک ردیف');
+      assert.equal(doc.querySelectorAll('#quList .qc-row input[type="checkbox"]').length, rows.length,
+        'هر ردیف چک‌باکس دارد');
+      assert.equal(doc.querySelectorAll('#quPicker').length, 1, 'فقط یک ناحیهٔ انتخاب (بدون اسکرول تودرتو)');
+      assert.ok($('#quPicked'), 'ناحیهٔ نمایش انتخاب‌شده‌ها');
+
+      /* تیک‌زدن واقعی: کلیک روی چک‌باکس و کلیک روی خود ردیف */
+      const rowA = rows.find((r) => r.dataset.name === 'کارشناس الف');
+      assert.ok(rowA, 'ردیف کارشناس الف');
+      rowA.querySelector('input[type="checkbox"]').click();
+      await settle();
+      assert.equal(rowA.querySelector('input').checked, true, 'چک‌باکس با کلیک تیک می‌خورد');
+      assert.ok($('#quCount').textContent.includes('۱'), 'شمارنده: ' + $('#quCount').textContent);
+      assert.ok([...doc.querySelectorAll('.qc-chip')].some((c) => c.textContent.includes('کارشناس الف')),
+        'انتخاب‌شده به‌شکل چیپ نشان داده می‌شود');
+      /* برداشتن تیک از راه چیپ */
+      doc.querySelector('.qc-chip [data-unpick]').click();
+      await settle();
+      assert.equal(rowA.querySelector('input').checked, false, 'چیپ تیک را برمی‌دارد');
+      rowA.click();
+      await settle();
+      assert.equal(rowA.querySelector('input').checked, true, 'کلیک روی خود ردیف هم تیک می‌زند');
+
+      /* دکمه‌های گروه: همه / هیچ / کل تیم */
+      const other = [...groups].find((g) => g !== rowA.closest('.qc-group'));
+      other.querySelector('[data-team-all]').click();
+      await settle();
+      assert.ok([...other.querySelectorAll('input[data-agent]')].every((c) => c.checked), 'دکمهٔ همه');
+      other.querySelector('[data-team-none]').click();
+      await settle();
+      assert.ok([...other.querySelectorAll('input[data-agent]')].every((c) => !c.checked), 'دکمهٔ هیچ');
+      assert.equal(rowA.querySelector('input').checked, true, 'تیک گروه دیگر دست‌نخورده می‌ماند');
+
+      /* جستجو فقط فیلتر می‌کند؛ تیک‌ها حفظ می‌شوند */
+      $('#quSearch').value = 'کارشناس الف';
+      $('#quSearch').dispatchEvent(new w.Event('input', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 160));
+      await settle();
+      assert.equal(rowA.hidden, false, 'ردیف مطابق دیده می‌شود');
+      assert.ok([...doc.querySelectorAll('#quList .qc-row')].some((r) => r.hidden), 'بقیه پنهان می‌شوند');
+      assert.equal(rowA.querySelector('input').checked, true, 'تیک بعد از جستجو حفظ می‌شود');
+      $('#quSearch').value = '';
+      $('#quSearch').dispatchEvent(new w.Event('input', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 160));
+      await settle();
+      assert.ok([...doc.querySelectorAll('#quList .qc-row')].every((r) => !r.hidden), 'با خالی‌شدن جستجو همه برمی‌گردند');
+
+      /* گزینهٔ نامحدود فهرست را بی‌اثر و کم‌رنگ می‌کند */
+      $('#quUnlimited').checked = true;
+      $('#quUnlimited').dispatchEvent(new w.Event('change', { bubbles: true }));
+      await settle();
+      assert.equal($('#quPicker').classList.contains('off'), true, 'با دسترسی نامحدود فهرست بی‌اثر می‌شود');
+      $('#quUnlimited').checked = false;
+      $('#quUnlimited').dispatchEvent(new w.Event('change', { bubbles: true }));
+      await settle();
+      assert.equal($('#quPicker').classList.contains('off'), false);
+
       $('#quName').value = 'مبینا';
       $('#quPass').value = 'qc-1234';
       $('#quExtraExt').value = '101';
@@ -842,6 +978,13 @@ for (const build of ['public', 'offline']) {
       assert.deepEqual([...users[1].exts], ['101']);
       assert.equal(users[1].password, '••••••');
       assert.equal(doc.querySelectorAll('.qc-users tbody tr').length, 2, 'فهرست کاربران به‌روز شد');
+
+      /* تیک‌ها روی ستون qcAgents ردیف کارشناسان (تب Agents) هم می‌نشینند */
+      const synced = await w.LocalApi.run('GET', '/api/agents');
+      assert.deepEqual([...(synced.find((a) => a.name === 'کارشناس الف').qcAgents || [])], ['مبینا'],
+        'ستون qcAgents برای کارشناس تیک‌خورده پر شد');
+      assert.deepEqual([...(synced.find((a) => a.name === 'کارشناس ب').qcAgents || [])], [],
+        'کارشناس تیک‌نخورده در ستون نمی‌آید');
     });
 
     await t.test('ورود کارشناس QC: صفحه‌های مدیریتی پنهان و داده محدود می‌شود', async () => {
@@ -998,6 +1141,70 @@ for (const build of ['public', 'offline']) {
       await settle();
       assert.ok($('#crOpenTab').getAttribute('href').includes('qcFrom='), 'بازه‌ی تاریخ هم به ابزار منتقل می‌شود');
       delete w.APP_SCRIPT_MODE; delete w.APP_SCRIPT_URL;
+    });
+
+    await t.test('ستون qcAgents: ویرایش از شیت/اکسل هم دسترسی می‌دهد و ویرایش کاربر ذخیره می‌شود', async () => {
+      await login('مدیر سیستم', 'admin-1234');
+
+      /* فرض: مدیر مستقیم روی تب Agents نوشته است که «کارشناس ب» را مبینا ریت می‌کند */
+      const before = await w.LocalApi.run('GET', '/api/agents');
+      const second = before.find((a) => a.name === 'کارشناس ب');
+      await w.LocalApi.run('PUT', '/api/agents/' + second.id, { qcAgents: 'مبینا، هادی' });
+      const afterEdit = (await w.LocalApi.run('GET', '/api/agents')).find((a) => a.id === second.id);
+      assert.deepEqual([...afterEdit.qcAgents], ['مبینا', 'هادی'], 'نوشتهٔ دستی با جداکنندهٔ فارسی هم خوانده می‌شود');
+
+      /* در مدیریت QC هم همان کارشناس تیک‌خورده و با برچسب «شیت» دیده می‌شود */
+      await go(w, 'qcadmin');
+      await settle(); await settle();
+      const list = (await w.LocalApi.run('GET', '/api/qc-users')).users;
+      doc.querySelector('[data-edit="' + list.findIndex((u) => u.name === 'مبینا') + '"]').click();
+      await settle();
+      const rowB = [...doc.querySelectorAll('#quList .qc-row')].find((r) => r.dataset.name === 'کارشناس ب');
+      assert.ok(rowB, 'ردیف کارشناس ب در ویرایشگر');
+      assert.equal(rowB.querySelector('input').checked, true, 'از ستون شیت تیک‌خورده می‌آید');
+      assert.ok(rowB.classList.contains('from-sheet') && rowB.querySelector('.qc-row-tag'), 'برچسب «شیت»');
+
+      /* رگرسیون: ویرایش کاربر قبلاً ذخیره نمی‌شد — تیک برداشته شده باید برداشته بماند */
+      const rowA = [...doc.querySelectorAll('#quList .qc-row')].find((r) => r.dataset.name === 'کارشناس الف');
+      rowA.querySelector('input').click();
+      await settle();
+      assert.equal(rowA.querySelector('input').checked, false);
+      $('#quSave').click();
+      await settle(); await settle(); await settle();
+      const edited = (await w.LocalApi.run('GET', '/api/qc-users')).users.find((u) => u.name === 'مبینا');
+      assert.deepEqual([...edited.exts], ['102'], 'ویرایش دسترسی ذخیره می‌شود: ' + JSON.stringify(edited.exts));
+      const cols = await w.LocalApi.run('GET', '/api/agents');
+      assert.deepEqual([...(cols.find((a) => a.name === 'کارشناس الف').qcAgents || [])], [], 'ستون هم همگام پاک شد');
+      assert.deepEqual([...(cols.find((a) => a.name === 'کارشناس ب').qcAgents || [])], ['مبینا', 'هادی'],
+        'نام دیگری که از شیت نوشته شده دست‌نخورده می‌ماند');
+
+      /* صفحهٔ مدیریت کارشناسان: ستون جدید و ویرایش آن‌لاین */
+      await go(w, 'agents');
+      await settle(); await settle();
+      assert.ok(txt('#agentsBody').includes('کارشناس QC مسئول'), 'سرستون جدید در صفحهٔ کارشناسان');
+      const agentRow = [...doc.querySelectorAll('#agentsBody tbody tr')].find((tr) => tr.dataset.name === 'کارشناس بدون ریت');
+      assert.ok(agentRow.querySelector('.row-qc'), 'سلول قابل ویرایش برای ستون QC');
+      assert.equal(agentRow.querySelector('.row-qc').value, '', 'فعلاً خالی است');
+      agentRow.querySelector('.row-qc').value = 'هادی';
+      agentRow.querySelector('.row-qc').dispatchEvent(new w.Event('blur'));
+      await settle(); await settle(); await settle();
+      const col3 = (await w.LocalApi.run('GET', '/api/agents')).find((a) => a.name === 'کارشناس بدون ریت');
+      assert.deepEqual([...col3.qcAgents], ['هادی'], 'ویرایش آن‌لاین ستون ذخیره شد');
+
+      /* فرم افزودن/ویرایش کارشناس هم همین فیلد را دارد */
+      doc.querySelector('#agentsBody tbody tr [data-act="edit"]').click();
+      await settle();
+      assert.ok($('#aQ'), 'فیلد کارشناس QC در فرم کارشناس');
+      assert.ok(doc.querySelectorAll('#qcDlForm option').length > 0, 'پیشنهاد نام‌های QC');
+      doc.querySelector('[data-close]').click();
+      await settle();
+
+      /* حذف کاربر QC → نامش از ستون همهی ردیف‌ها پاک می‌شود */
+      const all = (await w.LocalApi.run('GET', '/api/qc-users')).users;
+      await w.LocalApi.run('DELETE', '/api/qc-users/' + all.find((u) => u.name === 'مبینا').id);
+      const cleaned = await w.LocalApi.run('GET', '/api/agents');
+      assert.ok(cleaned.every((a) => !(a.qcAgents || []).includes('مبینا')), 'بعد از حذف کاربر، نامش در ستون نمی‌ماند');
+      assert.deepEqual([...(cleaned.find((a) => a.name === 'کارشناس ب').qcAgents || [])], ['هادی'], 'نام دیگران حفظ می‌شود');
     });
 
     assert.deepEqual(errors, [], 'بدون خطای کنسول: ' + errors.slice(0, 3).join(' | '));

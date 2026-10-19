@@ -25,6 +25,13 @@ function teamBadge(t) {
   return `<span class="tag-team" style="background:${cx[1]};color:${cx[0]};border-color:${cx[0]}33">${esc(t)}</span>`;
 }
 
+/* نام‌های کارشناس QC مسئول یک کارشناس — همان ستون qcAgents تب Agents */
+function qcNames(a) {
+  const A = window.QCAccess;
+  const list = A && A.splitList ? A.splitList(a && a.qcAgents) : [];
+  return list.map((x) => String(x).trim()).filter(Boolean);
+}
+
 async function render(root) {
   const st = App.state;
   root.innerHTML = `
@@ -61,7 +68,7 @@ async function render(root) {
     <!-- کارشناسان کنترل کیفیت — منتقل‌شده از مدیریت پایه (سینک همه‌ی مدیریت انسانی همین‌جا) -->
     <div class="card" style="margin-bottom:16px">
       <div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-user-shield"></i></div>
-        <div><h3>کارشناسان کنترل کیفیت</h3><div class="sub">این نام‌ها در فرم‌های ثبت ارزیابی تیکت و سوشال قابل انتخاب‌اند</div></div></div>
+        <div><h3>کارشناسان کنترل کیفیت</h3><div class="sub">این نام‌ها در فرم‌های ثبت ارزیابی تیکت و سوشال قابل انتخاب‌اند — برای رمز و دسترسی هر کارشناس، صفحهٔ مدیریت QC</div></div></div>
       <div class="card-pad">
         <div class="chips" id="qcChips"></div>
         <div style="display:flex;gap:9px;margin-top:13px;max-width:520px">
@@ -115,6 +122,9 @@ async function render(root) {
         <td class="cell-main">${esc(a.name)}${a.active === false ? ' <span class="badge gray">بایگانی</span>' : ''}${sub}</td>
         <td><input type="text" class="row-ext" dir="ltr" inputmode="numeric" data-ed="1" value="${a.ext == null ? '' : esc(String(a.ext))}" style="width:74px;text-align:center;font-size:12px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px"></td>
         <td><input type="text" class="row-team" data-ed="1" value="${esc(a.team)}" list="teamsDlAll" style="flex:1;min-width:140px;font-size:12px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 8px"></td>
+        <td><input type="text" class="row-qc" data-ed="1" value="${esc(qcNames(a).join('، '))}" list="qcDlAll" dir="rtl"
+          title="نام کارشناس(های) QC که این کارشناس را ریت می‌کنند — چند نام با ویرگول"
+          placeholder="—" style="width:100%;min-width:150px;font-size:12px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 8px"></td>
         <td class="agent-row-edit"><button class="btn soft sm" data-act="edit"><i class="fa-solid fa-user-pen"></i> ویرایش</button> ${a.active !== false ? '<button class="btn soft sm" data-act="archive">بایگانی</button>' : '<button class="btn success-soft sm" data-act="restore">بازیابی</button>'}</td>
       </tr>`;
     }
@@ -138,7 +148,7 @@ async function render(root) {
         </div>
         <div class="table-wrap team-body" style="max-height:340px;overflow-y:auto">
           <table class="tbl" style="font-size:13px">
-            <thead><tr><th style="width:30px"><input type="checkbox" class="sel-all"></th><th>نام</th><th style="width:110px">داخلی</th><th>تیم</th><th style="width:185px">عملیات</th></tr></thead>
+            <thead><tr><th style="width:30px"><input type="checkbox" class="sel-all"></th><th>نام</th><th style="width:110px">داخلی</th><th>تیم</th><th style="width:200px">کارشناس QC مسئول</th><th style="width:185px">عملیات</th></tr></thead>
             <tbody>${arr.map(rowHtml).join('')}</tbody>
           </table>
         </div>
@@ -156,14 +166,16 @@ async function render(root) {
       body.innerHTML = `<div class="card">
         <div class="table-wrap" style="max-height:600px;overflow-y:auto">
           <table class="tbl" style="font-size:13px">
-            <thead><tr><th style="width:30px"><input type="checkbox" class="sel-all"></th><th>نام</th><th style="width:110px">داخلی</th><th>تیم</th><th style="width:185px">عملیات</th></tr></thead>
+            <thead><tr><th style="width:30px"><input type="checkbox" class="sel-all"></th><th>نام</th><th style="width:110px">داخلی</th><th>تیم</th><th style="width:200px">کارشناس QC مسئول</th><th style="width:185px">عملیات</th></tr></thead>
             <tbody>${flatRows}</tbody>
           </table>
         </div></div>
-        <datalist id="teamsDlAll">${teamNames.map((x) => `<option value="${esc(x)}">`).join('')}</datalist>`;
+        <datalist id="teamsDlAll">${teamNames.map((x) => `<option value="${esc(x)}">`).join('')}</datalist>
+        <datalist id="qcDlAll">${(App.state.qcAgents || []).map((x) => `<option value="${esc(x)}">`).join('')}</datalist>`;
     } else {
       body.innerHTML = teamNames.map(teamSection).join('') +
-        `<datalist id="teamsDlAll">${teamNames.map((x) => `<option value="${esc(x)}">`).join('')}</datalist>`;
+        `<datalist id="teamsDlAll">${teamNames.map((x) => `<option value="${esc(x)}">`).join('')}</datalist>
+        <datalist id="qcDlAll">${(App.state.qcAgents || []).map((x) => `<option value="${esc(x)}">`).join('')}</datalist>`;
     }
     attachRowEvents();
   }
@@ -175,7 +187,7 @@ async function render(root) {
       inp.addEventListener('blur', () => { inp.style.border = '1px solid transparent'; inp.style.background = 'transparent'; saveRow(inp); });
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); });
     });
-    $$('#agentsBody input[data-ed="1"].row-team').forEach((inp) => {
+    $$('#agentsBody input[data-ed="1"].row-team, #agentsBody input[data-ed="1"].row-qc').forEach((inp) => {
       inp.addEventListener('focus', () => { inp.style.border = '1px solid var(--brand)'; inp.style.background = 'var(--panel-soft)'; });
       inp.addEventListener('blur', () => { inp.style.border = '1px solid transparent'; inp.style.background = 'transparent'; saveRow(inp); });
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); });
@@ -188,19 +200,32 @@ async function render(root) {
       if (!a) return;
       const newExt = tr.querySelector('.row-ext').value.trim();
       const newTeam = tr.querySelector('.row-team').value.trim();
+      const qcInput = tr.querySelector('.row-qc');
+      const newQc = qcInput ? qcInput.value.trim() : '';
+      const oldQc = qcNames(a).join('، ');
       const payload = {};
       const oldExt = (a.ext == null) ? '' : String(a.ext);
-      if (newExt !== oldExt || newTeam !== a.team) {
+      if (newExt !== oldExt || newTeam !== a.team || newQc !== oldQc) {
         const numExt = C.faToEn(newExt);
         if (numExt && !/^\d+$/.test(numExt)) { toast.error('داخلی باید عدد صحیح باشد'); tr.querySelector('.row-ext').value = oldExt; return; }
-        payload.ext = newExt === '' ? '' : numExt;
-        payload.team = newTeam;
+        if (newExt !== oldExt || newTeam !== a.team) {
+          payload.ext = newExt === '' ? '' : numExt;
+          payload.team = newTeam;
+        }
+        if (newQc !== oldQc) payload.qcAgents = newQc;
         api.put('/api/agents/' + id, payload).then((saved) => {
-          toast.success('به‌روز شد');
-          a.ext = payload.ext === '' ? null : +numExt;
+          toast.success(newQc !== oldQc ? 'به‌روز شد — دسترسی کارشناس QC هم اعمال شد' : 'به‌روز شد');
+          if (payload.ext !== undefined) a.ext = payload.ext === '' ? null : +payload.ext;
+          if (payload.qcAgents !== undefined) a.qcAgents = saved && saved.qcAgents ? saved.qcAgents : qcNames({ qcAgents: payload.qcAgents });
+          if (qcInput) qcInput.value = qcNames(a).join('، ');
           if (payload.team) { a.team = payload.team; load(); }
           App.boot(); // App.boot تیم‌های bootstrap را هم تازه می‌کند
-        }).catch((e) => { toast.error(e.message); tr.querySelector('.row-ext').value = oldExt; tr.querySelector('.row-team').value = a.team; });
+        }).catch((e) => {
+          toast.error(e.message);
+          tr.querySelector('.row-ext').value = oldExt;
+          tr.querySelector('.row-team').value = a.team;
+          if (qcInput) qcInput.value = oldQc;
+        });
       }
     }
 
@@ -306,10 +331,17 @@ async function render(root) {
           <input class="input" id="aE" dir="ltr" style="text-align:right" inputmode="numeric" value="${agent && agent.ext != null ? esc(agent.ext) : ''}" placeholder="مثلاً ۳۰۲۲"></div>
         <div class="field"><label>زیرمجموعه (واحد)</label>
           <input class="input" id="aS" value="${esc(agent && agent.subgroup ? agent.subgroup : '')}" placeholder="مثلاً Shams Team"></div>
+        <div class="field"><label>کارشناس(های) QC مسئول — چند نام با ویرگول</label>
+          <input class="input" id="aQ" value="${esc(qcNames(agent).join('، '))}" list="qcDlForm" autocomplete="off"
+            placeholder="مثلاً مبینا، هادی">
+          <datalist id="qcDlForm">${(App.state.qcAgents || []).map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
+          <div class="cell-sub" style="margin-top:6px">هر کارشناس QC که نامش اینجاست این کارشناس را می‌بیند و ریت می‌کند.
+            دقیقاً همین ستون <code>qcAgents</code> تب <code>Agents</code> شیت است.</div></div>
       </div></div>
       <div class="modal-foot"><button class="btn ghost" data-close>انصراف</button><button class="btn primary" id="aSave"><i class="fa-solid fa-floppy-disk"></i> ذخیره</button></div>`);
     $('#aSave', m).addEventListener('click', async () => {
-      const payload = { name: $('#aN', m).value.trim(), team: $('#aT', m).value.trim(), ext: $('#aE', m).value.trim() || null, subgroup: $('#aS', m).value.trim() };
+      const payload = { name: $('#aN', m).value.trim(), team: $('#aT', m).value.trim(), ext: $('#aE', m).value.trim() || null,
+        subgroup: $('#aS', m).value.trim(), qcAgents: $('#aQ', m).value.trim() };
       try {
         if (isNew) await api.post('/api/agents', payload);
         else await api.put('/api/agents/' + agent.id, payload);
@@ -373,7 +405,8 @@ async function render(root) {
       const hdr = rows[hi].map((c) => String(c).trim());
       const ci = {
         sub: hdr.findIndex((c) => /زیرمجموعه|زیر\s*مجموعه|واحد|sub/i.test(c)),
-        name: hdr.findIndex((c) => /کارشناس/.test(c)),
+        name: hdr.findIndex((c) => /کارشناس/.test(c) && !/qc|کنترل\s*کیفیت|ارزیاب/i.test(c)),
+        qc: hdr.findIndex((c) => /qc|کنترل\s*کیفیت|ارزیاب/i.test(c)),
         team: hdr.findIndex((c) => /تیم/.test(c)),
         ext: hdr.findIndex((c) => /caller|callerid|داخلی|دفتر/i.test(c))
       };
@@ -389,14 +422,16 @@ async function render(root) {
           ext: C.faToEn(String(ci.ext >= 0 && r[ci.ext] != null ? r[ci.ext] : '')).trim(),
           subgroup: sub === '—' || sub === '-' ? '' : sub
         });
+        /* ستون کارشناس QC اختیاری است؛ اگر نباشد مقدار قبلی حفظ می‌شود */
+        if (ci.qc >= 0) pending[pending.length - 1].qcAgents = String(r[ci.qc] == null ? '' : r[ci.qc]).trim();
       }
       if (!pending.length) { $('#impPreview', m).innerHTML = '<div class="note bad">ردیفی (به‌جز سرستون) با مقدار «کارشناس» پیدا نشد.</div>'; return; }
       const shown = pending.slice(0, 12);
       $('#impPreview', m).innerHTML = `
         <div class="note" style="margin-top:10px"><i class="fa-solid fa-check"></i> ${fa(pending.length)} ردیف آماده‌ی پردازش است${pending.length > 12 ? ' — ۱۲ ردیف اول:' : ':'}</div>
         <div class="table-wrap" style="max-height:230px;overflow-y:auto;margin-top:6px"><table class="tbl" style="font-size:12px">
-          <thead><tr><th>کارشناس</th><th>تیم</th><th>CallerID</th><th>زیرمجموعه</th></tr></thead>
-          <tbody>${shown.map((x) => `<tr><td class="cell-main">${esc(x.name)}</td><td>${esc(x.team)}</td><td dir="ltr">${esc(x.ext)}</td><td>${esc(x.subgroup || '')}</td></tr>`).join('')}</tbody>
+          <thead><tr><th>کارشناس</th><th>تیم</th><th>CallerID</th><th>زیرمجموعه</th><th>کارشناس QC</th></tr></thead>
+          <tbody>${shown.map((x) => `<tr><td class="cell-main">${esc(x.name)}</td><td>${esc(x.team)}</td><td dir="ltr">${esc(x.ext)}</td><td>${esc(x.subgroup || '')}</td><td>${esc(x.qcAgents || '')}</td></tr>`).join('')}</tbody>
         </table></div>`;
       $('#impGo', m).disabled = false;
     });
@@ -416,8 +451,8 @@ async function render(root) {
   }
 
   $('#agentTemplate').addEventListener('click', () => QCExport.sheets('نمونه کارشناسان', [
-    { name:'کارشناسان', rows:[['کارشناس','تیم','CallerID','زیرمجموعه اصلی'],['نام کارشناس اول','Telesales',3011,'واحد فروش'],['نام کارشناس دوم','Account',3012,'واحد اکانت'],['نام کارشناس سوم','MLM',3013,'واحد MLM']] },
-    { name:'راهنما', rows:[['راهنما'],['نام‌های نمونه را با نام دقیق افراد واقعی جایگزین کنید.'],['داخلی یکتا، عددی و اختیاری است.'],['نام تیم و نام کارشناس الزامی است. نام در فرم QC و این فایل یکسان باشد.'],['ورودی نام موجود، تیم/داخلی را به‌روزرسانی می‌کند؛ داخلی متعلق به شخص دیگر پذیرفته نمی‌شود.']] }
+    { name:'کارشناسان', rows:[['کارشناس','تیم','CallerID','زیرمجموعه اصلی','کارشناس QC'],['نام کارشناس اول','Telesales',3011,'واحد فروش','مبینا'],['نام کارشناس دوم','Account',3012,'واحد اکانت','مبینا، هادی'],['نام کارشناس سوم','MLM',3013,'واحد MLM','شیدا']] },
+    { name:'راهنما', rows:[['راهنما'],['نام‌های نمونه را با نام دقیق افراد واقعی جایگزین کنید.'],['داخلی یکتا، عددی و اختیاری است.'],['نام تیم و نام کارشناس الزامی است. نام در فرم QC و این فایل یکسان باشد.'],['ستون کارشناس QC اختیاری است: نام کارشناس(های) کنترل کیفیتی که این کارشناس را ریت می‌کنند؛ چند نام را با ویرگول جدا کنید.'],['این ستون دسترسی داده می‌دهد — دقیقاً معادل تیک‌زدن در صفحهٔ مدیریت QC است. خالی گذاشتنش دسترسی قبلی را پاک نمی‌کند.'],['ورودی نام موجود، تیم/داخلی/کارشناس QC را به‌روزرسانی می‌کند؛ داخلی متعلق به شخص دیگر پذیرفته نمی‌شود.']] }
   ]));
   $('#agentsDeleteAll').addEventListener('click', () => {
     const m=UI.modal(`${UI.modalHead('حذف تمام کارشناسان','fa-trash-can')}<div class="modal-body">

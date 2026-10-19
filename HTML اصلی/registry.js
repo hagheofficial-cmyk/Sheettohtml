@@ -31,6 +31,13 @@ function renameReferences(db, oldName, name) {
     delete db.agentActions[oldName];
   }
 }
+function nameList(value) {
+  if (value === undefined) return undefined;
+  const parts = Array.isArray(value) ? value : text(value).split(/[,،;؛|\n\r\t]+/);
+  const out = [];
+  parts.forEach((x) => { const n = P.normName(text(x)); if (n && !out.some((y) => P.nameKey(y) === P.nameKey(n))) out.push(n); });
+  return out;
+}
 function save(db, body, id) {
   db.agents = db.agents || [];
   const old = id == null ? null : db.agents.find(a => Number(a.id) === Number(id));
@@ -40,8 +47,11 @@ function save(db, body, id) {
     team: body.team == null && old ? old.team : text(body.team),
     ext: body.ext === undefined && old ? old.ext : extension(body.ext),
     subgroup: body.subgroup === undefined && old ? old.subgroup : text(body.subgroup),
-    active: body.active === undefined ? (old ? old.active !== false : true) : !!body.active
+    active: body.active === undefined ? (old ? old.active !== false : true) : !!body.active,
+    /* کارشناس(های) QC مسئول ریت‌کردن این کارشناس — ستون qcAgents تب Agents */
+    qcAgents: body.qcAgents === undefined ? nameList(old ? old.qcAgents : []) : nameList(body.qcAgents)
   });
+  if (!Array.isArray(row.qcAgents)) row.qcAgents = [];
   if (!row.name || !row.team) fail('نام و تیم الزامی است');
   const same = db.agents.filter(a => !old || a.id !== old.id);
   if (same.some(a => [a.name].concat(a.aliases || []).some(n => P.nameKey(n) === P.nameKey(row.name)))) fail('کارشناسی با این نام وجود دارد');

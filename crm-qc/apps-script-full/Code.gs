@@ -1430,6 +1430,13 @@ function renameReferences(db, oldName, name) {
     delete db.agentActions[oldName];
   }
 }
+function nameList(value) {
+  if (value === undefined) return undefined;
+  const parts = Array.isArray(value) ? value : text(value).split(/[,،;؛|\n\r\t]+/);
+  const out = [];
+  parts.forEach((x) => { const n = P.normName(text(x)); if (n && !out.some((y) => P.nameKey(y) === P.nameKey(n))) out.push(n); });
+  return out;
+}
 function save(db, body, id) {
   db.agents = db.agents || [];
   const old = id == null ? null : db.agents.find(a => Number(a.id) === Number(id));
@@ -1439,8 +1446,11 @@ function save(db, body, id) {
     team: body.team == null && old ? old.team : text(body.team),
     ext: body.ext === undefined && old ? old.ext : extension(body.ext),
     subgroup: body.subgroup === undefined && old ? old.subgroup : text(body.subgroup),
-    active: body.active === undefined ? (old ? old.active !== false : true) : !!body.active
+    active: body.active === undefined ? (old ? old.active !== false : true) : !!body.active,
+    /* کارشناس(های) QC مسئول ریت‌کردن این کارشناس — ستون qcAgents تب Agents */
+    qcAgents: body.qcAgents === undefined ? nameList(old ? old.qcAgents : []) : nameList(body.qcAgents)
   });
+  if (!Array.isArray(row.qcAgents)) row.qcAgents = [];
   if (!row.name || !row.team) fail('نام و تیم الزامی است');
   const same = db.agents.filter(a => !old || a.id !== old.id);
   if (same.some(a => [a.name].concat(a.aliases || []).some(n => P.nameKey(n) === P.nameKey(row.name)))) fail('کارشناسی با این نام وجود دارد');
@@ -2371,21 +2381,85 @@ function accounts(db) {
 }
 
 /* ------------------------------------------------------- محدوده‌ی داده */
-function allowedAgentNames(db, user) {
+function allowedAgentNames(db, user, ignoreColumn) {
   if (!user) return null;
   if (user.role === 'admin' || user.unrestricted) return null; // null = بدون محدودیت
   const agents = (db && db.agents) || [];
   const exts = new Set((user.exts || []).map(digits));
   const names = new Set((user.agents || []).map(nameKey));
   const teams = new Set((user.teams || []).map(teamKey));
+  const userKey = nameKey(user.name);
   const out = new Set();
   agents.forEach((a) => {
+    /* ستون `qcAgents` ردیف کارشناس (تب Agents) هم دسترسی می‌دهد: اگر نام این کاربر آنجا باشد،
+     * او مسئول ریت‌کردن این کارشناس است — پس می‌توان مستقیم از روی شیت/اکسل دسترسی داد. */
     const hit = (a.ext != null && a.ext !== '' && exts.has(digits(a.ext))) ||
-      names.has(nameKey(a.name)) || (a.aliases || []).some((al) => names.has(nameKey(al))) ||
-      (a.team && teams.has(teamKey(a.team)));
+      names.has(nameKey(a.name)) || splitList(a.aliases).some((al) => names.has(nameKey(al))) ||
+      (a.team && teams.has(teamKey(a.team))) ||
+      (!ignoreColumn && splitList(a.qcAgents).some((n) => nameKey(n) === userKey));
     if (hit) out.add(text(a.name));
   });
   return out;
+}
+
+/* همگام‌سازی دوطرفه: تیک‌های دسترسی یک کاربر QC روی ستون `qcAgents` تب Agents هم
+ * نوشته می‌شود تا از شیت/اکسل هم قابل دیدن و ویرایش باشد. برای مدیر و
+ * دسترسی نامحدود (*) این ستون خالی می‌ماند چون همه را می‌بینند. */
+function syncAgentQcColumn(db, user, mode) {
+  const name = text(user && user.name);
+  if (!name || !db || !Array.isArray(db.agents)) return 0;
+  const key = nameKey(name);
+  const unlimited = user.role === 'admin' || !!user.unrestricted;
+  /* mode === 'sync' یعنی کاربر از صفحهٔ مدیریت QC تیک‌ها را ثبت کرده: ستون دقیقاً
+   * با دسترسی اعلامی (exts/agents/teams) یکسان می‌شود — بدون خواندن خود ستون، وگرنه هرگز
+   * نمی‌شد تیکی را برداشت. در حالت پیش‌فرض ('keep') فقط نام اضافه می‌شود و از ستون
+   * چیزی پاک نمی‌شود، تا مثلاً تغییر رمز دسترسی‌های نوشته‌شده روی شیت را خراب نکند. */
+  const hard = mode === 'sync';
+  const allowed = unlimited ? null : allowedAgentNames(db, user, hard);
+  let touched = 0;
+  db.agents.forEach((a) => {
+    if (!a || typeof a !== 'object') return;
+    const list = splitList(a.qcAgents);
+    const has = list.some((n) => nameKey(n) === key);
+    const granted = unlimited ? false : !!(allowed && allowed.has(text(a.name)));
+    const want = hard ? granted : (has || granted);
+    if (has === want) return;
+    a.qcAgents = want ? list.concat(name) : list.filter((n) => nameKey(n) !== key);
+    touched += 1;
+  });
+  return touched;
+}
+
+/* تغییر نام کاربر QC → ستون qcAgents تب Agents هم با نام جدید به‌روز می‌شود. */
+function renameAgentQcColumn(db, oldName, name) {
+  const from = nameKey(P && P.normName ? P.normName(text(oldName)) : text(oldName));
+  const to = text(name);
+  if (!from || !to || from === nameKey(to) || !db || !Array.isArray(db.agents)) return 0;
+  let touched = 0;
+  db.agents.forEach((a) => {
+    if (!a || typeof a !== 'object') return;
+    const list = splitList(a.qcAgents);
+    if (!list.some((n) => nameKey(n) === from)) return;
+    a.qcAgents = Array.from(new Set(list.map((n) => (nameKey(n) === from ? to : n)).filter(Boolean)));
+    touched += 1;
+  });
+  return touched;
+}
+
+/* حذف نام یک کارشناس QC از ستون همهی ردیف‌های Agents (موقع حذف کاربر). */
+function dropAgentQcColumn(db, name) {
+  const key = nameKey(P && P.normName ? P.normName(text(name)) : text(name));
+  if (!key || !db || !Array.isArray(db.agents)) return 0;
+  let touched = 0;
+  db.agents.forEach((a) => {
+    if (!a || typeof a !== 'object') return;
+    const list = splitList(a.qcAgents);
+    const next = list.filter((n) => nameKey(n) !== key);
+    if (next.length === list.length) return;
+    a.qcAgents = next;
+    touched += 1;
+  });
+  return touched;
 }
 
 function recordById(db, path, id) {
@@ -2496,6 +2570,7 @@ function saveUser(db, body, existing) {
   const users = Array.isArray(db.qcUsers) ? db.qcUsers : (db.qcUsers = []);
   const fail = (message, status) => { const e = new Error(message); e.status = status || 400; throw e; };
   const name = P && P.normName ? P.normName(text(body.name)) : text(body.name);
+  const previousName = existing ? text(existing.name) : '';
   if (!name) fail('نام کارشناس QC الزامی است');
   const key = nameKey(name);
   const clash = users.find((u) => nameKey(u.name) === key && (!existing || String(u.id) !== String(existing.id)));
@@ -2519,10 +2594,16 @@ function saveUser(db, body, existing) {
     if (plain.length < 4) fail('رمز باید حداقل ۴ نویسه باشد');
     row.password = hashPassword(plain);
   } else if (!existing) fail('رمز اولیه الزامی است');
-  if (!existing) users.push(row);
+  /* ردیف ویرایش‌شده باید جایگزین ردیف قبلی شود؛ وگرنه ویرایش کاربر (دسترسی/نقش/رمز)
+   * فقط در پاسخ دیده می‌شود و روی تب QC_Users نمی‌نشیند. */
+  if (existing) {
+    const at = users.indexOf(existing);
+    if (at >= 0) users[at] = row; else users.push(row);
+  } else users.push(row);
   /* نام کارشناس QC باید در فهرست qcAgents هم باشد تا در فرم‌ها قابل انتخاب باشد. */
   if (!Array.isArray(db.qcAgents)) db.qcAgents = [];
   if (!db.qcAgents.some((x) => nameKey(x) === key)) db.qcAgents.push(name);
+  if (previousName && nameKey(previousName) !== key) renameAgentQcColumn(db, previousName, name);
   return clone(row);
 }
 
@@ -2532,7 +2613,8 @@ function deleteUser(db, name) {
   const found = users.find((u) => nameKey(u.name) === key);
   if (!found) { const e = new Error('کاربر یافت نشد'); e.status = 404; throw e; }
   db.qcUsers = users.filter((u) => u !== found);
-  return { ok: true };
+  dropAgentQcColumn(db, found.name);
+  return { ok: true, name: found.name };
 }
 
 /* ردیف‌های آماده‌ی نوشتن روی تب (بدون رمز hash‌شده؟ رمز hash می‌ماند). */
@@ -2553,6 +2635,8 @@ return {
   publicUser: publicUser, allowedAgentNames: allowedAgentNames, scopeDb: scopeDb, writeGuard: writeGuard,
   canAccessApi: canAccessApi, canAccessRoute: canAccessRoute, visibleRoutes: visibleRoutes, isAdmin: isAdmin,
   saveUser: saveUser, deleteUser: deleteUser, usersToRows: usersToRows, userMask: userMask,
+  syncAgentQcColumn: syncAgentQcColumn, dropAgentQcColumn: dropAgentQcColumn,
+  renameAgentQcColumn: renameAgentQcColumn,
   ADMIN_ROUTES: ADMIN_ROUTES, SHARED_ROUTES: SHARED_ROUTES, ADMIN_API: ADMIN_API, OPEN_API: OPEN_API
 };
 });
@@ -3535,7 +3619,8 @@ function qcUsersRoute(method, id, body) {
   if (method === 'GET' && id == null) {
     return { users: clone(A.userMask(users)), required: A.authRequired(db), mode: A.authMode(db),
       teams: [...new Set(db.agents.map((a) => a.team))].sort(),
-      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false }))) };
+      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false,
+        qcAgents: A.splitList(a.qcAgents) }))) };
   }
   if (method === 'GET' && id != null) {
     const u = users.find((x) => String(x.id) === String(id) || x.key === A.normalizeUser({ name: id }).key);
@@ -3550,8 +3635,12 @@ function qcUsersRoute(method, id, body) {
     if (session && A.normalizeUser({ name: session.name }).key === row.name.toLowerCase().replace(/\s/g, '')) {
       session = A.normalizeUser(row, 0); // تغییر نقش/دسترسی مدیر بلافاصله اعمال شود
     }
+    /* تیک‌ها → ستون qcAgents ردیف کارشناسان (تا از شیت/اکسل هم قابل ویرایش باشد) */
+    A.syncAgentQcColumn(db, A.normalizeUser(row, 0), body && body.syncColumn ? 'sync' : 'keep');
     saveDb();
-    return { ok: true, user: clone(A.userMask([A.normalizeUser(row, 0)])[0]), users: clone(A.userMask(A.normalizeUsers(db))) };
+    return { ok: true, user: clone(A.userMask([A.normalizeUser(row, 0)])[0]), users: clone(A.userMask(A.normalizeUsers(db))),
+      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false,
+        qcAgents: A.splitList(a.qcAgents) }))) };
   }
   if (method === 'DELETE' && id != null) {
     const target = users.find((x) => String(x.id) === String(id));
@@ -3617,11 +3706,21 @@ window.LocalApi = {
   put(url, b) { return Promise.resolve().then(() => route('PUT', url, b)); },
   del(url, body) { return Promise.resolve().then(() => route('DELETE', url, body)); },
   backup() { return clone(db); },
+  /* خودِ آبجکت زنده‌ی داده (بدون کپی عمیق). فقط سمت سرور Apps Script استفاده می‌شود:
+   * پیش از نوشتن، پاسخ ساخته شده و before هم کپیِ مستقل است، پس کپی سوم بیهوده است. */
+  liveDb() { return db; },
   flush() { clearTimeout(saveTimer); saveTimer=null;localStorage.setItem(KEY,JSON.stringify(db)); },
   replaceSnapshot(value) {
     const next=clone(value);
     if(!next||!Array.isArray(next.agents)||!Array.isArray(next.tickets)||!Array.isArray(next.socials)||!Array.isArray(next.callFeedbacks)||!next.settings||!next.seq||!next.lists)bad('نسخه مرورگر ناقص است');
     if(!window.APP_SCRIPT_SERVER)clearTimeout(saveTimer);saveTimer=null;db=next;
+  },
+  /* پذیرفتن داده بدون کپی عمیق: برای درخواست‌های خواندنی (GET) که هر چیزی را
+   * روی شیت ذخیره نمی‌کنند. روی دادهٔ چند هزار رکوردی، همین یک کپی حذف‌شده
+   * چند صد میلی‌ثانیه از هر گزارش می‌گیرد. */
+  adoptSnapshot(value) {
+    if(!value||!Array.isArray(value.agents)||!Array.isArray(value.tickets)||!Array.isArray(value.socials)||!Array.isArray(value.callFeedbacks)||!value.settings||!value.seq||!value.lists)bad('نسخه مرورگر ناقص است');
+    db=value; return db;
   },
   backupSize() { try { return (localStorage.getItem(KEY) || '').length; } catch (e) { return 0; } },
   importBackup(b) {
@@ -3683,7 +3782,7 @@ var QC_GAS_SHEETS = {
 };
 
 var QC_GAS_SCHEMAS = {
-  Agents: ['id', 'ext', 'name', 'team', 'active', 'subgroup', 'aliases'],
+  Agents: ['id', 'ext', 'name', 'team', 'active', 'subgroup', 'qcAgents', 'aliases'],
   Tickets: ['id', 'qcAgent', 'reviewDate', 'ticketDate', 'agentName', 'team', 'ticketCode', 'q1', 'q2', 'q3', 'q4', 'redline', 'score', 'comment', 'createdAt', 'updatedAt', 'sourceAgentName', 'demo'],
   Socials: ['id', 'reviewDate', 'qcAgent', 'receiveDate', 'receiveWeekday', 'replyDate', 'replyWeekday', 'agentName', 'team', 'messenger', 'receiveTime', 'replyTime', 'responseStatus', 'delayReason', 'reasonVerdict', 'qSla', 'qFollow', 'qClosing', 'qTone', 'durationMin', 'durationError', 'slaStatus', 'score', 'comment', 'messageLink', 'createdAt', 'updatedAt', 'sourceAgentName', 'demo'],
   Calls: ['syncId', 'expertName', 'sourceExpertName', 'team', 'score', 'redline', 'redlineReason', 'leadName', 'leadPhone', 'listeningTime', 'callDuration', 'qcAgent', 'qcComment', 'reviewDate', 'callDate', 'formType', 'evaluationId', 'sourceFile', 'sourceRow', 'datasetId', 'criteriaVersion', 'criteriaSnapshot', 'elements', 'demo'],
@@ -3719,14 +3818,26 @@ var QC_GAS_CALL_REPORT_KEYS = {
  * spreadsheet edit (onChange trigger), which is what invalidates cached reads. */
 var QC_GAS_ID_KEY = 'QC_GAS_SPREADSHEET_ID';
 var QC_GAS_REV_KEY = 'QC_GAS_REV';
-var QC_GAS_CACHE_PREFIX = 'qcdb@';
 var QC_GAS_SELF_WRITE_KEY = 'qcselfwrite';
 var QC_GAS_CACHE_TTL_SEC = 600;
 /* CacheService rejects values over 100 KB; 24k chars stays under that even when
  * every character is a 4-byte UTF-8 sequence. */
 var QC_GAS_CACHE_CHUNK_CHARS = 24000;
-/* Above this size the snapshot is read from the sheet every time instead. */
+/* Above this size a single tab is read from the sheet every time instead. */
 var QC_GAS_CACHE_MAX_CHARS = 4000000;
+var QC_GAS_TAB_MAX_CHARS = 6000000;
+var QC_GAS_CACHE_BATCH = 48;
+/* تب خلاصهٔ ماهانه در نوشتن‌های پی‌درپی حداکثر هر چند دقیقه یک‌بار بازسازی می‌شود
+ * (دستور منوی rebuildMonthlySummary همیشه فوری بازسازی می‌کند). */
+var QC_GAS_SUMMARY_EVERY_MS = 5 * 60 * 1000;
+var QC_GAS_SUMMARY_AT_KEY = 'QC_GAS_SUMMARY_AT';
+var QC_GAS_TAB_REV_KEY = 'QC_GAS_TAB_REV';
+var QC_GAS_TAB_PREFIX = 'qctab@';
+var QC_GAS_TAB_KEYS = ['meta', 'settings', 'lists', 'criteria', 'callMeta', 'agents', 'qcAgents',
+  'tickets', 'socials', 'callFeedbacks', 'agentActions', 'actionTypes', 'fiscalMonths', 'qcUsers',
+  'elements', 'reminders'];
+var QC_GAS_SMALL_TABS = ['meta', 'settings', 'lists', 'criteria', 'callMeta', 'agents', 'qcAgents',
+  'actionTypes', 'fiscalMonths', 'qcUsers', 'elements'];
 var QC_GAS_CHANGE_HANDLER = 'crmqcOnSheetChange';
 /* کش نتیجه‌ی تحلیل‌ها: کلید = نسخه‌ی داده + کاربر + مسیر؛ با هر نوشتن باطل می‌شود. */
 var QC_GAS_ANALYSIS_PREFIX = 'qcan@';
@@ -3776,6 +3887,7 @@ function setupStandaloneApp() {
     var hasData = ['Agents', 'Tickets', 'Socials', 'Calls', 'Actions', 'Reminders']
       .some(function (name) { return gridRows_(sheets[name]) > 1; });
 
+    invalidateTabCache_(); // راه‌اندازی باید وضعیت فیزیکی تب‌ها را ببیند، نه کش را
     var db;
     if (meta.datasetId) {
       db = normalizeDatabase_(readDatabase_(ss));
@@ -3808,6 +3920,7 @@ function setupStandaloneApp() {
 /** Menu item: drop the cached snapshot so the next read comes straight from the tabs. */
 function refreshFromSheet() {
   var ss = getDatabaseSpreadsheet_();
+  invalidateTabCache_(); // کش هر ۱۶ تب دور ریخته می‌شود؛ خواندن بعدی از خود شیت است
   var db = normalizeDatabase_(readDatabase_(ss));
   publishRevision_(bumpRevision_(), db);
   return { ok: true, counts: databaseCounts_(db) };
@@ -3823,6 +3936,8 @@ function crmqcOnSheetChange() {
   try {
     var cache = CacheService.getScriptCache();
     if (cache.get(QC_GAS_SELF_WRITE_KEY)) return;
+    /* ویرایش مستقیم روی شیت (بیرون از اپ): کش هر تب باید دور ریخته شود */
+    invalidateTabCache_();
     bumpRevision_();
   } catch (err) {
     // Never let a trigger failure break editing the spreadsheet.
@@ -3894,53 +4009,75 @@ function crmqcApi(method, requestUrl, body, token) {
     }
 
     var revision = currentRevision_();
-    var before = isRead ? readCachedDatabase_(revision) : null;
-    if (!before) {
-      before = normalizeDatabase_(readDatabase_(ss));
-      // Write the snapshot back under the revision it was read at. A concurrent
-      // write publishes under a newer revision, so this can never clobber it.
-      if (isRead) publishRevision_(revision, before);
+    /* تلاش دوم فقط وقتی رخ می‌دهد که مسیری تبی را تغییر داده باشد که در
+     * خواندن جزئی بارگذاری نشده بود؛ آن‌گاه کل داده خوانده و روت دوباره اجرا
+     * می‌شود تا هیچ تغییری گم نشود. */
+    for (var attempt = 0; ; attempt++) {
+      var readInfo = {};
+      /* خواندن جزئی: هر تب از کشِ خودش یا از شیت. مسیر نوشتنی فقط تب‌های موردنیاز
+       * خودش را بارگذاری می‌کند، پس ثبت یک ریت دیگر کل شیت را نمی‌خواند. */
+      var wanted = (isRead || attempt > 0) ? null : wantedTabsFor_(method, pathOnly);
+      var before = normalizeDatabase_(readDatabase_(ss, wanted, readInfo));
+
+      /* نشست: توکن از کش، نقش و دسترسی‌ها همیشه از داده‌ی تازه‌ی شیت */
+      var session = refreshSession_(resolveSession_(token), before);
+
+      /* کش نتیجه‌ی تحلیل‌ها (بند ۸): کلید = نسخه‌ی داده + کاربر + درخواست.
+       * با هر نوشتن نسخه عوض می‌شود، پس پاسخ کهنه هرگز خوانده نمی‌شود. */
+      var analysisKey = isRead && !authPath && cacheableRead_(pathOnly)
+        ? analysisCacheKey_(revision, requestUrl, session) : null;
+      if (analysisKey) {
+        var cached = readAnalysisCache_(analysisKey);
+        if (cached) return { status: 200, data: cached, cached: true };
+      }
+
+      /* دیگر هیچ کپی عمیقی از کل دیتابیس ساخته نمی‌شود: برای نوشتن‌ها پیش از اجرای
+       * روت، اثرانگشت JSON هر تب گرفته می‌شود (هم مبنای تشخیص تغییر، هم مبنای
+       * دیفِ سطری) و خودِ داده مستقیم در اختیار مسیرها قرار می‌گیرد. */
+      var beforeJson = isRead ? null : diffFingerprints_(before);
+      window.LocalApi.adoptSnapshot(before);
+      window.LocalApi.setSession(session);
+      window.__GAS_DB_DIRTY__ = false;
+
+      var result = window.LocalApi.run(method, requestUrl, body);
+
+      if (isRead) {
+        // Reads must not persist: a GET only re-derives in-memory defaults, and
+        // writing from a cached snapshot could clobber a concurrent edit.
+        var payload = jsonSafe_(result);
+        if (analysisKey) writeAnalysisCache_(analysisKey, payload);
+        return { status: 200, data: payload };
+      }
+
+      if (authPath && pathOnly === '/api/auth/logout') dropToken_(token);
+      if (authPath && result && result.user && (pathOnly === '/api/auth/login' || pathOnly === '/api/auth/setup')) {
+        result.token = issueToken_(result.user);
+        session = refreshSession_(result.user, before);
+      }
+
+      /* پاسخ پیش از هر دست‌کاریِ داده ساخته می‌شود تا بعداً بتوان خودِ db زنده را
+       * به‌جای یک کپی عمیق دیگر، مبنای نوشتن قرار داد. */
+      var data = jsonSafe_(result);
+      var live = window.LocalApi.liveDb();
+
+      /* تور ایمنی خواندن جزئی: تبِ تغییرکرده‌ای که بارگذاری نشده بود */
+      var missing = missingTabs_(beforeJson, live, readInfo.loaded);
+      if (missing.length && attempt === 0) {
+        console.warn('[qc] مسیر ' + pathOnly + ' تب‌های ' + missing.join('، ') +
+          ' را تغییر داد؛ با خواندن کامل تکرار می‌شود');
+        continue;
+      }
+
+      /* هر تغییر واقعی از راه saveDb() پرچم می‌خورد؛ مقایسهٔ JSON کل دیتابیس
+       * (دو رشته‌سازی کامل) حذف شد و تشخیص تغییر به همان مقایسهٔ تب‌به‌تبِ
+       * writeDatabaseDiffFp_ سپرده شد. */
+      if (window.__GAS_DB_DIRTY__) markSelfWrite_();
+      var changedTabs = writeDatabaseDiffFp_(ss, beforeJson, live, false, readInfo.loaded);
+      /* فقط همان تب‌ها نسخهٔ تازه می‌گیرند؛ بقیهٔ کش گرم می‌ماند و bootstrap
+       * بعدی (که کلاینت پس از هر ذخیره می‌زند) هیچ تبی را از شیت نمی‌خواند. */
+      if (changedTabs.length) publishAfterWrite_(bumpRevision_(), changedTabs, changedTabs.db);
+      return { status: 200, data: data };
     }
-
-    /* نشست: توکن از کش، نقش و دسترسی‌ها همیشه از داده‌ی تازه‌ی شیت */
-    var session = refreshSession_(resolveSession_(token), before);
-
-    /* کش نتیجه‌ی تحلیل‌ها (بند ۸): کلید = نسخه‌ی داده + کاربر + درخواست.
-     * با هر نوشتن نسخه عوض می‌شود، پس پاسخ کهنه هرگز خوانده نمی‌شود. */
-    var analysisKey = isRead && !authPath && cacheableRead_(pathOnly)
-      ? analysisCacheKey_(revision, requestUrl, session) : null;
-    if (analysisKey) {
-      var cached = readAnalysisCache_(analysisKey);
-      if (cached) return { status: 200, data: cached, cached: true };
-    }
-
-    window.LocalApi.replaceSnapshot(before);
-    window.LocalApi.setSession(session);
-    window.__GAS_DB_DIRTY__ = false;
-
-    var result = window.LocalApi.run(method, requestUrl, body);
-
-    if (isRead) {
-      // Reads must not persist: a GET only re-derives in-memory defaults, and
-      // writing from a cached snapshot could clobber a concurrent edit.
-      var payload = jsonSafe_(result);
-      if (analysisKey) writeAnalysisCache_(analysisKey, payload);
-      return { status: 200, data: payload };
-    }
-
-    if (authPath && pathOnly === '/api/auth/logout') dropToken_(token);
-    if (authPath && result && result.user && (pathOnly === '/api/auth/login' || pathOnly === '/api/auth/setup')) {
-      result.token = issueToken_(result.user);
-      session = refreshSession_(result.user, before);
-    }
-
-    var after = window.LocalApi.backup();
-    if (window.__GAS_DB_DIRTY__ || JSON.stringify(before) !== JSON.stringify(after)) {
-      markSelfWrite_();
-      writeDatabaseDiff_(ss, before, after, false);
-      publishRevision_(bumpRevision_(), after);
-    }
-    return { status: 200, data: jsonSafe_(result) };
   } catch (error) {
     return {
       status: Number(error && error.status) || 500,
@@ -4081,6 +4218,7 @@ function rebuildMonthlySummary() {
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
+    invalidateTabCache_();
     var db = normalizeDatabase_(readDatabase_(ss));
     var rows = window.QCFiscal.monthlySummary(db).rows;
     markSelfWrite_();
@@ -4165,38 +4303,217 @@ function markSelfWrite_() {
   try { CacheService.getScriptCache().put(QC_GAS_SELF_WRITE_KEY, '1', 30); } catch (ignored) {}
 }
 
-function readCachedDatabase_(revision) {
-  try {
-    var cache = CacheService.getScriptCache();
-    var meta = cache.get(QC_GAS_CACHE_PREFIX + revision + '#meta');
-    if (!meta) return null;
-    var info = JSON.parse(meta);
-    var keys = [];
-    for (var i = 0; i < info.chunks; i++) keys.push(QC_GAS_CACHE_PREFIX + revision + '#' + i);
-    var parts = cache.getAll(keys);
-    var json = '';
-    for (var c = 0; c < keys.length; c++) {
-      if (parts[keys[c]] == null) return null; // partially expired → read the sheet
-      json += parts[keys[c]];
-    }
-    return normalizeDatabase_(JSON.parse(json));
-  } catch (err) {
-    return null;
-  }
+/* ---------------------------------------------------- کش تب‌به‌تب
+ * هر تب با نسخه‌ی خودش کش می‌شود: نوشتن یک ریت فقط همان تب را بی‌اعتبار می‌کند و
+ * بقیه‌ی داده (تماس‌ها، سوشال‌ها، اقدام‌ها…) در کش گرم می‌ماند. نتیجه: ثبت هر ریت
+ * دیگر کل شیت را نمی‌خواند و گزارش‌گرفتن هم از کش سرو می‌شود. */
+
+function tabCacheKey_(revision, key, part) {
+  return QC_GAS_TAB_PREFIX + revision + '@' + key + '#' + part;
 }
 
+function tabRevisions_() {
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty(QC_GAS_TAB_REV_KEY);
+    var map = raw ? JSON.parse(raw) : {};
+    return map && typeof map === 'object' ? map : {};
+  } catch (err) { return {}; }
+}
+
+function saveTabRevisions_(map) {
+  try {
+    PropertiesService.getScriptProperties().setProperty(QC_GAS_TAB_REV_KEY, JSON.stringify(map || {}));
+  } catch (err) {}
+}
+
+function invalidateTabCache_() {
+  saveTabRevisions_({});
+  /* زمان بازسازی خلاصه هم صفر می‌شود تا نوشتن بعدی تب خلاصه را تازه کند */
+  try { PropertiesService.getScriptProperties().setProperty(QC_GAS_SUMMARY_AT_KEY, '0'); } catch (err) {}
+}
+
+function cacheGetAll_(cache, keys) {
+  var out = {};
+  for (var i = 0; i < keys.length; i += QC_GAS_CACHE_BATCH) {
+    var slice = keys.slice(i, i + QC_GAS_CACHE_BATCH);
+    var part = {};
+    try { part = cache.getAll(slice) || {}; } catch (err) { part = {}; }
+    Object.keys(part).forEach(function (k) { out[k] = part[k]; });
+  }
+  return out;
+}
+
+function readTabsCache_(keys) {
+  var out = {};
+  try {
+    var revs = tabRevisions_();
+    var cache = CacheService.getScriptCache();
+    var metaKeys = [], metaOf = {};
+    keys.forEach(function (key) {
+      var rev = revs[key];
+      if (!rev) return;
+      var mk = tabCacheKey_(rev, key, 'meta');
+      metaKeys.push(mk); metaOf[mk] = key;
+    });
+    if (!metaKeys.length) return out;
+    var metas = cacheGetAll_(cache, metaKeys);
+    var layout = {}, chunkKeys = [];
+    Object.keys(metaOf).forEach(function (mk) {
+      var key = metaOf[mk];
+      if (!metas[mk]) return;
+      var info;
+      try { info = JSON.parse(metas[mk]); } catch (err) { return; }
+      var list = [];
+      for (var i = 0; i < info.chunks; i++) {
+        var ck = tabCacheKey_(revs[key], key, i);
+        list.push(ck); chunkKeys.push(ck);
+      }
+      layout[key] = list;
+    });
+    if (!chunkKeys.length) return out;
+    var parts = cacheGetAll_(cache, chunkKeys);
+    Object.keys(layout).forEach(function (key) {
+      var json = '';
+      for (var i = 0; i < layout[key].length; i++) {
+        var value = parts[layout[key][i]];
+        if (value == null) { json = null; break; }
+        json += value;
+      }
+      if (!json) return;
+      try { out[key] = JSON.parse(json); } catch (err) {}
+    });
+  } catch (err) { return {}; }
+  return out;
+}
+
+/* entries = { key: { revision, value } } → کلیدهایی که واقعاً کش شدند */
+function publishTabsCache_(entries) {
+  var published = [], batches = [], values = {};
+  var flush = function () {
+    if (!Object.keys(values).length) return;
+    batches.push(values); values = {};
+  };
+  Object.keys(entries || {}).forEach(function (key) {
+    var json;
+    try { json = JSON.stringify(entries[key].value); } catch (err) { return; }
+    if (json == null || json.length > QC_GAS_TAB_MAX_CHARS) return; // بزرگ‌تر از سقف کش → از شیت خوانده می‌شود
+    published.push(key);
+    var rev = entries[key].revision;
+    var chunks = Math.max(1, Math.ceil(json.length / QC_GAS_CACHE_CHUNK_CHARS));
+    for (var i = 0; i < chunks; i++) {
+      values[tabCacheKey_(rev, key, i)] = json.substr(i * QC_GAS_CACHE_CHUNK_CHARS, QC_GAS_CACHE_CHUNK_CHARS);
+      if (Object.keys(values).length >= QC_GAS_CACHE_BATCH) flush();
+    }
+    values[tabCacheKey_(rev, key, 'meta')] = JSON.stringify({ chunks: chunks });
+    if (Object.keys(values).length >= QC_GAS_CACHE_BATCH) flush();
+  });
+  flush();
+  var cache = CacheService.getScriptCache();
+  batches.forEach(function (batch) {
+    try { cache.putAll(batch, QC_GAS_CACHE_TTL_SEC); } catch (err) {}
+  });
+  return published;
+}
+
+/* مقدار خامِ هر تب در db (همان شکلی که از شیت خوانده/در کش نگه داشته می‌شود) */
+function tabValueFromDb_(key, db) {
+  db = db || {};
+  var settings = db.settings || {};
+  if (key === 'meta') {
+    return { version: db.version || 1, datasetId: db.datasetId || '', createdAt: db.createdAt || '',
+      registryCleared: !!db.registryCleared, seq: db.seq || {} };
+  }
+  if (key === 'settings') {
+    var copy = Object.assign({}, settings);
+    delete copy.callCriteria;
+    return copy;
+  }
+  if (key === 'criteria') return { callCriteria: settings.callCriteria || {} };
+  if (key === 'elements') return window.QCElements.criteriaToRows(settings.callCriteria || null);
+  if (key === 'lists') return db.lists || {};
+  if (key === 'callMeta') {
+    return { callImport: db.callImport || null, callRaw: db.callRaw || null, callSync: db.callSync || null };
+  }
+  if (key === 'qcAgents') return db.qcAgents || [];
+  if (key === 'agentActions') return db.agentActions || {};
+  if (key === 'actionTypes') return db.actionTypes || [];
+  if (key === 'fiscalMonths') return db.fiscalMonths || [];
+  if (key === 'qcUsers') return db.qcUsers || [];
+  if (db[key] !== undefined) return db[key];
+  return undefined;
+}
+
+/* نوشتن، فقط تب‌هایی را بی‌اعتبار/منتشر می‌کند که واقعاً عوض شده‌اند */
+function publishAfterWrite_(revision, changedKeys, db) {
+  var revs = tabRevisions_();
+  var entries = {};
+  (changedKeys || []).forEach(function (key) {
+    var value = tabValueFromDb_(key, db);
+    if (value === undefined) { delete revs[key]; return; }
+    entries[key] = { revision: revision, value: value };
+  });
+  var published = publishTabsCache_(entries);
+  Object.keys(entries).forEach(function (key) {
+    if (published.indexOf(key) >= 0) revs[key] = revision; else delete revs[key];
+  });
+  saveTabRevisions_(revs);
+}
+
+function summaryDue_() {
+  try {
+    var at = Number(PropertiesService.getScriptProperties().getProperty(QC_GAS_SUMMARY_AT_KEY) || 0);
+    return (Date.now() - at) > QC_GAS_SUMMARY_EVERY_MS;
+  } catch (err) { return true; }
+}
+
+/* مسیرهای سنگین (بازگردانی بک‌آپ، ایمپورت، حذف بازه، ویرایش کارشناسان) داده را
+ * زیرورو می‌کنند: تب خلاصه باید بی‌درنگ بازسازی شود، نه بعد از پایان بازه. */
+function markSummaryDue_() {
+  try { PropertiesService.getScriptProperties().setProperty(QC_GAS_SUMMARY_AT_KEY, '0'); } catch (err) {}
+}
+
+function markSummaryBuilt_() {
+  try {
+    PropertiesService.getScriptProperties().setProperty(QC_GAS_SUMMARY_AT_KEY, String(Date.now()));
+  } catch (err) {}
+}
+
+/* تب‌هایی که یک مسیر واقعاً لازم دارد؛ بقیه از شیت خوانده نمی‌شوند */
+function wantedTabsFor_(method, pathOnly) {
+  var p = String(pathOnly || '');
+  var heavy;
+  if (p.indexOf('/api/tickets') === 0) heavy = ['tickets'];
+  else if (p.indexOf('/api/socials') === 0) heavy = ['socials'];
+  else if (p.indexOf('/api/calls') === 0) heavy = ['callFeedbacks'];
+  else if (p.indexOf('/api/actions') === 0) heavy = ['agentActions'];
+  else if (p.indexOf('/api/reminders') === 0) heavy = ['reminders'];
+  else if (p.indexOf('/api/qc-users') === 0 || p.indexOf('/api/auth') === 0 ||
+    p.indexOf('/api/fiscal-months') === 0 || p.indexOf('/api/criteria') === 0 ||
+    p.indexOf('/api/settings') === 0 || p.indexOf('/api/elements') === 0) heavy = [];
+  else {
+    heavy = ['tickets', 'socials', 'callFeedbacks', 'agentActions', 'reminders'];
+    markSummaryDue_();
+  }
+
+  /* وقتی خلاصه‌ی ماهانه قرار است در همین نوشتن بازسازی شود، همه‌ی ورودی‌هایش لازم‌اند */
+  var inputs = ['tickets', 'socials', 'callFeedbacks', 'agentActions'];
+  if (summaryDue_() && heavy.some(function (k) { return inputs.indexOf(k) >= 0; })) {
+    inputs.forEach(function (k) { if (heavy.indexOf(k) < 0) heavy.push(k); });
+  }
+  var wanted = QC_GAS_SMALL_TABS.slice();
+  heavy.forEach(function (k) { if (wanted.indexOf(k) < 0) wanted.push(k); });
+  return wanted;
+}
+
+/* انتشار کامل: همه‌ی تب‌ها زیر یک نسخه (راه‌اندازی، بازخوانی دستی، بازسازی خلاصه) */
 function publishRevision_(revision, db) {
   try {
-    var json = JSON.stringify(db);
-    if (json.length > QC_GAS_CACHE_MAX_CHARS) return;
-    var cache = CacheService.getScriptCache();
-    var chunks = Math.max(1, Math.ceil(json.length / QC_GAS_CACHE_CHUNK_CHARS));
-    var values = {};
-    for (var i = 0; i < chunks; i++) {
-      values[QC_GAS_CACHE_PREFIX + revision + '#' + i] = json.substr(i * QC_GAS_CACHE_CHUNK_CHARS, QC_GAS_CACHE_CHUNK_CHARS);
-    }
-    values[QC_GAS_CACHE_PREFIX + revision + '#meta'] = JSON.stringify({ chunks: chunks, at: new Date().toISOString() });
-    cache.putAll(values, QC_GAS_CACHE_TTL_SEC);
+    var entries = {};
+    QC_GAS_TAB_KEYS.forEach(function (key) {
+      var value = tabValueFromDb_(key, db);
+      if (value !== undefined) entries[key] = { revision: revision, value: value };
+    });
+    publishAfterWrite_(revision, Object.keys(entries), db);
   } catch (err) {
     // Caching is an optimization; reads fall back to the spreadsheet.
   }
@@ -4281,29 +4598,59 @@ function gridRows_(sheet) {
   return sheet ? sheet.getLastRow() : 0;
 }
 
-function readDatabase_(ss) {
+/**
+ * خواندن دیتابیس از شیت — با دو بهینه‌سازی مهم:
+ * ۱) هر تب جداگانه کش می‌شود (با نسخه‌ی خودش)؛ تب‌های گرم اصلاً از شیت خوانده نمی‌شوند.
+ * ۲) `wanted` می‌گوید همین مسیر به کدام تب‌ها نیاز دارد؛ بقیه خوانده نمی‌شوند
+ *    (ثبت یک ریت دیگر تماس‌ها و سوشال‌های چند هزار سطری را نمی‌خواند).
+ * `info` در صورت ارسال، {loaded, fresh} را پر می‌کند تا نوشتن فقط همان تب‌ها را بنویسد.
+ */
+function readDatabase_(ss, wanted, info) {
   var sheets = sheetMap_(ss);
-  var meta = readKeyValueGrid_(gridValues_(sheets[QC_GAS_SHEETS.meta]));
-  var settings = readKeyValueGrid_(gridValues_(sheets[QC_GAS_SHEETS.settings]));
-  var lists = readKeyValueGrid_(gridValues_(sheets[QC_GAS_SHEETS.lists]));
-  var criteria = readKeyValueGrid_(gridValues_(sheets[QC_GAS_SHEETS.criteria]));
-  var callMeta = readKeyValueGrid_(gridValues_(sheets[QC_GAS_SHEETS.callMeta]));
+  var keys = wanted && wanted.length ? wanted : null; // null = همه‌ی تب‌ها
+  var need = function (key) { return !keys || keys.indexOf(key) >= 0; };
+  var cached = {};
+  try { cached = readTabsCache_(keys || QC_GAS_TAB_KEYS); } catch (err) { cached = {}; }
+  var fresh = {};
+  /* مقدار خام تب: اول کش، بعد شیت */
+  function raw(key, reader) {
+    if (!need(key)) return null;
+    if (cached[key] !== undefined) return cached[key];
+    var value = reader();
+    fresh[key] = value;
+    return value;
+  }
+  function rows(sheetName) {
+    return readRowsGrid_(gridValues_(sheets[sheetName]));
+  }
 
-  var agentActions = {};
-  readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.actions])).forEach(function (action) {
-    var name = String(action.agent || '').trim();
-    if (!name) return;
-    if (!agentActions[name]) agentActions[name] = [];
-    delete action.agent;
-    agentActions[name].push(action);
-  });
+  var meta = raw('meta', function () { return readKeyValueGrid_(gridValues_(sheets[QC_GAS_SHEETS.meta])); }) || {};
+  var settings = raw('settings', function () { return readKeyValueGrid_(gridValues_(sheets[QC_GAS_SHEETS.settings])); }) || {};
+  var lists = raw('lists', function () { return readKeyValueGrid_(gridValues_(sheets[QC_GAS_SHEETS.lists])); }) || {};
+  var criteria = raw('criteria', function () { return readKeyValueGrid_(gridValues_(sheets[QC_GAS_SHEETS.criteria])); }) || {};
+  var callMeta = raw('callMeta', function () { return readKeyValueGrid_(gridValues_(sheets[QC_GAS_SHEETS.callMeta])); }) || {};
 
-  var actionTypes = readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.actionTypes]))
-    .map(function (row) { return String(row.label || '').trim(); }).filter(Boolean);
+  var agentActions = raw('agentActions', function () {
+    var map = {};
+    rows(QC_GAS_SHEETS.actions).forEach(function (action) {
+      var name = String(action.agent || '').trim();
+      if (!name) return;
+      if (!map[name]) map[name] = [];;
+      delete action.agent;
+      map[name].push(action);
+    });
+    return map;
+  }) || {};
 
-  var fiscalMonths = window.QCFiscal.normalizeMonths(readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.fiscalMonths])));
-  var qcUsers = readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.qcUsers]));
-  var elementRows = readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.elements]));
+  var actionTypes = raw('actionTypes', function () {
+    return rows(QC_GAS_SHEETS.actionTypes).map(function (row) { return String(row.label || '').trim(); }).filter(Boolean);
+  }) || [];
+
+  var fiscalMonths = window.QCFiscal.normalizeMonths(raw('fiscalMonths', function () {
+    return rows(QC_GAS_SHEETS.fiscalMonths);
+  }) || []);
+  var qcUsers = raw('qcUsers', function () { return rows(QC_GAS_SHEETS.qcUsers); }) || [];
+  var elementRows = raw('elements', function () { return rows(QC_GAS_SHEETS.elements); }) || [];
 
   var db = {
     version: meta.version || 1,
@@ -4313,18 +4660,19 @@ function readDatabase_(ss) {
     createdAt: meta.createdAt || '',
     registryCleared: !!meta.registryCleared,
     seq: meta.seq || {},
-    agents: readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.agents])),
-    qcAgents: readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.qcAgents]))
-      .map(function (row) { return String(row.name || '').trim(); }).filter(Boolean),
-    tickets: readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.tickets])),
-    socials: readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.socials])),
-    callFeedbacks: readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.calls])),
+    agents: raw('agents', function () { return rows(QC_GAS_SHEETS.agents); }) || [],
+    qcAgents: raw('qcAgents', function () {
+      return rows(QC_GAS_SHEETS.qcAgents).map(function (row) { return String(row.name || '').trim(); }).filter(Boolean);
+    }) || [],
+    tickets: raw('tickets', function () { return rows(QC_GAS_SHEETS.tickets); }) || [],
+    socials: raw('socials', function () { return rows(QC_GAS_SHEETS.socials); }) || [],
+    callFeedbacks: raw('callFeedbacks', function () { return rows(QC_GAS_SHEETS.calls); }) || [],
     callImport: callMeta.callImport || null,
     callRaw: callMeta.callRaw || null,
     callSync: callMeta.callSync || { files: {}, syncedAt: null },
     agentActions: agentActions,
     actionTypes: actionTypes.length ? actionTypes : undefined,
-    reminders: readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.reminders])),
+    reminders: raw('reminders', function () { return rows(QC_GAS_SHEETS.reminders); }) || [],
     settings: settings,
     lists: lists
   };
@@ -4334,6 +4682,25 @@ function readDatabase_(ss) {
     db.settings.callCriteria = window.QCElements.rowsToCriteria(elementRows, db.settings.callCriteria || null);
   }
   if (settings.authMode) db.settings.authMode = String(settings.authMode);
+
+  if (info) {
+    info.loaded = keys ? keys.slice() : QC_GAS_TAB_KEYS.slice();
+    info.fresh = Object.keys(fresh);
+  }
+  /* تب‌هایی که تازه از شیت خوانده شدند زیر نسخه‌ی جاری کش می‌شوند تا درخواست بعدی
+   * (و نوشتن‌های بعدی) دیگر شیت را نخوانند. */
+  if ((!info || info.publish !== false) && Object.keys(fresh).length) {
+    try {
+      var rev = currentRevision_();
+      var revs = tabRevisions_();
+      var entries = {};
+      Object.keys(fresh).forEach(function (key) { entries[key] = { revision: rev, value: fresh[key] }; });
+      /* خواندن بدون قفل انجام می‌شود: فقط جاهای خالی پر می‌شود تا نگاشتِ
+       * نوشتنِ همزمانِ تازه‌تر هرگز با دادهٔ کهنه جایگزین نشود. */
+      publishTabsCache_(entries).forEach(function (key) { if (!revs[key]) revs[key] = rev; });
+      saveTabRevisions_(revs);
+    } catch (err) {}
+  }
   return db;
 }
 
@@ -4382,85 +4749,168 @@ function readSingleJsonGrid_(grid, fallback) {
 
 /* ------------------------------------------------------------- write tabs */
 
-function writeDatabaseDiff_(ss, before, after, forceAll) {
-  before = before || {};
-  after = normalizeDatabase_(JSON.parse(JSON.stringify(after || {})));
+/* واحدِ مقایسه‌ی هر تب: دقیقاً همان شکلی که روی شیت نوشته می‌شود.
+ * با «اثرانگشت JSON» هر تب، نوشتن‌ها دیگر به کپی عمیقِ کل دیتابیس نیاز ندارند:
+ * پیش از اجرای روت، رشته‌ی JSON هر تب گرفته می‌شود و بعد فقط تبِ عوض‌شده
+ * برای ساختن دیفِ سطری، دوباره پارس می‌شود. */
+function diffUnits_(db) {
+  db = db || {};
+  var units = {};
+  QC_GAS_TAB_KEYS.forEach(function (key) {
+    if (key === 'qcAgents') {
+      units[key] = (db.qcAgents || []).map(function (name) { return { name: name }; });
+    } else if (key === 'actionTypes') {
+      units[key] = (db.actionTypes || []).map(function (label) { return { label: label }; });
+    } else {
+      var value = tabValueFromDb_(key, db);
+      if (value !== undefined) units[key] = value;
+    }
+  });
+  return units;
+}
+
+function jsonString_(value) {
+  try { return JSON.stringify(value == null ? null : value); } catch (err) { return null; }
+}
+
+function diffFingerprints_(db) {
+  var units = diffUnits_(db), out = {};
+  Object.keys(units).forEach(function (key) { out[key] = jsonString_(units[key]); });
+  return out;
+}
+
+/* تب‌هایی که در این درخواست بارگذاری نشده‌اند اما مسیر آن‌ها را تغییر داده است.
+ * مقایسه فقط روی همان تب‌های خالی انجام می‌شود، پس هزینه‌اش ناچیز است. */
+function missingTabs_(beforeJson, after, loaded) {
+  if (!loaded) return [];
+  var units = diffUnits_(after || {});
+  var missing = [];
+  QC_GAS_TAB_KEYS.forEach(function (key) {
+    if (loaded.indexOf(key) >= 0) return;
+    var was = beforeJson && beforeJson[key] !== undefined ? beforeJson[key] : null;
+    if (was !== jsonString_(units[key])) missing.push(key);
+  });
+  return missing;
+}
+
+/* بازسازی داده‌ی «پیش از تغییر» فقط برای ورودی‌های خلاصه‌ی ماهانه */
+function beforeDbFromFingerprints_(beforeJson, keys, after) {
+  var db = { agents: [], tickets: [], socials: [], callFeedbacks: [], agentActions: {}, fiscalMonths: [], settings: (after && after.settings) || {} };
+  (keys || []).forEach(function (key) {
+    var raw = beforeJson ? beforeJson[key] : null;
+    if (raw == null) return;
+    try { db[key] = JSON.parse(raw); } catch (err) {}
+  });
+  return db;
+}
+
+/**
+ * نوشتن فقط تب‌هایی که واقعاً عوض شده‌اند.
+ * `only` = کلیدهایی که در این درخواست از شیت خوانده شده‌اند؛ تب‌های خوانده‌نشده
+ * هرگز مقایسه یا نوشته نمی‌شوند (نه JSON اضافی، نه ریسک پاک‌شدن داده).
+ * خروجی: فهرست کلیدهایی که نوشته شدند (برای انتشار همان‌ها در کش).
+ */
+function writeDatabaseDiff_(ss, before, after, forceAll, only) {
+  return writeDatabaseDiffFp_(ss, diffFingerprints_(before || {}), after, forceAll, only);
+}
+
+/* نسخه‌ی اصلیِ نوشتن: `beforeJson` اثرانگشت JSON هر تب پیش از تغییر است.
+ * خروجی آرایه‌ی کلیدهای نوشته‌شده است و `written.db` همان داده‌ی نرمال‌شده‌ی
+ * «پس از تغییر» است تا دقیقاً همان چیزی که روی شیت رفت، در کش هم منتشر شود. */
+function writeDatabaseDiffFp_(ss, beforeJson, after, forceAll, only) {
+  beforeJson = beforeJson || {};
+  after = normalizeDatabase_(after || {});
   var sheets = sheetMap_(ss);
+  var written = [];
+  var allowed = function (key) { return !only || only.indexOf(key) >= 0; };
+  var units = diffUnits_(after);
+  var afterJson = {}, beforeRows = {};
   var changed = function (key) {
-    return forceAll || JSON.stringify(before[key] == null ? null : before[key]) !== JSON.stringify(after[key] == null ? null : after[key]);
+    if (!allowed(key)) return false;
+    if (forceAll) return true;
+    if (afterJson[key] === undefined) afterJson[key] = jsonString_(units[key]);
+    var was = beforeJson[key] === undefined ? null : beforeJson[key];
+    return was !== afterJson[key];
+  };
+  var rows = function (key) {
+    if (beforeRows[key] === undefined) {
+      var raw = beforeJson[key];
+      var value = null;
+      try { value = raw == null ? null : JSON.parse(raw); } catch (err) { value = null; }
+      beforeRows[key] = value;
+    }
+    return beforeRows[key];
+  };
+  var write = function (key, fn) {
+    if (!fn()) return;
+    if (written.indexOf(key) < 0) written.push(key);
   };
 
-  if (changed('agents')) writeRowsSheet_(sheets[QC_GAS_SHEETS.agents], before.agents, after.agents, 'Agents');
-  if (changed('tickets')) writeRowsSheet_(sheets[QC_GAS_SHEETS.tickets], before.tickets, after.tickets, 'Tickets');
-  if (changed('socials')) writeRowsSheet_(sheets[QC_GAS_SHEETS.socials], before.socials, after.socials, 'Socials');
-  if (changed('callFeedbacks')) writeRowsSheet_(sheets[QC_GAS_SHEETS.calls], before.callFeedbacks, after.callFeedbacks, 'Calls');
-  if (changed('qcAgents')) {
-    writeRowsSheet_(sheets[QC_GAS_SHEETS.qcAgents],
-      (before.qcAgents || []).map(function (name) { return { name: name }; }),
-      (after.qcAgents || []).map(function (name) { return { name: name }; }), 'QC_Agents');
-  }
+  if (changed('agents')) write('agents', function () {
+    return writeRowsSheet_(sheets[QC_GAS_SHEETS.agents], rows('agents') || [], units.agents, 'Agents');
+  });
+  if (changed('tickets')) write('tickets', function () {
+    return writeRowsSheet_(sheets[QC_GAS_SHEETS.tickets], rows('tickets') || [], units.tickets, 'Tickets');
+  });
+  if (changed('socials')) write('socials', function () {
+    return writeRowsSheet_(sheets[QC_GAS_SHEETS.socials], rows('socials') || [], units.socials, 'Socials');
+  });
+  if (changed('callFeedbacks')) write('callFeedbacks', function () {
+    return writeRowsSheet_(sheets[QC_GAS_SHEETS.calls], rows('callFeedbacks') || [], units.callFeedbacks, 'Calls');
+  });
+  if (changed('qcAgents')) write('qcAgents', function () {
+    return writeRowsSheet_(sheets[QC_GAS_SHEETS.qcAgents], rows('qcAgents') || [], units.qcAgents, 'QC_Agents');
+  });
+  if (changed('agentActions')) write('agentActions', function () {
+    return writeRowsSheet_(sheets[QC_GAS_SHEETS.actions], flatActions_(rows('agentActions') || {}), flatActions_(units.agentActions), 'Actions');
+  });
+  if (changed('reminders')) write('reminders', function () {
+    return writeRowsSheet_(sheets[QC_GAS_SHEETS.reminders], rows('reminders') || [], units.reminders, 'Reminders');
+  });
+  if (changed('actionTypes')) write('actionTypes', function () {
+    return writeRowsSheet_(sheets[QC_GAS_SHEETS.actionTypes], rows('actionTypes') || [], units.actionTypes, 'Action_Types');
+  });
+  if (changed('settings')) write('settings', function () {
+    return writeKeyValueSheet_(sheets[QC_GAS_SHEETS.settings], rows('settings') || {}, units.settings);
+  });
+  if (changed('criteria')) write('criteria', function () {
+    return writeKeyValueSheet_(sheets[QC_GAS_SHEETS.criteria], {}, { callCriteria: (after.settings || {}).callCriteria || {} });
+  });
+  if (changed('lists')) write('lists', function () {
+    return writeKeyValueSheet_(sheets[QC_GAS_SHEETS.lists], rows('lists') || {}, units.lists);
+  });
+  if (changed('fiscalMonths')) write('fiscalMonths', function () {
+    return writeRowsSheet_(sheets[QC_GAS_SHEETS.fiscalMonths], rows('fiscalMonths') || [], units.fiscalMonths, 'Fiscal_Months');
+  });
+  if (changed('qcUsers')) write('qcUsers', function () {
+    return writeRowsSheet_(sheets[QC_GAS_SHEETS.qcUsers], rows('qcUsers') || [], units.qcUsers, 'QC_Users');
+  });
+  if (changed('elements')) write('elements', function () {
+    return writeRowsSheet_(sheets[QC_GAS_SHEETS.elements], rows('elements') || [], units.elements, 'Elements');
+  });
 
-  if (forceAll || JSON.stringify(before.agentActions || {}) !== JSON.stringify(after.agentActions || {})) {
-    writeRowsSheet_(sheets[QC_GAS_SHEETS.actions], flatActions_(before.agentActions), flatActions_(after.agentActions), 'Actions');
-  }
-  if (changed('reminders')) writeRowsSheet_(sheets[QC_GAS_SHEETS.reminders], before.reminders, after.reminders, 'Reminders');
-  if (changed('actionTypes')) {
-    writeRowsSheet_(sheets[QC_GAS_SHEETS.actionTypes],
-      (before.actionTypes || []).map(function (label) { return { label: label }; }),
-      (after.actionTypes || []).map(function (label) { return { label: label }; }), 'Action_Types');
-  }
-
-  var beforeSettings = Object.assign({}, before.settings || {});
-  var afterSettings = Object.assign({}, after.settings || {});
-  delete beforeSettings.callCriteria;
-  delete afterSettings.callCriteria;
-  if (forceAll || JSON.stringify(beforeSettings) !== JSON.stringify(afterSettings)) {
-    writeKeyValueSheet_(sheets[QC_GAS_SHEETS.settings], beforeSettings, afterSettings);
-  }
-  if (forceAll || JSON.stringify((before.settings || {}).callCriteria || null) !== JSON.stringify((after.settings || {}).callCriteria || null)) {
-    writeKeyValueSheet_(sheets[QC_GAS_SHEETS.criteria], {}, { callCriteria: (after.settings || {}).callCriteria || {} });
-  }
-  if (changed('lists')) writeKeyValueSheet_(sheets[QC_GAS_SHEETS.lists], before.lists || {}, after.lists || {});
-  if (changed('fiscalMonths')) writeRowsSheet_(sheets[QC_GAS_SHEETS.fiscalMonths], before.fiscalMonths || [], after.fiscalMonths || [], 'Fiscal_Months');
-  if (changed('qcUsers')) writeRowsSheet_(sheets[QC_GAS_SHEETS.qcUsers], before.qcUsers || [], after.qcUsers || [], 'QC_Users');
-
-  /* نگاشت تخت المان‌ها روی تب Elements (بند ۹) */
-  var beforeElements = window.QCElements.criteriaToRows((before.settings || {}).callCriteria || null);
-  var afterElements = window.QCElements.criteriaToRows((after.settings || {}).callCriteria || null);
-  if (forceAll || JSON.stringify(beforeElements) !== JSON.stringify(afterElements)) {
-    writeRowsSheet_(sheets[QC_GAS_SHEETS.elements], beforeElements, afterElements, 'Elements');
-  }
-
-  /* خلاصه‌ی ماهانه فقط وقتی داده‌ی مؤثر عوض شده بازسازی می‌شود (بند ۸) */
+  /* خلاصه‌ی ماهانه: فقط وقتی همه‌ی ورودی‌هایش در این درخواست خوانده شده‌اند و
+   * زمان بازسازی‌اش رسیده (هر QC_GAS_SUMMARY_EVERY_MS یک‌بار) — وگرنه ساختنِ
+   * دوباره‌ی آن برای هر ریت، هزینه‌ی بیهوده‌ای روی داده‌ی بزرگ است. */
   var summaryInputs = ['tickets', 'socials', 'callFeedbacks', 'agentActions', 'fiscalMonths', 'agents'];
-  if (forceAll || summaryInputs.some(changed)) {
-    writeRowsSheet_(sheets[QC_GAS_SHEETS.monthlySummary],
-      window.QCFiscal.monthlySummary(before).rows, window.QCFiscal.monthlySummary(after).rows, 'Monthly_Summary');
+  var summaryReady = summaryInputs.every(allowed);
+  if (summaryReady && (forceAll || summaryDue_()) && (forceAll || summaryInputs.some(changed))) {
+    write('summary', function () {
+      markSummaryBuilt_();
+      return writeRowsSheet_(sheets[QC_GAS_SHEETS.monthlySummary],
+        window.QCFiscal.monthlySummary(beforeDbFromFingerprints_(beforeJson, summaryInputs, after)).rows,
+        window.QCFiscal.monthlySummary(after).rows, 'Monthly_Summary');
+    });
   }
 
-  var beforeMeta = {
-    version: before.version || after.version,
-    datasetId: before.datasetId || after.datasetId,
-    createdAt: before.createdAt || after.createdAt,
-    registryCleared: !!before.registryCleared,
-    seq: before.seq || {}
-  };
-  var afterMeta = {
-    version: after.version,
-    datasetId: after.datasetId,
-    createdAt: after.createdAt,
-    registryCleared: !!after.registryCleared,
-    seq: after.seq
-  };
-  if (forceAll || JSON.stringify(beforeMeta) !== JSON.stringify(afterMeta)) {
-    writeKeyValueSheet_(sheets[QC_GAS_SHEETS.meta], beforeMeta, afterMeta);
-  }
-
-  var beforeCallMeta = { callImport: before.callImport || null, callRaw: before.callRaw || null, callSync: before.callSync || null };
-  var afterCallMeta = { callImport: after.callImport || null, callRaw: after.callRaw || null, callSync: after.callSync || null };
-  if (forceAll || JSON.stringify(beforeCallMeta) !== JSON.stringify(afterCallMeta)) {
-    writeKeyValueSheet_(sheets[QC_GAS_SHEETS.callMeta], beforeCallMeta, afterCallMeta);
-  }
+  if (changed('meta')) write('meta', function () {
+    return writeKeyValueSheet_(sheets[QC_GAS_SHEETS.meta], rows('meta') || {}, units.meta);
+  });
+  if (changed('callMeta')) write('callMeta', function () {
+    return writeKeyValueSheet_(sheets[QC_GAS_SHEETS.callMeta], rows('callMeta') || {}, units.callMeta);
+  });
+  written.db = after;
+  return written;
 }
 
 function flatActions_(agentActions) {
@@ -4486,17 +4936,26 @@ function writeRowsSheet_(sheet, beforeRows, afterRows, schemaName) {
   var afterValues = encodeRows_(afterRows, afterKeys);
   var sameKeys = beforeKeys.length === afterKeys.length && beforeKeys.every(function (key, i) { return key === afterKeys[i]; });
 
-  if (sameKeys && gridEqual_(beforeValues, afterValues)) return;
+  /* اگر سرستون‌های فیزیکی شیت با ترتیب مورد انتظار یکی نباشد (مثلاً ستون جدید qcAgents
+   * بعد از ارتقای کد هنوز اضافه نشده)، نوشتن سطری در جای خود ستون‌ها را جابه‌جا می‌کرد.
+   * پس ابتدا کل تب با سرستون درست بازنویسی می‌شود. این بررسی باید قبل از
+   * مقایسهٔ محتوا باشد تا تب قدیمی با دادهٔ یکسان هم ستون تازه بگیرد. */
+  if (!headerMatches_(sheet, afterKeys)) {
+    fullRewrite_(sheet, afterKeys, afterValues);
+    styleHeader_(sheet, afterKeys.length);
+    return true;
+  }
+  if (sameKeys && gridEqual_(beforeValues, afterValues)) return false;
   if (!sameKeys || (beforeValues.length === 0 && gridRows_(sheet) < 1)) {
     fullRewrite_(sheet, afterKeys, afterValues);
-    return;
+    return true;
   }
 
   // Appended rows: the common case for every new ticket/social/call import.
   if (afterValues.length > beforeValues.length && prefixEqual_(beforeValues, afterValues)) {
     var tail = afterValues.slice(beforeValues.length);
     sheet.getRange(beforeValues.length + 2, 1, tail.length, afterKeys.length).setValues(tail);
-    return;
+    return true;
   }
 
   // Contiguous deletion (single record delete, range clear, demo cleanup).
@@ -4505,7 +4964,7 @@ function writeRowsSheet_(sheet, beforeRows, afterRows, schemaName) {
     var removed = beforeValues.length - afterValues.length;
     if (at + removed <= beforeValues.length && suffixEqual_(beforeValues, at + removed, afterValues, at)) {
       sheet.deleteRows(at + 2, removed);
-      return;
+      return true;
     }
   }
 
@@ -4517,15 +4976,34 @@ function writeRowsSheet_(sheet, beforeRows, afterRows, schemaName) {
         sheet.getRange(range[0] + 2, 1, range[1] - range[0] + 1, afterKeys.length)
           .setValues(afterValues.slice(range[0], range[1] + 1));
       });
-      return;
+      return true;
     }
     if (afterValues.length) {
       sheet.getRange(2, 1, afterValues.length, afterKeys.length).setValues(afterValues);
-      return;
+      return true;
     }
   }
 
   fullRewrite_(sheet, afterKeys, afterValues);
+  return true;
+}
+
+function headerMatches_(sheet, keys) {
+  try {
+    /* ابتدا فقط پهنای تب سنجیده می‌شود (بدون خواندن اضافه): اگر برابر بود،
+     * سرستون‌ها همان هستند که نوشته شده‌اند و مسیر سریع (اضافه‌کردن ردیف) تغییر نمی‌کند. */
+    if (sheet.getLastColumn() === keys.length) return true;
+    var width = Math.max(sheet.getLastColumn(), keys.length, 1);
+    var row = sheet.getRange(1, 1, 1, width).getValues()[0] || [];
+    var header = [];
+    for (var i = 0; i < row.length; i++) {
+      var text = String(row[i] == null ? '' : row[i]).trim();
+      if (text) header.push(text);
+    }
+    if (header.length !== keys.length) return false;
+    for (var k = 0; k < keys.length; k++) if (header[k] !== keys[k]) return false;
+    return true;
+  } catch (ignored) { return true; }
 }
 
 function fullRewrite_(sheet, keys, values) {
@@ -4541,15 +5019,16 @@ function writeKeyValueSheet_(sheet, before, after) {
   var keys = Object.keys(after || {}).sort();
   var beforeKeys = Object.keys(before || {}).sort();
   if (keys.join('\u0001') === beforeKeys.join('\u0001') &&
-      keys.every(function (key) { return JSON.stringify(before[key] == null ? null : before[key]) === JSON.stringify(after[key] == null ? null : after[key]); })) return;
+      keys.every(function (key) { return JSON.stringify(before[key] == null ? null : before[key]) === JSON.stringify(after[key] == null ? null : after[key]); })) return false;
   var rows = [['key', 'value']].concat(keys.map(function (key) { return [key, encodeCell_(after[key])]; }));
   if (gridRows_(sheet) === rows.length) {
     sheet.getRange(1, 1, rows.length, 2).setValues(rows);
-    return;
+    return true;
   }
   sheet.clearContents();
   sheet.getRange(1, 1, rows.length, 2).setValues(rows);
   styleHeader_(sheet, 2);
+  return true;
 }
 
 function columnKeys_(schema, rows) {
@@ -4562,7 +5041,7 @@ function columnKeys_(schema, rows) {
 
 function encodeRows_(rows, keys) {
   return (rows || []).map(function (row) {
-    return keys.map(function (key) { return encodeCell_(row && row[key]); });
+    return keys.map(function (key) { return encodeCell_(row && row[key], key); });
   });
 }
 
@@ -4632,7 +5111,9 @@ function styleHeader_(sheet, width) {
     .setFontColor('#ffffff');
 }
 
-function encodeCell_(value) {
+function encodeCell_(value, key) {
+  /* ستون qcAgents باید روی شیت خوانا و دست‌نویس‌شدنی باشد: نام‌ها با جداکننده، نه JSON. */
+  if (key === 'qcAgents' && Array.isArray(value)) return value.join('، ');
   if (value == null) return '';
   if (value instanceof Date) return value.toISOString();
   if (typeof value === 'object') return JSON.stringify(value);
@@ -4657,6 +5138,8 @@ function decodeCell_(value, key) {
       if (/^(true|yes|1)$/i.test(text)) return true;
       if (/^(false|no|0)$/i.test(text)) return false;
     }
+    /* ستون کارشناس QC مسئول: نوشتهٔ دستی روی شیت به فهرست نام‌ها تبدیل شود */
+    if (key === 'qcAgents') return window.QCAccess.splitList(value);
     return value;
   }
   return value;

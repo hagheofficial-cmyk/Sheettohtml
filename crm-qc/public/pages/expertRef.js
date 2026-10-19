@@ -768,7 +768,7 @@ async function openForms(name, tab, root) {
     const d = await fetchDetail(name);
     if (d && m.isConnected) { D = d; $('.er-hero-slot', m).innerHTML = headHtml(D); }
     if (to) switchTab(to);
-    if (App.refreshCounts) App.refreshCounts();
+    if (App.refreshCounts) App.refreshCounts(true);
     refreshGrid(root);
   };
   const switchTab = (k) => {

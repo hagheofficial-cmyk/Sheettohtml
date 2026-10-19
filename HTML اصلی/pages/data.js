@@ -240,7 +240,7 @@ async function render(root) {
       }
       const added=okF.reduce((n,x)=>n+(x.changes?x.changes.added:x.count),0), duplicates=okF.reduce((n,x)=>n+(x.changes?x.changes.duplicates:0),0);
       toast.success(fa(added)+' ریت جدید وارد شد؛ '+fa(duplicates)+' ریت تکراری دوباره شمرده نشد');
-      loadStatus(); App.refreshCounts();
+      loadStatus(); App.refreshCounts(true);
       if (!STANDALONE) loadFiles();
     } catch (e) {
       resEl.style.background = 'rgba(248,113,113,.08)'; resEl.style.color = '#f87171';

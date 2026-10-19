@@ -215,21 +215,85 @@ function accounts(db) {
 }
 
 /* ------------------------------------------------------- محدوده‌ی داده */
-function allowedAgentNames(db, user) {
+function allowedAgentNames(db, user, ignoreColumn) {
   if (!user) return null;
   if (user.role === 'admin' || user.unrestricted) return null; // null = بدون محدودیت
   const agents = (db && db.agents) || [];
   const exts = new Set((user.exts || []).map(digits));
   const names = new Set((user.agents || []).map(nameKey));
   const teams = new Set((user.teams || []).map(teamKey));
+  const userKey = nameKey(user.name);
   const out = new Set();
   agents.forEach((a) => {
+    /* ستون `qcAgents` ردیف کارشناس (تب Agents) هم دسترسی می‌دهد: اگر نام این کاربر آنجا باشد،
+     * او مسئول ریت‌کردن این کارشناس است — پس می‌توان مستقیم از روی شیت/اکسل دسترسی داد. */
     const hit = (a.ext != null && a.ext !== '' && exts.has(digits(a.ext))) ||
-      names.has(nameKey(a.name)) || (a.aliases || []).some((al) => names.has(nameKey(al))) ||
-      (a.team && teams.has(teamKey(a.team)));
+      names.has(nameKey(a.name)) || splitList(a.aliases).some((al) => names.has(nameKey(al))) ||
+      (a.team && teams.has(teamKey(a.team))) ||
+      (!ignoreColumn && splitList(a.qcAgents).some((n) => nameKey(n) === userKey));
     if (hit) out.add(text(a.name));
   });
   return out;
+}
+
+/* همگام‌سازی دوطرفه: تیک‌های دسترسی یک کاربر QC روی ستون `qcAgents` تب Agents هم
+ * نوشته می‌شود تا از شیت/اکسل هم قابل دیدن و ویرایش باشد. برای مدیر و
+ * دسترسی نامحدود (*) این ستون خالی می‌ماند چون همه را می‌بینند. */
+function syncAgentQcColumn(db, user, mode) {
+  const name = text(user && user.name);
+  if (!name || !db || !Array.isArray(db.agents)) return 0;
+  const key = nameKey(name);
+  const unlimited = user.role === 'admin' || !!user.unrestricted;
+  /* mode === 'sync' یعنی کاربر از صفحهٔ مدیریت QC تیک‌ها را ثبت کرده: ستون دقیقاً
+   * با دسترسی اعلامی (exts/agents/teams) یکسان می‌شود — بدون خواندن خود ستون، وگرنه هرگز
+   * نمی‌شد تیکی را برداشت. در حالت پیش‌فرض ('keep') فقط نام اضافه می‌شود و از ستون
+   * چیزی پاک نمی‌شود، تا مثلاً تغییر رمز دسترسی‌های نوشته‌شده روی شیت را خراب نکند. */
+  const hard = mode === 'sync';
+  const allowed = unlimited ? null : allowedAgentNames(db, user, hard);
+  let touched = 0;
+  db.agents.forEach((a) => {
+    if (!a || typeof a !== 'object') return;
+    const list = splitList(a.qcAgents);
+    const has = list.some((n) => nameKey(n) === key);
+    const granted = unlimited ? false : !!(allowed && allowed.has(text(a.name)));
+    const want = hard ? granted : (has || granted);
+    if (has === want) return;
+    a.qcAgents = want ? list.concat(name) : list.filter((n) => nameKey(n) !== key);
+    touched += 1;
+  });
+  return touched;
+}
+
+/* تغییر نام کاربر QC → ستون qcAgents تب Agents هم با نام جدید به‌روز می‌شود. */
+function renameAgentQcColumn(db, oldName, name) {
+  const from = nameKey(P && P.normName ? P.normName(text(oldName)) : text(oldName));
+  const to = text(name);
+  if (!from || !to || from === nameKey(to) || !db || !Array.isArray(db.agents)) return 0;
+  let touched = 0;
+  db.agents.forEach((a) => {
+    if (!a || typeof a !== 'object') return;
+    const list = splitList(a.qcAgents);
+    if (!list.some((n) => nameKey(n) === from)) return;
+    a.qcAgents = Array.from(new Set(list.map((n) => (nameKey(n) === from ? to : n)).filter(Boolean)));
+    touched += 1;
+  });
+  return touched;
+}
+
+/* حذف نام یک کارشناس QC از ستون همهی ردیف‌های Agents (موقع حذف کاربر). */
+function dropAgentQcColumn(db, name) {
+  const key = nameKey(P && P.normName ? P.normName(text(name)) : text(name));
+  if (!key || !db || !Array.isArray(db.agents)) return 0;
+  let touched = 0;
+  db.agents.forEach((a) => {
+    if (!a || typeof a !== 'object') return;
+    const list = splitList(a.qcAgents);
+    const next = list.filter((n) => nameKey(n) !== key);
+    if (next.length === list.length) return;
+    a.qcAgents = next;
+    touched += 1;
+  });
+  return touched;
 }
 
 function recordById(db, path, id) {
@@ -340,6 +404,7 @@ function saveUser(db, body, existing) {
   const users = Array.isArray(db.qcUsers) ? db.qcUsers : (db.qcUsers = []);
   const fail = (message, status) => { const e = new Error(message); e.status = status || 400; throw e; };
   const name = P && P.normName ? P.normName(text(body.name)) : text(body.name);
+  const previousName = existing ? text(existing.name) : '';
   if (!name) fail('نام کارشناس QC الزامی است');
   const key = nameKey(name);
   const clash = users.find((u) => nameKey(u.name) === key && (!existing || String(u.id) !== String(existing.id)));
@@ -363,10 +428,16 @@ function saveUser(db, body, existing) {
     if (plain.length < 4) fail('رمز باید حداقل ۴ نویسه باشد');
     row.password = hashPassword(plain);
   } else if (!existing) fail('رمز اولیه الزامی است');
-  if (!existing) users.push(row);
+  /* ردیف ویرایش‌شده باید جایگزین ردیف قبلی شود؛ وگرنه ویرایش کاربر (دسترسی/نقش/رمز)
+   * فقط در پاسخ دیده می‌شود و روی تب QC_Users نمی‌نشیند. */
+  if (existing) {
+    const at = users.indexOf(existing);
+    if (at >= 0) users[at] = row; else users.push(row);
+  } else users.push(row);
   /* نام کارشناس QC باید در فهرست qcAgents هم باشد تا در فرم‌ها قابل انتخاب باشد. */
   if (!Array.isArray(db.qcAgents)) db.qcAgents = [];
   if (!db.qcAgents.some((x) => nameKey(x) === key)) db.qcAgents.push(name);
+  if (previousName && nameKey(previousName) !== key) renameAgentQcColumn(db, previousName, name);
   return clone(row);
 }
 
@@ -376,7 +447,8 @@ function deleteUser(db, name) {
   const found = users.find((u) => nameKey(u.name) === key);
   if (!found) { const e = new Error('کاربر یافت نشد'); e.status = 404; throw e; }
   db.qcUsers = users.filter((u) => u !== found);
-  return { ok: true };
+  dropAgentQcColumn(db, found.name);
+  return { ok: true, name: found.name };
 }
 
 /* ردیف‌های آماده‌ی نوشتن روی تب (بدون رمز hash‌شده؟ رمز hash می‌ماند). */
@@ -397,6 +469,8 @@ return {
   publicUser: publicUser, allowedAgentNames: allowedAgentNames, scopeDb: scopeDb, writeGuard: writeGuard,
   canAccessApi: canAccessApi, canAccessRoute: canAccessRoute, visibleRoutes: visibleRoutes, isAdmin: isAdmin,
   saveUser: saveUser, deleteUser: deleteUser, usersToRows: usersToRows, userMask: userMask,
+  syncAgentQcColumn: syncAgentQcColumn, dropAgentQcColumn: dropAgentQcColumn,
+  renameAgentQcColumn: renameAgentQcColumn,
   ADMIN_ROUTES: ADMIN_ROUTES, SHARED_ROUTES: SHARED_ROUTES, ADMIN_API: ADMIN_API, OPEN_API: OPEN_API
 };
 });

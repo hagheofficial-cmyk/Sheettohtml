@@ -826,7 +826,8 @@ const App = {
     this.syncDateRangeUI();
     $('#globalRange').classList.add('updating'); $('#gRangeState').textContent = 'در حال بروزرسانی گزارش‌ها…';
     const refresh = this._dateRefresh;
-    try { await Promise.all([this.refreshCounts(), refresh ? refresh() : Promise.resolve()]); }
+    /* اعمال بازه می‌تواند بعد از تغییر داده (بدون boot) باشد، پس شمارش تازه پرسیده می‌شود */
+    try { await Promise.all([this.refreshCounts(true), refresh ? refresh() : Promise.resolve()]); }
     finally { if (request === this._rangeRequest) {
       $('#globalRange').classList.remove('updating');
       if (!$('#globalRange').classList.contains('draft')) $('#gRangeState').textContent = 'روی همه گزارش‌ها اعمال شد';
@@ -834,12 +835,22 @@ const App = {
     return true;
   },
 
-  async refreshCounts() {
+  paintCounts(counts) {
+    const el = $('#footCounts');
+    if (el) el.textContent = `${fa(counts.tickets)} تیکت · ${fa(counts.socials)} سوشال · ${fa(counts.calls)} تماس`;
+  },
+
+  /* شمارش پاورقی در خودِ پاسخ bootstrap هست؛ پس درخواست جداگانه به
+   * /api/data/status (که هر بار کل تیکت/سوشال/تماس را جارو می‌کند) حذف شد.
+   * این یعنی بعد از هر ثبت ریت، یک جاروی کامل داده کمتر انجام می‌شود. */
+  async refreshCounts(force) {
     const request = ++this._countsRequest;
+    const st = this.state || {};
+    if (!force && st.counts) { this.paintCounts(st.counts); return; }
     try {
       const counts = await api.get('/api/data/status');
       if (request !== this._countsRequest) return;
-      $('#footCounts').textContent = `${fa(counts.tickets)} تیکت · ${fa(counts.socials)} سوشال · ${fa(counts.calls)} تماس`;
+      this.paintCounts(counts);
     } catch (e) { /* خطای صفحه‌ی فعلی جداگانه نمایش داده می‌شود. */ }
   },
   bindDateRangeUI() {

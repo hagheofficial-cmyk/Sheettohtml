@@ -14,7 +14,11 @@ function accessSummary(user) {
   const names = (user.agents || []).filter(Boolean);
   const teams = (user.teams || []).filter(Boolean);
   const matched = matchedAgents(user).length;
-  if (!exts.length && !names.length && !teams.length) return { text: 'دسترسی تعریف نشده', cls: 'bad', count: 0 };
+  if (!exts.length && !names.length && !teams.length) {
+    return matched
+      ? { text: fa(matched) + ' کارشناس ← از ستون qcAgents شیت', cls: 'info', count: matched }
+      : { text: 'دسترسی تعریف نشده', cls: 'bad', count: 0 };
+  }
   const bits = [];
   if (exts.length) bits.push(fa(exts.length) + ' داخلی');
   if (names.length) bits.push(fa(names.length) + ' نام');
@@ -126,7 +130,9 @@ function draw(root) {
         <div class="note" style="margin-top:14px"><i class="fa-solid fa-table"></i>
           همین فهرست در تب <code>QC_Users</code> شیت نگهداری می‌شود: <code>name</code>، <code>password</code>، <code>role</code>،
           <code>active</code>، <code>exts</code> (داخلی‌ها با ویرگول)، <code>agents</code> و <code>teams</code>.
-          می‌توانید دسترسی‌ها را مستقیم روی شیت هم بنویسید.</div>
+          می‌توانید دسترسی‌ها را مستقیم روی شیت هم بنویسید.
+          راه دیگر: در تب <code>Agents</code> ستون <code>qcAgents</code> ردیف هر کارشناس، نام کارشناس QC مسئولش را
+          بنویسید — همین اپ هم هنگام ذخیرهی کاربر، این ستون را پر می‌کند.</div>
       </div>
     </div>`;
 
@@ -197,21 +203,62 @@ function passwordDialog(user) {
 /* ------------------------------------------------------- ساخت/ویرایش کاربر */
 function editor(user) {
   const editing = !!user;
-  const selectedExt = new Set((user && user.exts || []).map(String));
-  const selectedNames = new Set((user && user.agents || []));
-  const selectedTeams = new Set((user && user.teams || []));
+  const A = window.QCAccess;
+  const P = window.QCParse || {};
+  const normKey = (v) => (P.nameKey ? P.nameKey(v == null ? '' : String(v)) : String(v == null ? '' : v).trim().toLowerCase());
+  const userName = user ? String(user.name || '') : '';
+  const selectedTeams = new Set((user && user.teams) || []);
+  const extSet = new Set(((user && user.exts) || []).map((x) => String(x)));
+  const nameSet = new Set(((user && user.agents) || []).map(normKey));
+
+  /* ستون `qcAgents` ردیف کارشناس (تب Agents): اگر نام این کاربر آنجا نوشته شده باشد،
+   * آن کارشناس هم در دسترسی‌اش هست — پس از شیت/اکسل هم می‌شود دسترسی داد و اینجا تیک‌خورده می‌آید. */
+  const viaSheet = (a) => (A && A.splitList ? A.splitList(a.qcAgents) : [])
+    .some((n) => normKey(n) === normKey(userName));
+  const isOn = (a) => (a.ext != null && a.ext !== '' && extSet.has(String(a.ext))) ||
+    nameSet.has(normKey(a.name)) || (!!userName && viaSheet(a));
+
   const byTeam = new Map();
   state.agents.forEach((a) => {
     const key = a.team || '—';
     if (!byTeam.has(key)) byTeam.set(key, []);
     byTeam.get(key).push(a);
   });
+  const teamNames = [...byTeam.keys()].sort((x, y) => String(x).localeCompare(String(y), 'fa'));
+  const groups = teamNames.map((team) => {
+    const list = byTeam.get(team).slice().sort((x, y) => String(x.name).localeCompare(String(y.name), 'fa'));
+    return `
+      <div class="qc-group" data-team="${esc(team)}">
+        <div class="qc-group-head">
+          <strong>${esc(team)}</strong>
+          <span class="cell-sub" data-team-count></span>
+          <div class="spacer"></div>
+          <button type="button" class="btn ghost sm" data-team-all>همه</button>
+          <button type="button" class="btn ghost sm" data-team-none>هیچ</button>
+          <button type="button" class="btn ghost sm" data-team-scope
+            title="کل تیم به‌عنوان دسترسی ثبت شود؛ کارشناسان تازه‌ی این تیم خودکار اضافه می‌شوند">کل تیم</button>
+        </div>
+        <div class="qc-rows">
+          ${list.map((a) => {
+            const ext = a.ext == null || a.ext === '' ? '' : String(a.ext);
+            const sheet = !!userName && viaSheet(a);
+            return `<label class="qc-row${sheet ? ' from-sheet' : ''}" data-name="${esc(a.name)}" data-ext="${esc(ext)}">
+              <input type="checkbox" data-agent="${esc(a.name)}" ${isOn(a) ? 'checked' : ''}>
+              <span class="qc-row-name">${esc(a.name)}</span>
+              ${ext ? `<span class="qc-row-ext" dir="ltr">${esc(C.toFaDigits(ext))}</span>` : '<span class="qc-row-ext none">بدون داخلی</span>'}
+              ${sheet ? '<span class="qc-row-tag" title="از ستون qcAgents تب Agents">شیت</span>' : ''}
+            </label>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }).join('');
 
   const m = modal(`${modalHead(editing ? 'ویرایش کاربر — ' + user.name : 'کاربر QC جدید', 'fa-user-shield')}
     <div class="modal-body qc-editor">
       <div class="form-grid qc-form-grid">
         <div class="field"><label>نام کارشناس QC <span class="req">*</span></label>
-          <input class="input" id="quName" value="${esc(user ? user.name : '')}" placeholder="همان نامی که در فرم‌ها به‌عنوان QC ثبت می‌شود" ${editing ? 'readonly' : ''}></div>
+          <input class="input" id="quName" value="${esc(user ? user.name : '')}" autocomplete="off"
+            placeholder="همان نامی که در فرم‌ها به‌عنوان QC ثبت می‌شود" ${editing ? 'readonly' : ''}></div>
         <div class="field"><label>نقش</label>
           <select class="input" id="quRole">
             <option value="qc" ${!user || user.role !== 'admin' ? 'selected' : ''}>کارشناس QC — فقط داده‌ی مجاز</option>
@@ -228,38 +275,36 @@ function editor(user) {
       </div>
 
       <div class="field qc-access">
-        <label>دسترسی داده — از هر تیم کدام کارشناسان (یا داخلی‌ها) دیده شوند</label>
+        <label>دسترسی داده — کدام کارشناسان را ببیند و ریت کند</label>
         <div class="qc-access-bar">
-          <input class="input" id="quSearch" placeholder="جستجوی نام یا داخلی…">
-          <span class="badge info" id="quCount">۰ کارشناس انتخاب شده</span>
+          <div class="qc-search"><i class="fa-solid fa-magnifying-glass"></i>
+            <input class="input" id="quSearch" autocomplete="off" placeholder="جستجوی نام یا داخلی…"></div>
+          <span class="badge info" id="quCount">۰ کارشناس</span>
           <div class="spacer"></div>
-          <label class="qc-all"><input type="checkbox" id="quUnlimited"> همه‌ی کارشناسان (بدون محدودیت)</label>
+          <label class="qc-all" title="همه‌ی کارشناسان، بدون استثنا"><input type="checkbox" id="quUnlimited">
+            <span>همه‌ی کارشناسان</span></label>
         </div>
-        <div class="qc-teams" id="quTeams">
-          ${[...byTeam.keys()].sort().map((team) => `
-            <div class="qc-team" data-team="${esc(team)}">
-              <div class="qc-team-head">
-                <strong>${esc(team)}</strong>
-                <span class="cell-sub" data-team-count></span>
-                <div class="spacer"></div>
-                <button type="button" class="btn ghost sm" data-team-all>همه</button>
-                <button type="button" class="btn ghost sm" data-team-none>هیچ</button>
-                <button type="button" class="btn ghost sm" data-team-scope title="کل تیم به‌عنوان دسترسی (کارشناسان جدید هم خودکار اضافه می‌شوند)">کل تیم</button>
-              </div>
-              <div class="qc-agents">
-                ${byTeam.get(team).map((a) => `
-                  <label class="qc-agent" data-name="${esc(a.name)}" data-ext="${esc(a.ext == null ? '' : a.ext)}">
-                    <input type="checkbox" data-agent="${esc(a.name)}" ${selectedExt.has(String(a.ext)) || selectedNames.has(a.name) ? 'checked' : ''}>
-                    <span>${esc(a.name)}</span><small>${esc(a.ext == null || a.ext === '' ? 'بدون داخلی' : 'داخلی ' + C.toFaDigits(a.ext))}</small>
-                  </label>`).join('')}
-              </div>
-            </div>`).join('')}
+
+        <div class="qc-picker" id="quPicker">
+          <div class="qc-picked" id="quPicked"></div>
+          ${state.agents.length
+            ? `<div class="qc-list" id="quList">${groups}</div>`
+            : `<div class="qc-empty" id="quList"><i class="fa-solid fa-user-slash"></i> هنوز کارشناسی ثبت نشده —
+                اول از صفحه‌ی «مدیریت کارشناسان» فهرست را بسازید یا از تب <code>Agents</code> شیت پر کنید.</div>`}
         </div>
-        <div class="field" style="margin-top:12px"><label>داخلی‌های اضافه (جدا‌شده با ویرگول) — برای کارشناسانی که در فهرست نیستند</label>
-          <input class="input" id="quExtraExt" dir="ltr" style="text-align:right" placeholder="3121, 3122"
-            value="${esc([...selectedExt].filter((x) => !state.agents.some((a) => String(a.ext) === x)).join(', '))}"></div>
-        <div class="field"><label>یادداشت (اختیاری)</label><input class="input" id="quNote" value="${esc(user ? user.note || '' : '')}" placeholder="مثلاً: مسئول بررسی تیم MLM"></div>
-        <div class="note" id="quHint"><i class="fa-solid fa-circle-info"></i> دسترسی خالی یعنی این کارشناس هیچ داده‌ای نمی‌بیند.</div>
+
+        <div class="qc-two">
+          <div class="field"><label>داخلی‌های اضافه (با ویرگول) — کارشناسانی که در فهرست نیستند</label>
+            <input class="input" id="quExtraExt" dir="ltr" style="text-align:right" autocomplete="off" placeholder="3121, 3122"
+              value="${esc([...extSet].filter((x) => !state.agents.some((a) => String(a.ext) === x)).join(', '))}"></div>
+          <div class="field"><label>یادداشت (اختیاری)</label>
+            <input class="input" id="quNote" value="${esc(user ? user.note || '' : '')}" autocomplete="off"
+              placeholder="مثلاً: مسئول بررسی تیم MLM"></div>
+        </div>
+        <div class="note" id="quHint"></div>
+        <div class="note soft-note"><i class="fa-solid fa-table"></i> این تیک‌ها روی ستون <code>qcAgents</code> تب
+          <code>Agents</code> هم نوشته می‌شود؛ پس همان دسترسی را می‌توانید مستقیم روی شیت/اکسل هم ویرایش کنید
+          (نام کارشناس QC را در ردیف کارشناس بنویسید — چند نام با ویرگول).</div>
       </div>
     </div>
     <div class="modal-foot">
@@ -267,34 +312,56 @@ function editor(user) {
       <button class="btn primary" id="quSave"><i class="fa-solid fa-floppy-disk"></i> ${editing ? 'ذخیره تغییرات' : 'ساخت کاربر'}</button>
     </div>`, { lg: true });
 
-  const roleSel = $('#quRole', m), unlimited = $('#quUnlimited', m);
+  const roleSel = $('#quRole', m), unlimited = $('#quUnlimited', m), picker = $('#quPicker', m);
   unlimited.checked = !!user && (user.role === 'admin' || !!user.unrestricted);
 
+  /* انتخاب‌شده‌ها مستقیم از خود چک‌باکس‌ها خوانده می‌شود تا تیک‌هایی که از ستون شیت
+   * آمده‌اند هم موقع ذخیره از دست نروند. */
   function selected() {
-    const names = $$('#quTeams input[data-agent]', m).filter((c) => c.checked).map((c) => c.dataset.agent);
-    const exts = names.map((n) => {
+    const names = $$('input[data-agent]', m).filter((c) => c.checked).map((c) => c.dataset.agent);
+    const exts = [], plain = [];
+    names.forEach((n) => {
       const a = state.agents.find((x) => x.name === n);
-      return a && a.ext != null && a.ext !== '' ? String(a.ext) : '';
-    }).filter(Boolean);
-    const extra = String($('#quExtraExt', m).value || '').split(/[,،;؛\\s]+/).map((x) => x.trim()).filter(Boolean);
-    return { names: names, exts: [...new Set(exts.concat(extra))] };
+      if (a && a.ext != null && a.ext !== '') exts.push(String(a.ext)); else plain.push(n);
+    });
+    const extra = String($('#quExtraExt', m).value || '').split(/[,،;؛|\s]+/).map((x) => x.trim()).filter(Boolean);
+    return { names, exts: [...new Set(exts.concat(extra))], plain: [...new Set(plain)] };
   }
+
   function refreshCount() {
     const sel = selected();
-    const teamScoped = [...selectedTeams].length;
-    $('#quCount', m).textContent = unlimited.checked ? 'همه‌ی کارشناسان'
-      : fa(sel.names.length) + ' کارشناس انتخاب شده' + (teamScoped ? ' + ' + fa(teamScoped) + ' تیم کامل' : '');
-    $$('.qc-team', m).forEach((t) => {
-      const total = $$('input[data-agent]', t).length;
-      const on = $$('input[data-agent]', t).filter((c) => c.checked).length;
-      $('[data-team-count]', t).textContent = fa(on) + ' از ' + fa(total);
-      t.classList.toggle('scoped', selectedTeams.has(t.dataset.team));
+    const off = unlimited.checked || roleSel.value === 'admin';
+    picker.classList.toggle('off', off);
+    $('#quCount', m).textContent = off ? 'همه‌ی کارشناسان'
+      : fa(sel.names.length) + ' کارشناس' + (selectedTeams.size ? ' + ' + fa(selectedTeams.size) + ' تیم کامل' : '');
+
+    $$('.qc-picked', m).forEach((box) => {
+      box.innerHTML = off
+        ? '<span class="qc-picked-empty">دسترسی نامحدود — همه‌ی کارشناسان</span>'
+        : (sel.names.length
+          ? sel.names.map((n) => `<span class="qc-chip">${esc(n)}<button type="button" data-unpick="${esc(n)}"
+              title="برداشتن"><i class="fa-solid fa-xmark"></i></button></span>`).join('')
+          : '<span class="qc-picked-empty">هنوز کارشناسی انتخاب نشده — از فهرست زیر تیک بزنید</span>');
     });
-    const sel2 = selected();
-    $('#quHint', m).innerHTML = unlimited.checked
-      ? '<i class="fa-solid fa-circle-info"></i> این کاربر همه‌ی کارشناسان را می‌بیند.'
-      : (sel2.exts.length || sel2.names.length || selectedTeams.size)
-        ? '<i class="fa-solid fa-circle-info"></i> فقط ارزیابی‌های این کارشناسان در داشبورد، گزارش‌ها و سوابق دیده می‌شود.'
+    $$('[data-unpick]', m).forEach((b) => b.addEventListener('click', () => {
+      const box = $$('input[data-agent]', m).find((c) => c.dataset.agent === b.dataset.unpick);
+      if (box && box.checked) { box.checked = false; refreshCount(); }
+    }));
+
+    $$('.qc-group', m).forEach((g) => {
+      const boxes = $$('input[data-agent]', g);
+      const on = boxes.filter((c) => c.checked).length;
+      const countEl = $('[data-team-count]', g);
+      if (countEl) countEl.textContent = fa(on) + ' از ' + fa(boxes.length);
+      g.classList.toggle('scoped', selectedTeams.has(g.dataset.team));
+      const visible = $$('.qc-row', g).filter((r) => !r.hidden).length;
+      g.hidden = visible === 0;
+    });
+
+    $('#quHint', m).innerHTML = off
+      ? '<i class="fa-solid fa-circle-info"></i> این کاربر همه‌ی کارشناسان را می‌بیند؛ ستون <code>qcAgents</code> برای او خالی می‌ماند.'
+      : (sel.exts.length || sel.plain.length || selectedTeams.size)
+        ? '<i class="fa-solid fa-circle-check"></i> فقط ارزیابی‌های این کارشناسان در داشبورد، گزارش‌ها و سوابق دیده می‌شود.'
         : '<i class="fa-solid fa-triangle-exclamation"></i> دسترسی خالی یعنی این کارشناس هیچ داده‌ای نمی‌بیند.';
   }
 
@@ -304,28 +371,22 @@ function editor(user) {
   });
   $('#quSearch', m).addEventListener('input', debounce(() => {
     const q = String($('#quSearch', m).value).trim().toLowerCase();
-    $$('.qc-agent', m).forEach((node) => {
-      const hay = (node.dataset.name + ' ' + node.dataset.ext).toLowerCase();
-      node.hidden = !!q && hay.indexOf(q) === -1;
+    $$('.qc-row', m).forEach((row) => {
+      const hay = (row.dataset.name + ' ' + row.dataset.ext).toLowerCase();
+      row.hidden = !!q && hay.indexOf(q) === -1;
     });
-  }, 120));
-  unlimited.addEventListener('change', refreshCount);
-  roleSel.addEventListener('change', () => { if (roleSel.value === 'admin') { unlimited.checked = true; refreshCount(); } });
-  $$('#quTeams input[data-agent]', m).forEach((c) => c.addEventListener('change', () => {
-    const agent = state.agents.find((a) => a.name === c.dataset.agent);
-    if (agent && agent.ext != null && agent.ext !== '') {
-      if (c.checked) selectedExt.add(String(agent.ext)); else selectedExt.delete(String(agent.ext));
-    } else {
-      if (c.checked) selectedNames.add(c.dataset.agent); else selectedNames.delete(c.dataset.agent);
-    }
     refreshCount();
-  }));
-  $$('.qc-team', m).forEach((t) => {
-    const boxes = () => $$('input[data-agent]', t);
-    $('[data-team-all]', t).addEventListener('click', () => { boxes().forEach((c) => { if (!c.checked) { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); } }); refreshCount(); });
-    $('[data-team-none]', t).addEventListener('click', () => { boxes().forEach((c) => { if (c.checked) { c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); } }); refreshCount(); });
-    $('[data-team-scope]', t).addEventListener('click', () => {
-      const team = t.dataset.team;
+  }, 110));
+  $('#quExtraExt', m).addEventListener('input', debounce(refreshCount, 150));
+  unlimited.addEventListener('change', refreshCount);
+  roleSel.addEventListener('change', () => { if (roleSel.value === 'admin') unlimited.checked = true; refreshCount(); });
+  $$('input[data-agent]', m).forEach((c) => c.addEventListener('change', refreshCount));
+  $$('.qc-group', m).forEach((g) => {
+    const boxes = () => $$('input[data-agent]', g);
+    $('[data-team-all]', g).addEventListener('click', () => { boxes().forEach((c) => { c.checked = true; }); refreshCount(); });
+    $('[data-team-none]', g).addEventListener('click', () => { boxes().forEach((c) => { c.checked = false; }); refreshCount(); });
+    $('[data-team-scope]', g).addEventListener('click', () => {
+      const team = g.dataset.team;
       if (selectedTeams.has(team)) selectedTeams.delete(team); else selectedTeams.add(team);
       refreshCount();
     });
@@ -339,15 +400,18 @@ function editor(user) {
     if (pass && pass.length < 4) { toast.error('رمز باید حداقل ۴ نویسه باشد'); return; }
     const sel = selected();
     const role = roleSel.value;
+    const off = role === 'admin' || unlimited.checked;
     const payload = {
       id: editing ? user.id : '',
       name: name,
       role: role,
       active: $('#quActive', m).value === '1',
-      exts: role === 'admin' || unlimited.checked ? '*' : sel.exts.join(','),
-      agents: role === 'admin' || unlimited.checked ? '' : [...selectedNames].join(','),
-      teams: role === 'admin' || unlimited.checked ? '' : [...selectedTeams].join(','),
-      note: $('#quNote', m).value.trim()
+      exts: off ? '*' : sel.exts.join(','),
+      agents: off ? '' : sel.plain.join(','),
+      teams: off ? '' : [...selectedTeams].join(','),
+      note: $('#quNote', m).value.trim(),
+      /* تیک‌ها قطعی‌اند: ستون qcAgents تب Agents دقیقاً همین می‌شود */
+      syncColumn: true
     };
     if (pass) payload.password = pass;
     const btn = $('#quSave', m); btn.disabled = true;
@@ -358,7 +422,8 @@ function editor(user) {
       await load();
       await App.boot();
       draw(document.querySelector('.route-view'));
-      toast.success(editing ? 'کاربر به‌روز شد' : 'کاربر ساخته شد — از این پس با رمز وارد می‌شود');
+      toast.success(editing ? 'ذخیره شد — ستون qcAgents تب Agents هم به‌روز شد'
+        : 'کاربر ساخته شد — از این پس با رمز وارد می‌شود');
     } catch (e) { toast.error(e.message); btn.disabled = false; }
   });
 

@@ -72,12 +72,51 @@ function loadStore() {
 }
 
 let scopedRead = false;
+/* شماره‌ی نسل داده: با هر نوشتن یکی زیاد می‌شود و کلید حافظه‌ی نتیجه‌ی گزارش‌هاست.
+ * گزارش‌گیری تکراری (داشبورد/گزارش‌ها/خلاصه‌ی ماهانه/وضعیت داده) به‌جای محاسبه‌ی
+ * دوباره روی هزاران رکورد، پاسخ آماده را برمی‌گرداند. */
+let dataEpoch = 0;
+const computeMemo = new Map();
+const COMPUTE_MEMO_LIMIT = 80;
+function memoized(key, compute) {
+  if (computeMemo.has(key)) return computeMemo.get(key);
+  const value = compute();
+  if (computeMemo.size >= COMPUTE_MEMO_LIMIT) computeMemo.clear();
+  computeMemo.set(key, value);
+  return value;
+}
+function qkey(query) {
+  const q = query || {};
+  return Object.keys(q).sort().map((k) => k + '=' + q[k]).join('&');
+}
+function scopeKeyOf(session) {
+  try {
+    if (!Access.authRequired(db)) return 'open';
+    if (!session) return 'anon';
+    return Access.isAdmin(session) ? 'admin' : 'u:' + (session.name || '');
+  } catch (e) { return 'u:' + (session && session.name || ''); }
+}
+/* کپی محدودشده‌ی داده برای هر کارشناس QC هم حافظه دارد (هر GET آن را می‌ساخت) */
+const scopeMemo = new Map();
+function scopedDb(full, session) {
+  const key = dataEpoch + '|' + (session && session.name || '');
+  if (scopeMemo.has(key)) return scopeMemo.get(key);
+  const value = Access.scopeDb(full, session);
+  if (scopeMemo.size >= 40) scopeMemo.clear();
+  scopeMemo.set(key, value);
+  return value;
+}
+
 function saveStore(sync) {
   if (scopedRead) { console.warn('[auth] تلاش برای ذخیره در حالت خواندن محدودشده — نادیده گرفته شد'); return; }
   db.revision = Number(db.revision || 0) + 1; // برای اطلاع کاربران همزمان از تغییر داده
+  dataEpoch++; // حافظه‌ی گزارش‌ها و داده‌ی محدودشده باطل شود
+  computeMemo.clear();
+  scopeMemo.clear();
   const write = () => {
     const tmp = STORE_FILE + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(db, null, 1));
+    /* JSON فشرده: روی داده‌ی بزرگ، قالب‌بندی تورفتگی‌دار تا دو برابر زمان و حجم می‌گیرد */
+    fs.writeFileSync(tmp, JSON.stringify(db));
     fs.renameSync(tmp, STORE_FILE); // اتمیک
   };
   if (sync) return write();
@@ -348,7 +387,7 @@ async function handleApi(req, res, pathname, query) {
   const scopeable = !authPath && pathname !== '/api/revision';
   if (method === 'GET' && session && scopeable && Access.authRequired(db) && !Access.isAdmin(session)) {
     const full = db;
-    db = Access.scopeDb(full, session);
+    db = scopedDb(full, session);
     scopedRead = true;
     try { return await dispatchApi(req, res, pathname, query, body, session); }
     finally { scopedRead = false; db = full; }
@@ -368,8 +407,12 @@ async function dispatchApi(req, res, pathname, query, body, session) {
     if (error) return bad(res, error);
   }
 
-  if (pathname === '/api/data/status' && method === 'GET') return ok(res, QCReports.dataStatus(db, query));
-  if (pathname === '/api/portfolio/agents' && method === 'GET') return ok(res, { rows: QCReports.portfolioAgents(db, query) });
+  if (pathname === '/api/data/status' && method === 'GET') {
+    return ok(res, memoized(dataEpoch + '|' + scopeKeyOf(session) + '|status|' + qkey(query), () => QCReports.dataStatus(db, query)));
+  }
+  if (pathname === '/api/portfolio/agents' && method === 'GET') {
+    return ok(res, memoized(dataEpoch + '|' + scopeKeyOf(session) + '|portfolio-agents|' + qkey(query), () => ({ rows: QCReports.portfolioAgents(db, query) })));
+  }
 
   // نسخه کامل تأیید مرورگر مستقل از هر فیلتر؛ شامل seq، لیست‌ها و داده خام.
   if(pathname === '/api/session-snapshot' && method === 'GET')return ok(res, clone(db));
@@ -642,7 +685,8 @@ async function dispatchApi(req, res, pathname, query, body, session) {
 
   /* داشبورد */
   if (pathname === '/api/dashboard' && method === 'GET') {
-    return ok(res, QCReports.dashboard(db, { from: query.from, to: query.to, team: query.team }));
+    return ok(res, memoized(dataEpoch + '|' + scopeKeyOf(session) + '|dashboard|' + qkey(query),
+      () => QCReports.dashboard(db, { from: query.from, to: query.to, team: query.team })));
   }
 
   /* ارزیابی تیکت */
@@ -756,19 +800,23 @@ async function dispatchApi(req, res, pathname, query, body, session) {
 
   /* گزارش‌ها */
   if (parts[1] === 'reports' && method === 'GET') {
-    const type = query.type || 'social';
-    const level = query.level === 'team' ? 'team' : 'agent';
-    const q = { from: query.from, to: query.to, team: query.team, agent: query.agent, qc: query.qc, form: query.form };
-    /* نرخ اقلام نسبت به کل دیتای فیلترشده — برای همه‌ی تب‌ها */
-    const elements = QCReports.elementRates(db, q);
-    if (type === 'combined') return ok(res, { type, level, rows: QCReports.combinedAgentReport(db, q), elements });
-    if (type === 'call') {
-      const rep = QCReports.callReport(db, level, q, P.resolver(db.settings.callCriteria));
-      return ok(res, { type: 'call', level, rows: rep.rows, calls: rep.calls, redlineRows: rep.redlineRows, elements: Object.assign({}, elements, { call: rep.elements }) });
-    }
-    const tt = type === 'ticket' ? 'ticket' : 'social';
-    const rows = tt === 'ticket' ? QCReports.ticketReport(db, level, q) : QCReports.socialReport(db, level, q);
-    return ok(res, { type: tt, level, rows, elements });
+    /* گزارش‌گیری سنگین‌ترین مسیر خواندنی است؛ نتیجه با کلید «نسل داده + کاربر +
+     * فیلترها» حافظه می‌شود و با هر نوشتن کل حافظه پاک می‌شود. */
+    return ok(res, memoized(dataEpoch + '|' + scopeKeyOf(session) + '|reports|' + qkey(query), () => {
+      const type = query.type || 'social';
+      const level = query.level === 'team' ? 'team' : 'agent';
+      const q = { from: query.from, to: query.to, team: query.team, agent: query.agent, qc: query.qc, form: query.form };
+      /* نرخ اقلام نسبت به کل دیتای فیلترشده — برای همه‌ی تب‌ها */
+      const elements = QCReports.elementRates(db, q);
+      if (type === 'combined') return { type, level, rows: QCReports.combinedAgentReport(db, q), elements };
+      if (type === 'call') {
+        const rep = QCReports.callReport(db, level, q, P.resolver(db.settings.callCriteria));
+        return { type: 'call', level, rows: rep.rows, calls: rep.calls, redlineRows: rep.redlineRows, elements: Object.assign({}, elements, { call: rep.elements }) };
+      }
+      const tt = type === 'ticket' ? 'ticket' : 'social';
+      const rows = tt === 'ticket' ? QCReports.ticketReport(db, level, q) : QCReports.socialReport(db, level, q);
+      return { type: tt, level, rows, elements };
+    }));
   }
 
   /* پرونده کارشناس (نام یا داخلی) */
@@ -1030,7 +1078,8 @@ async function dispatchApi(req, res, pathname, query, body, session) {
     if (parts.length === 2 && method === 'GET') {
       return ok(res, { users: Access.userMask(users), required: Access.authRequired(db), mode: Access.authMode(db),
         teams: [...new Set(db.agents.map((a) => a.team))].sort(),
-        agents: db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false })) });
+        agents: db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false,
+          qcAgents: Access.splitList(a.qcAgents) })) });
     }
     /* شناسه‌ی کاربر هم در بدنه و هم در مسیر (/api/qc-users/u2) پذیرفته می‌شود —
      * تا رفتار Node و Apps Script (که از همان LocalApi استفاده می‌کند) یکی بماند. */
@@ -1041,10 +1090,14 @@ async function dispatchApi(req, res, pathname, query, body, session) {
       if (method === 'PUT' && !existing) return notFound(res);
       const before = existing ? existing.name : '';
       const row = Access.saveUser(db, body, existing);
+      /* تیک‌ها روی ستون qcAgents تب Agents هم می‌نشینند تا از شیت/اکسل هم ویرایش‌پذیر باشند. */
+      Access.syncAgentQcColumn(db, Access.normalizeUser(row, 0), body && body.syncColumn ? 'sync' : 'keep');
       saveStore();
       if (before && before !== row.name) dropSessionsOf(before);
       return ok(res, { ok: true, user: Access.userMask([Access.normalizeUser(row, 0)])[0],
-        users: Access.userMask(Access.normalizeUsers(db)) });
+        users: Access.userMask(Access.normalizeUsers(db)),
+        agents: db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false,
+          qcAgents: Access.splitList(a.qcAgents) })) });
     }
     if (parts.length === 3 && method === 'DELETE') {
       const target = users.find((u) => String(u.id) === String(parts[2]));
@@ -1093,7 +1146,9 @@ async function dispatchApi(req, res, pathname, query, body, session) {
   if (parts[1] === 'elements' && method === 'GET') {
     return ok(res, Elements.table(db.settings.callCriteria, [...new Set(db.agents.map((a) => a.team))]));
   }
-  if (parts[1] === 'monthly-summary' && method === 'GET') return ok(res, Fiscal.monthlySummary(db, query));
+  if (parts[1] === 'monthly-summary' && method === 'GET') {
+    return ok(res, memoized(dataEpoch + '|' + scopeKeyOf(session) + '|monthly|' + qkey(query), () => Fiscal.monthlySummary(db, query)));
+  }
   if (parts[1] === 'revision' && method === 'GET') return ok(res, { revision: Number(db.revision || 0), at: Date.now() });
 
   notFound(res);

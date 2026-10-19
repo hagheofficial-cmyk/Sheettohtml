@@ -242,3 +242,43 @@ test('real HTTP API and LocalApi agree on review dates, counts, scores and indep
     assert.equal((await http('POST', '/api/calls/rescan', {})).data.changed, false);
   });
 });
+
+/* گزارش‌گیری تکراری حافظه می‌شود (کلید = نسل داده + کاربر + فیلترها)؛ نوشتن باید
+ * بلافاصله آن را باطل کند تا هیچ گزارش کهنه‌ای سرو نشود. */
+test('report memoization speeds repeats up and never serves stale data after a write', async (t) => {
+  const server = await startServer();
+  t.after(async () => { await server.close(); });
+  async function http(method, url, data) {
+    const response = await fetch(server.origin + url, { method, headers: data ? { 'Content-Type': 'application/json' } : undefined,
+      body: data ? JSON.stringify(data) : undefined });
+    return { status: response.status, data: await response.json() };
+  }
+  const q = 'from=1405%2F06%2F20&to=1405%2F06%2F20';
+  const urls = ['/api/reports?type=ticket&' + q, '/api/reports?type=combined&' + q, '/api/dashboard?' + q,
+    '/api/data/status?' + q, '/api/monthly-summary', '/api/portfolio/agents?' + q];
+
+  for (const url of urls) {
+    const a = await http('GET', url);
+    assert.equal(a.status, 200, url);
+    assert.deepEqual(await http('GET', url), a, 'پاسخ تکراری باید یکی باشد: ' + url);
+  }
+  const before = {};
+  for (const url of urls) before[url] = await http('GET', url);
+  assert.equal(before['/api/data/status?' + q].data.tickets, 0);
+
+  const bootstrap = await http('GET', '/api/bootstrap');
+  const agent = bootstrap.data.agents[0];
+  const posted = await http('POST', '/api/tickets', {
+    qcAgent: bootstrap.data.qcAgents[0], reviewDate: '1405/06/20', ticketDate: '1405/06/20',
+    agentName: agent.name, team: agent.team, ticketCode: 'MEMO-1',
+    q1: '1', q2: '1', q3: '0', q4: '1', redline: '0', comment: 'memo'
+  });
+  assert.equal(posted.status, 200, JSON.stringify(posted.data));
+
+  for (const url of urls) {
+    const now = await http('GET', url);
+    assert.equal(now.status, 200, url);
+    assert.notDeepEqual(now.data, before[url].data, 'حافظه‌ی گزارش باید با نوشتن باطل شود: ' + url);
+  }
+  assert.equal((await http('GET', '/api/data/status?' + q)).data.tickets, 1);
+});
