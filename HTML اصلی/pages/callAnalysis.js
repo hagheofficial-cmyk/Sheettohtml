@@ -121,7 +121,6 @@ async function render(root) {
       if (request !== loadId || !body.isConnected) return;
       App.clearCharts();
       renderAnalysis(an);
-      drawCharts(an);
       lastAnalysis = an;
     } catch (e) {
       if (request !== loadId || !body.isConnected) return;
@@ -146,40 +145,8 @@ async function render(root) {
       ${kpi('fa-headphones', 'دارای زمان شنود', fa(k.listeningCalls || 0), '#f472b6')}
     </div>`;
 
-    /* نمودارها */
-    const chartsRow = F.team ? `
-    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(360px,1fr));margin-bottom:16px">
-      <div class="card"><div class="card-head"><div class="head-icon"><i class="fa-solid fa-chart-area"></i></div><div><h3>روند ماهانه</h3><div class="sub">میانگین نمره و تعداد ریت در هر ماه</div></div></div>
-        <div class="ch-box" style="height:240px"><canvas id="chMonthly"></canvas></div></div>
-      <div class="card"><div class="card-head"><div class="head-icon"><i class="fa-solid fa-chart-column"></i></div><div><h3 id="chElTitle">نرخ موفقیت معیارها</h3><div class="sub">درصد رعایت هر معیار در تماس‌های ارزیابی‌شده</div></div></div>
-        <div class="ch-box" style="height:240px"><canvas id="chElements"></canvas></div></div>
-    </div>` : '';
-
-    /* جدول معیارها — با تگ نوع فرم که انتخاب شده */
-    let ratesSection = '';
+    /* جدول‌های ستون افقی (هیت‌مپ) — تنها نمای معیارها */
     const forms = form ? [form] : ['tele', 'account', 'mlm'];
-    for (const ft of forms) {
-      const rates = (an.elementRates && an.elementRates[ft]) || [];
-      const ratesWithData = rates.filter((r) => r.total > 0);
-      if (!ratesWithData.length) continue;
-      const sorted = ratesWithData.slice().sort((a, b) => (a.successRate === '' ? 101 : a.successRate) - (b.successRate === '' ? 101 : b.successRate));
-      ratesSection += `
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-head"><div class="head-icon"><i class="fa-solid fa-list-check"></i></div>
-          <div><h3>نرخ موفقیت معیارها — ${FORM_FA[ft]}</h3>
-          <div class="sub">مرتب‌شده از ضعیف‌ترین؛ هر ردیف = درصد رعایت آن معیار در ${fa(sorted.length)} تست</div></div></div>
-        <div class="card-pad" style="display:flex;flex-direction:column;gap:9px">
-          ${sorted.map((r) => `
-            <div style="display:flex;align-items:center;gap:10px">
-              <div style="flex:0 0 280px;font-size:12px">${esc(r.label)} <span style="color:var(--muted);font-size:10px">(${fa(r.ok)}/${fa(r.total)})</span></div>
-              <div style="flex:1;height:8px;background:rgba(148,163,184,.12);border-radius:999px;overflow:hidden">
-                <div style="width:${r.successRate === '' ? 0 : r.successRate}%;height:100%;border-radius:999px;background:${scoreColorHex(r.successRate === '' ? -1 : r.successRate)}"></div>
-              </div>
-              <div style="flex:0 0 54px;text-align:center;font-weight:600">${r.successRate === '' ? '—' : fa(r.successRate) + '٪'}</div>
-            </div>`).join('')}
-        </div>
-      </div>`;
-    }
 
     /* هیت‌مپ خطا */
     let heatSection = '';
@@ -265,7 +232,7 @@ async function render(root) {
         </div>
       </div>`;
 
-    body.innerHTML = kpiRow + chartsRow + ratesSection + heatSection + leaderSection + redlineSection + commentSection;
+    body.innerHTML = kpiRow + heatSection + leaderSection + redlineSection + commentSection;
     body.style.display = 'flex';
     body.style.flexDirection = 'column';
     body.style.gap = '0';
@@ -280,92 +247,65 @@ async function render(root) {
     });
   }
 
-  function drawCharts(an) {
-    if (!F.team) return; // دو نمودار ابتدایی در حالت «همه تیم‌ها» حذف شده‌اند.
-    /* روند ماهانه */
-    const monthly = an.monthly || [];
-    const labels = monthly.map((m) => m.month.replace('1405/', '').replace(/^1404/, '04/').replace(/^0*/, '') + ' ماه');
-    const c1 = $('#chMonthly');
-    if (c1 && monthly.length) {
-      App.chart(c1, {
-        type: 'line',
-        data: {
-          labels: monthly.map((m) => m.month),
-          datasets: [
-            { label: 'میانگین نمره', data: monthly.map((m) => m.avgScore === '' ? null : m.avgScore), borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,.12)', fill: true, tension: 0.35, yAxisID: 'y' },
-            { label: 'تعداد ریت', data: monthly.map((m) => m.count), borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,.1)', fill: true, tension: 0.35, yAxisID: 'y1' }
-          ]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: true, rtl: true }, tooltip: { rtl: true } },
-          scales: {
-            y: { min: 0, max: 100, position: 'right', grid: { color: 'rgba(34,48,79,.5)' } },
-            y1: { min: 0, position: 'left', grid: { drawOnChartArea: false } }
-          }
-        }
-      });
-    } else if (c1) {
-      c1.parentElement.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px 0">دیتای ماهانه در این بازه نیست</div>';
-    }
-    /* نمودار ستونی معیارها — فرم جاری */
-    const curF = F.form || 'mlm';
-    const ratesAll = (an.elementRates && an.elementRates[curF]) || [];
-    const withD = ratesAll.filter((r) => r.total > 0);
-    const c2 = $('#chElements');
-    const title = $('#chElTitle');
-    if (title) title.textContent = 'نرخ موفقیت معیارها — ' + (FORM_FA[curF] || curF);
-    if (c2 && withD.length) {
-      const scoreColor = scoreColorRgba;
-      App.chart(c2, {
-        type: 'bar',
-        data: {
-          labels: withD.map((r) => r.label),
-          datasets: [{ data: withD.map((r) => r.successRate), backgroundColor: withD.map((r) => scoreColor(r.successRate)), borderRadius: 6, borderSkipped: false }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ' رعایت: ' + fa(c.parsed.y) + '٪' }, rtl: true } },
-          scales: { y: { min: 0, max: 100, grid: { color: 'rgba(34,48,79,.5)' } }, x: { grid: { display: false }, ticks: { maxRotation: 65, font: { size: 10 } } } }
-        }
-      });
-    } else if (c2) {
-      c2.parentElement.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px 0">دیتای معیار برای این فرم نیست</div>';
-    }
+  /* خروجی اکسل تحلیل — ۵ شیت
+   * داده‌ی صفحه سبک است (بدون تفکیک معیار و ماهانه)؛ فقط هنگام گرفتن اکسل
+   * یک‌بار نسخه‌ی کامل (`full=1`) گرفته می‌شود تا تحلیل روزمره کند نشود. */
+  let fullCache = { key: '', data: null };
+  async function fullAnalysis() {
+    const p = new URLSearchParams();
+    if (F.form) p.set('form', F.form);
+    if (F.team) p.set('team', F.team);
+    const av = msAgents.getValues(); if (av.length) p.set('agent', av.join(','));
+    p.set('full', '1');
+    const key = p.toString();
+    if (fullCache.key === key && fullCache.data) return fullCache.data;
+    const data = await api.get('/api/calls/analysis?' + key);
+    fullCache = { key, data };
+    return data;
   }
 
-  /* خروجی اکسل تحلیل — ۵ شیت */
-  $('#btnXls').addEventListener('click', () => {
-    const an = lastAnalysis;
-    if (!an) return toast.info('ابتدا تحلیل بارگذاری شود');
-    const sheets = [];
-    sheets.push({ name: 'رتبه‌بندی', rows: [
-      ['کارشناس', 'تیم', 'تعداد ریت', 'میانگین نمره', 'ردلاین'],
-      ...(an.leaderboard || []).map((x) => [x.name, x.team, x.count, x.avgScore === '' ? '' : x.avgScore, x.redlines])
-    ]});
-    for (const ft of ['tele', 'account', 'mlm']) {
-      const fa = FORM_FA[ft];
-      const rates = (an.elementRates && an.elementRates[ft]) || [];
-      if (!rates.filter((r) => r.total > 0).length) continue;
-      sheets.push({ name: fa + ' - معیارها', rows: [
-        ['معیار', 'کلید', 'رعایت شده', 'رعایت نشده', 'نرخ موفقیت٪'],
-        ...rates.filter((r) => r.total > 0).map((r) => [r.label, r.key, r.ok, r.bad, r.successRate === '' ? '' : r.successRate])
+  $('#btnXls').addEventListener('click', async (e) => {
+    const base = lastAnalysis;
+    if (!base) return toast.info('ابتدا تحلیل بارگذاری شود');
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    const label = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> آماده‌سازی…';
+    try {
+      let an = base;
+      try { an = await fullAnalysis(); } catch (err) { an = base; }
+      const sheets = [];
+      sheets.push({ name: 'رتبه‌بندی', rows: [
+        ['کارشناس', 'تیم', 'تعداد ریت', 'میانگین نمره', 'ردلاین'],
+        ...(an.leaderboard || []).map((x) => [x.name, x.team, x.count, x.avgScore === '' ? '' : x.avgScore, x.redlines])
       ]});
+      for (const ft of ['tele', 'account', 'mlm']) {
+        const formLabel = FORM_FA[ft];
+        const rates = (an.elementRates && an.elementRates[ft]) || [];
+        if (!rates.filter((r) => r.total > 0).length) continue;
+        sheets.push({ name: formLabel + ' - معیارها', rows: [
+          ['معیار', 'کلید', 'رعایت شده', 'رعایت نشده', 'نرخ موفقیت٪'],
+          ...rates.filter((r) => r.total > 0).map((r) => [r.label, r.key, r.ok, r.bad, r.successRate === '' ? '' : r.successRate])
+        ]});
+      }
+      sheets.push({ name: 'ردلاین‌ها', rows: [
+        ['کارشناس', 'تیم', 'نمره', 'علت', 'لید', 'تلفن لید', 'تاریخ', 'فایل'],
+        ...(an.redlines || []).map((r) => [r.expertName, r.formType, r.score, r.reason, r.leadName, r.leadPhone, r.date, r.sourceFile || ''])
+      ]});
+      sheets.push({ name: 'کامنت‌های QC', rows: [
+        ['کارشناس', 'تیم', 'نمره', 'کامنت', 'لید', 'تلفن لید', 'تاریخ'],
+        ...(an.comments || []).map((r) => [r.expertName, r.formType, r.score, r.comment, r.leadName, r.leadPhone, r.date])
+      ]});
+      sheets.push({ name: 'ماهانه', rows: [
+        ['ماه', 'تعداد ریت', 'میانگین', 'ردلاین'],
+        ...(an.monthly || []).map((m) => [m.month, m.count, m.avgScore === '' ? '' : m.avgScore, m.redlines])
+      ]});
+      window.QCExport.sheets('تحلیل ریت تماس', sheets);
+      toast.success('فایل اکسل تحلیل دانلود شد (' + fa(sheets.length) + ' شیت)');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = label;
     }
-    sheets.push({ name: 'ردلاین‌ها', rows: [
-      ['کارشناس', 'تیم', 'نمره', 'علت', 'لید', 'تلفن لید', 'تاریخ', 'فایل'],
-      ...(an.redlines || []).map((r) => [r.expertName, r.formType, r.score, r.reason, r.leadName, r.leadPhone, r.date, r.sourceFile || ''])
-    ]});
-    sheets.push({ name: 'کامنت‌های QC', rows: [
-      ['کارشناس', 'تیم', 'نمره', 'کامنت', 'لید', 'تلفن لید', 'تاریخ'],
-      ...(an.comments || []).map((r) => [r.expertName, r.formType, r.score, r.comment, r.leadName, r.leadPhone, r.date])
-    ]});
-    sheets.push({ name: 'ماهانه', rows: [
-      ['ماه', 'تعداد ریت', 'میانگین', 'ردلاین'],
-      ...(an.monthly || []).map((m) => [m.month, m.count, m.avgScore === '' ? '' : m.avgScore, m.redlines])
-    ]});
-    window.QCExport.sheets('تحلیل ریت تماس', sheets);
-    toast.success('فایل اکسل تحلیل دانلود شد (' + fa(sheets.length) + ' شیت)');
   });
 
   App.onDateRangeChange(load);

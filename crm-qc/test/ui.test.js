@@ -93,19 +93,18 @@ for (const build of ['public', 'offline']) {
       assert.ok(text('#pBody').includes('ردلاین‌ها'));
       assert.equal(text('#pBody').includes('تفکیک به‌ازای هر تاریخ'), false);
       assert.equal(text('#pBody').includes('تفکیک به‌ازای هر فایل'), false);
-      assert.deepEqual($$('#pCallHistory > thead th').map((node) => node.textContent), ['لید', 'نمره', 'ردلاین', 'جزئیات بیشتر']);
-      $('#pCallHistory [data-call-detail="0"]').click();
+      /* جزئیات کامل همه‌ی تماس‌ها همیشه باز است؛ دکمه‌ی «جزئیات بیشتر» وجود ندارد. */
+      assert.equal($$('#pCallHistory .call-log-item').length, 4);
+      assert.equal($$('#pCallHistory .call-detail-table').length, 4);
+      assert.equal(text('#pCallHistory').includes('جزئیات بیشتر'), false);
       assert.equal($('#pCallDetails-0').hidden, false);
-      assert.equal($('#pCallHistory > tbody > tr').children[2].textContent, '-');
       const headings = $$('#pCallDetails-0 th').map((node) => node.textContent);
       assert.deepEqual(headings.slice(0, 2), ['لید', 'شماره تماس']);
       assert.deepEqual(headings.slice(-3), ['ردلاین', 'تایم مکالمه', 'تاریخ بررسی']);
       assert.ok(text('#pCallDetails-0').includes('۹۰ ثانیه'));
-      $('#pCallHistory [data-call-detail="1"]').click();
       assert.ok(text('#pCallDetails-1').includes('زمان شنود: ۴۰ ثانیه'));
       $('#pCallDetails-1 [data-call-redline]').click();
       assert.ok(text('.modal-body').includes('گفتار نامناسب')); $('.modal-back:last-child .modal-head .x').click();
-      $('#pCallHistory [data-call-detail="0"]').click(); assert.equal($('#pCallDetails-0').hidden, true);
       const alpha = $$('#pAll tbody tr').find((node) => node.dataset.name === 'کارشناس الف');
       assert.ok(alpha.children[8].textContent.includes('تماس: ۱'));
       assert.equal(alpha.children[8].textContent.includes('سوشال'), false); // SLA failure is not a redline.
@@ -134,17 +133,18 @@ for (const build of ['public', 'offline']) {
       await w.App.setDateRange({ from: '1405/06/20', to: '1405/06/20' });
     });
 
-    await t.test('call analysis removes only the first two charts in all-team mode, keeps lower analysis', async () => {
+    await t.test('call analysis keeps only the horizontal criteria matrices; both chart windows are gone', async () => {
       await go(w, 'call-analysis');
       assert.equal($('#chMonthly'), null); assert.equal($('#chElements'), null);
       assert.ok(text('#anBody').includes('ماتریس خطای کارشناس'));
       assert.ok(text('#anBody').includes('رتبه‌بندی کارشناسان'));
       assert.equal(w.App.charts.length, 0);
       $('#formTabs button[data-t="Tele Sales"]').click(); await settle();
-      assert.ok($('#chMonthly')); assert.ok($('#chElements')); assert.equal(w.App.charts.length, 2);
+      assert.equal($('#chMonthly'), null); assert.equal($('#chElements'), null);
+      assert.equal(w.App.charts.length, 0);
+      assert.ok(text('#anBody').includes('ماتریس خطای کارشناس'));
       await w.App.setDateRange({ from: '1405/06/21', to: '1405/06/21' });
       assert.equal($('#formTabs button.active').dataset.t, 'Tele Sales');
-      assert.equal(w.App.charts.length, 0); // no call of the selected team/form on this day
       $('#fReset').click(); await settle();
       assert.equal($('#chMonthly'), null); assert.equal($('#chElements'), null);
     });
@@ -202,11 +202,14 @@ test('rapid date changes discard stale dashboard responses instead of attributin
   assert.equal(w.App.dateRange.from, '1405/06/21');
 });
 
-test('a real zero monthly call score stays zero, never a gap/null in the analysis chart', async (t) => {
+test('analysis keeps the horizontal criteria matrix and drops the two removed chart windows', async (t) => {
   const data = fixture(); data.callFeedbacks = [{ ...data.callFeedbacks[0], score: 0 }];
   const { w, dom } = browser('public', data); t.after(() => dom.window.close());
   await w.App.boot(); await go(w, 'call-analysis');
   w.document.querySelector('#formTabs button[data-t="Tele Sales"]').click(); await settle();
-  const monthly = w.App.charts.find((chart) => chart.canvas.id === 'chMonthly');
-  assert.equal(monthly.config.data.datasets[0].data[0], 0);
+  /* روند ماهانه و نرخ موفقیت المان‌ها عمداً حذف شده‌اند (درخواست کاربر) */
+  assert.equal(w.document.querySelector('#chMonthly'), null);
+  assert.equal(w.document.querySelector('#chElements'), null);
+  assert.equal(w.App.charts.length, 0);
+  assert.ok(w.document.querySelector('#content .tbl'), 'ماتریس/جدول معیارها باقی می‌ماند');
 });

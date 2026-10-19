@@ -127,7 +127,9 @@ test('all aggregates share date/team filters, and dashboard includes imported ca
   assert.equal(R.combinedAgentReport(data, q).reduce((n, r) => n + r.callCount, 0), 5);
   assert.equal(R.callAnalysis(data, q, P).kpis.totalCalls, 5);
   assert.equal(R.callAnalysis(data, q, P).kpis.redlineCount, 1);
-  assert.equal(R.callAnalysis(data, q, P).monthly[0].avgScore, 60);
+  /* monthly/elementRates فقط با full درخواست می‌شوند؛ مسیر سبک همیشه خالی می‌دهد */
+  assert.equal(R.callAnalysis(data, q, P).monthly.length, 0);
+  assert.equal(R.callAnalysis(data, { ...q, full: 1 }, P).monthly[0].avgScore, 60);
 });
 
 test('team transfers use current expert registry without changing stored history', () => {

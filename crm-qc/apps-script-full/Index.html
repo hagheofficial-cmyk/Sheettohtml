@@ -546,6 +546,16 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
 .cr-frame-card { padding:0; overflow:hidden; }
 #crWrap { position:relative; background:var(--bg-2,#0f172a); height:calc(100vh - 178px); min-height:560px; }
 #crFrame { width:100%; height:100%; border:0; display:block; }
+/* نسخه‌ی Apps Script: ابزار در فریم محلی (srcdoc) باز می‌شود */
+.cr-embed-bar { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--line-soft); background:var(--bg-2,#0f172a); font-size:12.5px; color:var(--muted); }
+.cr-embed-state { display:inline-flex; align-items:center; gap:7px; font-weight:700; color:var(--muted); }
+.cr-embed-state.ok { color:var(--good); }
+.cr-embed-state.bad { color:var(--bad); }
+.cr-embed-hint b { color:var(--text); }
+.cr-embed-wrap { height:calc(100vh - 226px); min-height:540px; }
+.cr-embed-frame { width:100%; height:100%; border:0; display:block; background:#0b1220; }
+.cr-embed-fallback { max-width:760px; margin:38px auto; }
+.cr-embed-fallback p { margin:14px 0 18px; line-height:2; color:var(--muted); }
 
 /* فیلترهای بدون خط جداکننده (وقتی داخل کارت‌اند) */
 .filters.plain { border-bottom:none; }
@@ -587,6 +597,92 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
   .global-range .date-f .input { width:142px; }
 }
 @media print { .global-range { display:none; } }
+
+/* ماه‌های مالی — جدول بزرگ‌تر و خواناتر */
+.fm-card .card-head { gap:12px; flex-wrap:wrap; }
+.fm-year { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); font-weight:700; }
+.fm-year .input { width:96px; height:38px; font-size:14px; text-align:center; }
+.fm-scroll { max-height:430px; }
+.fm-tbl { min-width:820px; }
+.fm-tbl thead th { font-size:12.5px; padding:12px 10px; }
+.fm-tbl td { padding:10px 10px; vertical-align:middle; }
+.fm-tbl .input { height:44px; font-size:14px; }
+.fm-tbl .date-f { min-width:168px; }
+.fm-tbl .date-f .input { padding-inline-end:40px; }
+.fm-tbl .cal-btn { width:32px; height:32px; font-size:14px; }
+.fm-tbl .fm-name { font-weight:700; min-width:170px; }
+.fm-tbl .fm-note { min-width:140px; }
+.fm-empty { text-align:center; color:var(--muted); padding:26px 10px !important; font-size:13px; }
+.fm-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:14px; }
+.fm-actions .btn { height:42px; }
+.fm-summary { margin-top:12px; display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.fm-chips { display:flex; flex-wrap:wrap; gap:8px; }
+.fm-chip { display:inline-flex; align-items:center; gap:7px; padding:6px 10px; border-radius:10px;
+  border:1px solid var(--line-soft); background:rgba(56,189,248,.06); font-size:11.5px; color:var(--muted); }
+.fm-chip b { color:var(--text); font-size:12px; }
+.fm-chip em { font-style:normal; color:var(--brand); font-weight:700; }
+.fm-total { font-size:11.5px; color:var(--muted); }
+.fm-summary.has-err .fm-chip { border-color:rgba(248,113,113,.35); }
+.fm-err { flex:1 1 100%; display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border-radius:10px;
+  border:1px solid rgba(248,113,113,.35); background:rgba(248,113,113,.07); color:#fca5a5; font-size:12px; }
+.fm-err ul { margin:0; padding-inline-start:16px; line-height:1.9; }
+
+/* زیرمجموعه‌ی کارشناس QC — ست‌کردن از مدیریت کارشناسان */
+.qc-subset { margin:10px 0 12px; border:1px solid var(--line-soft); border-radius:14px;
+  background:linear-gradient(180deg, rgba(56,189,248,.06), rgba(56,189,248,.015)); padding:12px 14px; }
+.qc-subset-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.qc-subset-head b { font-size:13px; }
+.qc-subset-head .sub { font-size:11px; color:var(--muted); margin-top:2px; }
+.qc-subset-ic { width:32px; height:32px; border-radius:10px; display:grid; place-items:center;
+  background:rgba(56,189,248,.14); color:#38bdf8; font-size:14px; flex:0 0 auto; }
+.qc-subset-row { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-top:10px; }
+.qc-subset-f { display:flex; flex-direction:column; gap:5px; font-size:11px; color:var(--muted); font-weight:700; min-width:180px; flex:1 1 180px; }
+.qc-subset-f .input { height:40px; font-size:13px; }
+.qc-subset-mode { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); height:40px; }
+.qc-subset-hint { margin-top:9px; font-size:11.5px; color:var(--muted); display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+
+/* المان‌ها — سرستون دوزبانه و شمارش هر تیم */
+.th-en { display:block; font-size:9.5px; font-weight:600; color:var(--muted); letter-spacing:.4px; opacity:.8; }
+.criteria-team small { display:block; font-size:10px; color:var(--muted); margin-top:2px; }
+
+/* ------------------------- پرونده کارشناس (بازطراحی) ------------------------- */
+.profile-modal .profile-content { font-size:13px; }
+.history-stack { display:flex; flex-direction:column; gap:14px; }
+.history-stack .full-row { min-width:0; width:100%; }
+.history-wrap { max-height:560px; overflow-y:auto; }
+.history-types { border-bottom:1px solid var(--border); padding:9px 14px; font-size:12px; display:flex; flex-wrap:wrap; gap:8px; }
+.history-tbl .history-main td { font-size:13px; }
+.history-tbl .rating-detail-row > td { padding:0 12px 10px; border-bottom:1px solid var(--line-soft); }
+.history-tbl .history-main > td { border-bottom:none; padding-bottom:4px; }
+
+/* هر تماس: بلوک کامل و باز */
+.call-log { display:flex; flex-direction:column; }
+.call-log-item { padding:10px 12px 12px; border-bottom:1px solid var(--line-soft); }
+.call-log-item:last-child { border-bottom:none; }
+.call-log-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:7px; }
+.call-log-lead { font-weight:800; font-size:13.5px; }
+.call-log-meta { font-size:11px; color:var(--muted); }
+.call-log-tags { margin-inline-start:auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.call-log-body .cell-sub { font-size:11px; color:var(--muted); margin-bottom:6px; }
+.call-detail-table { font-size:11.5px; }
+.call-detail-table th { white-space:nowrap; font-size:10.5px; }
+.call-detail-table td { text-align:center; white-space:nowrap; }
+.call-detail-table td:nth-child(-n+2) { text-align:right; }
+
+/* کارنامه: سه ستون قوت/ضعف/بهبود */
+.scorecard .sc-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding:12px 14px 14px; }
+.sc-col { border-radius:12px; padding:11px 12px; border:1px solid var(--line-soft); background:var(--panel-soft); }
+.sc-col.good { border-color:rgba(52,211,153,.28); background:rgba(52,211,153,.06); }
+.sc-col.bad { border-color:rgba(248,113,113,.28); background:rgba(248,113,113,.06); }
+.sc-col.info { border-color:rgba(56,189,248,.28); background:rgba(56,189,248,.06); }
+.sc-col-head { display:flex; align-items:center; gap:8px; font-size:12.5px; margin-bottom:8px; }
+.sc-col.good .sc-col-head i { color:var(--good); }
+.sc-col.bad .sc-col-head i { color:#f87171; }
+.sc-col.info .sc-col-head i { color:#38bdf8; }
+.sc-col ul { margin:0; padding-inline-start:16px; display:flex; flex-direction:column; gap:7px; }
+.sc-col li { font-size:12px; line-height:1.85; color:var(--text); }
+.sc-grade { font-size:12px; padding:6px 12px; }
+@media (max-width:900px) { .scorecard .sc-grid { grid-template-columns:1fr; } }
 
 </style>
 
@@ -668,6 +764,9 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
 .capture-host [data-call-detail],.capture-host .pDel,.capture-host #pAddAction,.capture-host .no-capture { display:none !important; }
 .capture-host .card,.capture-host .grid { break-inside:avoid; }
 .capture-host .grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+.capture-host .history-wrap { max-height:none !important; overflow:visible !important; }
+.capture-host .history-stack .full-row { width:100% !important; }
+.capture-host .call-log-body { display:block !important; }
 .capture-host .capture-title { padding:15px 20px;margin-bottom:18px;border-bottom:2px solid var(--brand);font-weight:800;font-size:21px; }
 .capture-host .capture-title small { display:block;color:var(--muted);font-weight:400;font-size:12px; }
 .criteria-layout { display:grid;grid-template-columns:250px minmax(0,1fr);gap:17px; }
@@ -2164,13 +2263,32 @@ function teamForm(s) {
   return null;
 }
 function displayTeam(s) { return teamForm(s) === 'tele' ? 'Telesales' : String(s || ''); }
+/* تطبیق نام کارشناس با کش: گزارش‌ها برای هر ردیف نام را resolve می‌کنند و
+ * بدون کش، فیلتر یک کارشناس روی چند هزار ردیف × ده‌ها نام، چند ثانیه طول می‌کشید.
+ * کش به «همان آرایه‌ی agents» گره خورده و با تغییر تعداد عضو یا صریحاً با
+ * clearResolveCache() پاک می‌شود. */
+let resolveCacheAgents = null, resolveCacheSize = -1, resolveCache = new Map();
+function clearResolveCache() { resolveCacheAgents = null; resolveCacheSize = -1; resolveCache = new Map(); }
 function resolveExpert(agents, rawName) {
   const name = normName(rawName);
   if (!name) return { agent: null, ambiguous: false };
-  const exact = (agents || []).filter(a => a.name === String(rawName).trim());
-  if (exact.length === 1) return { agent: exact[0], ambiguous: false };
-  const matches = (agents || []).filter(a => [a.name].concat(a.aliases || []).some(n => nameKeyOf(n) === nameKeyOf(name)));
-  return { agent: matches.length === 1 ? matches[0] : null, ambiguous: matches.length > 1 };
+  const list = agents || [];
+  if (resolveCacheAgents !== list || resolveCacheSize !== list.length) {
+    resolveCacheAgents = list; resolveCacheSize = list.length; resolveCache = new Map();
+  }
+  const key = nameKeyOf(name);
+  const hit = resolveCache.get(key);
+  if (hit) return hit;
+  const exact = list.filter(a => a.name === String(rawName).trim());
+  let result;
+  if (exact.length === 1) {
+    result = { agent: exact[0], ambiguous: false };
+  } else {
+    const matches = list.filter(a => [a.name].concat(a.aliases || []).some(n => nameKeyOf(n) === key));
+    result = { agent: matches.length === 1 ? matches[0] : null, ambiguous: matches.length > 1 };
+  }
+  resolveCache.set(key, result);
+  return result;
 }
 function defaults(type) {
   const keys = type === 'tele' ? TELE_CRITERIA : type === 'mlm' ? MLM_CRITERIA : ACCOUNT_CRITERIA;
@@ -2276,6 +2394,7 @@ function importDiagnostics(rows, agents) {
 }
 
 return {
+  clearResolveCache: clearResolveCache,
   PARSER_VERSION: 3, anyToJalali, parseRows, formTypeOfFileName, sniffFormType, normName, isRedline, callRowKey,
   criteriaFor, criteriaLabelsFor, labelOf, definitionsFor, defaults, resolver, validateConfig, saveTeamConfig, hasConfiguration,
   elementValue, teamKey, teamForm, displayTeam, nameKey: nameKeyOf, resolveExpert, importDiagnostics, setConfig: cfg => { browserConfig = cfg || null; },
@@ -2346,9 +2465,9 @@ window.QC_SEED = {"version":2,"agents":[{"id":1,"ext":3073,"name":"مبینا س
     var teamSet = valueSet(q.team), agentSet = valueSet(q.agent);
     if (teamSet) teamSet = new Set(Array.from(teamSet).map(P.teamKey));
     return (rows || []).map(function (r) {
-      if (!data) return r;
+      if (!data || !data.agents || !data.agents.length) return r;
       var field = r.expertName !== undefined ? 'expertName' : 'agentName';
-      var match = P.resolveExpert(data.agents || [], r[field]).agent;
+      var match = P.resolveExpert(data.agents, r[field]).agent;
       return match && match.name !== r[field] ? Object.assign({}, r, { [field]: match.name }) : r;
     }).filter(function (r) {
       if ((q.from || q.to) && !inRange(r.reviewDate, q.from, q.to)) return false;
@@ -2392,7 +2511,21 @@ window.QC_SEED = {"version":2,"agents":[{"id":1,"ext":3073,"name":"مبینا س
       .concat(Array.from(present).filter(function (k) { return (ordered || []).indexOf(k) === -1; }));
   }
   function configuredCriteria(data, supplied) {
-    return Object.assign({}, P.resolver((data.settings || {}).callCriteria), supplied || {}, { rowTeam: r => rowTeam(data, r), elementValue: (r,k) => P.elementValue(Object.assign({},r,{team:r.criteriaTeam||r.team||rowTeam(data,r)}),k,(data.settings||{}).callCriteria||null) });
+    const base = P.resolver((data.settings || {}).callCriteria);
+    const memo = new Map();
+    const cached = (key, make) => { if (memo.has(key)) return memo.get(key); const value = make(); memo.set(key, value); return value; };
+    const wrapped = {
+      config: base.config,
+      definitionsFor: (type, team) => cached('d|' + type + '|' + (team || ''), () => base.definitionsFor(type, team)),
+      criteriaFor: (type, team) => cached('c|' + type + '|' + (team || ''), () => base.criteriaFor(type, team)),
+      configured: (type, team) => cached('g|' + type + '|' + (team || ''), () => base.configured(type, team)),
+      labelOf: (type, key, team) => cached('l|' + type + '|' + (team || '') + '|' + key, () => base.labelOf(type, key, team)),
+      elementValue: base.elementValue
+    };
+    return Object.assign(wrapped, supplied || {}, {
+      rowTeam: r => rowTeam(data, r),
+      elementValue: (r, k) => P.elementValue(Object.assign({}, r, { team: r.criteriaTeam || r.team || rowTeam(data, r) }), k, (data.settings || {}).callCriteria || null)
+    });
   }
   function criterionLabel(rows, type, key, crit) {
     const team = rows.length ? rows[0].criteriaTeam || rows[0].team || (crit.rowTeam ? crit.rowTeam(rows[0]) : '') : '';
@@ -2694,10 +2827,13 @@ window.QC_SEED = {"version":2,"agents":[{"id":1,"ext":3073,"name":"مبینا س
     var voices = Array.isArray(vRaw) ? vRaw : (vRaw && typeof vRaw === 'object' && typeof vRaw.count === 'number' ? { count: vRaw.count } : []);
 
     /* نرخ موفقیت معیارهای تماس برای این کارشناس — طبق نمونه پنل (بازیگر معیارها از روی خود ردیف‌ها، چون دیکشنری نمی‌خواهیم سرور وابسته شود) */
+    var profileCriteria = configuredCriteria(data);
+    var callsByForm = { tele: [], account: [], mlm: [] };
+    Ph.forEach(function (r) { if (callsByForm[r.formType]) callsByForm[r.formType].push(r); });
     var byTypeRates = ['tele', 'account', 'mlm'].map(function (ft) {
-      var rs = Ph.filter(function (r) { return r.formType === ft; });
+      var rs = callsByForm[ft];
       if (!rs.length) return null;
-      var criteria = configuredCriteria(data);
+      var criteria = profileCriteria;
       var keys = criteriaKeys(rs, ft, criteria);
       var list = keys.map(function (k) {
         var stats = criterionStats(rs, k, criteria);
@@ -2731,7 +2867,7 @@ window.QC_SEED = {"version":2,"agents":[{"id":1,"ext":3073,"name":"مبینا س
       calls: {
         rows: Ph, count: Ph.length,
         byType: ['tele', 'account', 'mlm'].map(function (t) {
-          var rs = Ph.filter(function (x) { return x.formType === t; });
+          var rs = callsByForm[t];
           return { type: t, count: rs.length, avg: avgScore(rs) };
         }).filter(function (x) { return x.count > 0; }),
         redlineCount: redlineCount(Ph, 'call'), scoredCount: scoredRows(Ph).length,
@@ -2783,6 +2919,16 @@ window.QC_SEED = {"version":2,"agents":[{"id":1,"ext":3073,"name":"مبینا س
       return { form: ft, count: rs.length, avgScore: avgScore(rs), redlines: redlineCount(rs, 'call') };
     }).filter(Boolean);
 
+    /* گروه‌بندی کارشناسان یک‌بار انجام می‌شود؛ هیت‌مپ و رتبه‌بندی از همین
+     * گروه‌ها ساخته می‌شوند تا O(کارشناس × ردیف) به O(ردیف) برسد. */
+    var byExpert = Object.create(null);
+    Ph.forEach(function (r) {
+      var name = r.expertName;
+      if (!byExpert[name]) byExpert[name] = [];
+      byExpert[name].push(r);
+    });
+    var byExpertNames = Object.keys(byExpert);
+
     /* نرخ هر معیار — جدا برای هر نوع فرم به ترتیب پنل */
     function ratesOf(rows, type) {
       return criteriaKeys(rows, type, crit).map(function (key) {
@@ -2790,7 +2936,10 @@ window.QC_SEED = {"version":2,"agents":[{"id":1,"ext":3073,"name":"مبینا س
         return Object.assign({}, stats, { label: criterionLabel(rows,type,key,crit), total: stats.applicable, observations: stats.total });
       });
     }
-    var elementRates = {
+    /* سنگین‌ترین بخش تحلیل فقط وقتی ساخته می‌شود که صریحاً خواسته شده باشد
+     * (خروجی اکسل)؛ نمای معمول صفحه به آن نیاز ندارد. */
+    var wantFull = q.full === true || q.full === '1' || q.full === 1;
+    var elementRates = !wantFull ? null : {
       tele: ratesOf(Ph.filter(function (r) { return r.formType === 'tele'; }), 'tele'),
       account: ratesOf(Ph.filter(function (r) { return r.formType === 'account'; }), 'account'),
       mlm: ratesOf(Ph.filter(function (r) { return r.formType === 'mlm'; }), 'mlm')
@@ -2800,14 +2949,22 @@ window.QC_SEED = {"version":2,"agents":[{"id":1,"ext":3073,"name":"مبینا س
     function heatmapOf(type) {
       var rows = Ph.filter(function (r) { return r.formType === type; });
       var keys = criteriaKeys(rows, type, crit);
-      var names = Array.from(new Set(rows.map(function (r) { return r.expertName; })));
+      var present = Object.create(null);
+      rows.forEach(function (r) { present[r.expertName] = 1; });
+      var names = Object.keys(present);
       var out = names.map(function (name) {
-        var ers = rows.filter(function (r) { return r.expertName === name; });
-        var cells = keys.map(function (k) {
-          var ok = 0, bad = 0;
-          ers.forEach(function (r) { var v = crit.elementValue ? crit.elementValue(r,k) : C.normalizeTri((r.elements || {})[k]); if (v === 1) ok++; else if (v === 0) bad++; });
-          var tot = ok + bad;
-          return tot === 0 ? null : { ok: ok, bad: bad, total: tot, errorRate: C.round2(100 * bad / tot) };
+        var ers = byExpert[name] || [];
+        var counters = keys.map(function () { return { ok: 0, bad: 0 }; });
+        ers.forEach(function (r) {
+          if (r.formType !== type) return;
+          keys.forEach(function (k, i) {
+            var v = crit.elementValue ? crit.elementValue(r, k) : C.normalizeTri((r.elements || {})[k]);
+            if (v === 1) counters[i].ok++; else if (v === 0) counters[i].bad++;
+          });
+        });
+        var cells = counters.map(function (c) {
+          var tot = c.ok + c.bad;
+          return tot === 0 ? null : { ok: c.ok, bad: c.bad, total: tot, errorRate: C.round2(100 * c.bad / tot) };
         });
         return { name: name, team: teamOf(data.agents, name) || '', count: ers.length, avg: avgScore(ers), cells: cells };
       });
@@ -2822,8 +2979,8 @@ window.QC_SEED = {"version":2,"agents":[{"id":1,"ext":3073,"name":"مبینا س
     var heatmaps = { tele: heatmapOf('tele'), account: heatmapOf('account'), mlm: heatmapOf('mlm') };
 
     /* رتبه‌بندی کارشناسان */
-    var leaderboard = Object.keys(expertSet).map(function (name) {
-      var rs = Ph.filter(function (r) { return r.expertName === name; });
+    var leaderboard = byExpertNames.map(function (name) {
+      var rs = byExpert[name];
       return {
         name: name, team: teamOf(data.agents, name) || rs[0].team || '',
         count: rs.length, avgScore: avgScore(rs),
@@ -2844,8 +3001,12 @@ window.QC_SEED = {"version":2,"agents":[{"id":1,"ext":3073,"name":"مبینا س
         score: r.score, comment: r.qcComment, date: r.reviewDate };
     }).sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); }).slice(0, 60);
 
-    /* روند ماهانه */
+    /* روند ماهانه — فقط در درخواست کامل (خروجی اکسل) */
     var byMonth = {};
+    if (!wantFull) {
+      return { kpis: kpis, byForm: byForm, elementRates: null, heatmaps: heatmaps,
+        leaderboard: leaderboard, redlines: redlines, comments: comments, monthly: [] };
+    }
     Ph.forEach(function (r) {
       var j = C.parseDate(r.reviewDate); if (!j) return;
       var d = C.formatJalali(j).slice(0, 7);
@@ -3531,6 +3692,7 @@ function save(db, body, id) {
     }
     db.agents[db.agents.indexOf(old)] = row;
   } else { row.id = nextId(db); db.agents.push(row); }
+  if (P.clearResolveCache) P.clearResolveCache();
   return row;
 }
 function bulk(db, rows) {
@@ -3554,6 +3716,7 @@ function removeAll(db, body) {
   const removed = (db.agents || []).length;
   db.seq = db.seq || {}; db.seq.agent = Math.max(db.seq.agent || 1, Math.max(0, ...(db.agents || []).map(a => Number(a.id) || 0)) + 1);
   db.agents = []; db.registryCleared = true;
+  if (P.clearResolveCache) P.clearResolveCache();
   return { ok: true, removed, historyPreserved: true };
 }
 return { save, bulk, removeAll, extension };
@@ -4777,6 +4940,32 @@ function route(method, url, body) {
   return dispatch(method, url, body);
 }
 
+/* یک شکل واحد برای bootstrap — ورود موفق هم همین را برمی‌گرداند تا کلاینت
+ * بلافاصله بعد از رمز، یک درخواست کامل دیگر نگیرد. */
+function bootstrapPayload() {
+  const auth = { required: A.authRequired(db), mode: A.authMode(db), accounts: A.accounts(db),
+    user: session ? A.publicUser(session) : null, admin: A.isAdmin(session) };
+  if (auth.required && !session) {
+    return clone({ auth: auth, agents: [], teams: [], qcAgents: [], lists: db.lists,
+      fiscalMonths: [], revision: db.revision || 0,
+      settings: { orgName: db.settings.orgName || 'سامانه کنترل کیفیت', scoreBands: db.settings.scoreBands,
+        defaultPreset: db.settings.defaultPreset, authMode: db.settings.authMode },
+      counts: { tickets: 0, socials: 0, calls: 0, callMeta: null } });
+  }
+  return clone({
+    auth: auth,
+    fiscalMonths: db.fiscalMonths || [],
+    revision: db.revision || 0,
+    qcUsers: A.isAdmin(session) ? A.userMask(A.normalizeUsers(db)) : undefined,
+    agents: db.agents.filter((a) => a.active),
+    teams: [...new Set(db.agents.filter((a) => a.active).map((a) => a.team))],
+    qcAgents: db.qcAgents,
+    lists: db.lists,
+    settings: db.settings,
+    counts: { tickets: db.tickets.length, socials: db.socials.length, calls: (db.callFeedbacks || []).length, callMeta: db.callImport || null }
+  });
+}
+
 function dispatch(method, url, body) {
   // کوئری را اول جدا کن — تاریخ‌ها شامل «/» هستند و نباید در مسیر شکسته شوند
   const [pathPart, qsAll] = url.slice(1).split('?');
@@ -4801,31 +4990,8 @@ function dispatch(method, url, body) {
 
   if (name === 'auth') return authRoute(method, id, body);
 
-  if (name === 'bootstrap' && method === 'GET') {
-    const auth = { required: A.authRequired(db), mode: A.authMode(db), accounts: A.accounts(db),
-      user: session ? A.publicUser(session) : null, admin: A.isAdmin(session) };
-    if (auth.required && !session) {
-      /* پیش از ورود هیچ داده‌ای لو نمی‌رود؛ فقط آنچه صفحه‌ی ورود لازم دارد. */
-      return { auth: auth, agents: [], teams: [], qcAgents: [], lists: clone(db.lists),
-        fiscalMonths: [], revision: db.revision || 0,
-        settings: { orgName: db.settings.orgName || 'سامانه کنترل کیفیت', scoreBands: db.settings.scoreBands,
-          defaultPreset: db.settings.defaultPreset, authMode: db.settings.authMode },
-        counts: { tickets: 0, socials: 0, calls: 0, callMeta: null } };
-    }
-    return {
-      auth: auth,
-      fiscalMonths: clone(db.fiscalMonths || []),
-      revision: db.revision || 0,
-      qcUsers: A.isAdmin(session) ? clone(A.userMask(A.normalizeUsers(db))) : undefined,
-      agents: clone(db.agents.filter((a) => a.active)),
-      teams: [...new Set(db.agents.filter((a) => a.active).map((a) => a.team))],
-      qcAgents: clone(db.qcAgents),
-      lists: clone(db.lists),
-      settings: clone(db.settings),
-      agentActions: clone(db.agentActions || {}),
-      counts: { tickets: db.tickets.length, socials: db.socials.length, calls: (db.callFeedbacks || []).length, callMeta: db.callImport || null }
-    };
-  }
+  if (name === 'bootstrap' && method === 'GET') return bootstrapPayload();
+
   if (name === 'tickets' && method === 'GET' && id == null) return list('tickets', q);
   if (name === 'tickets' && method === 'POST') {
     const n = normalizeTicket(body); if (typeof n === 'string') bad(n);
@@ -5205,7 +5371,15 @@ function authRoute(method, id, body) {
   if (id === 'login' && method === 'POST') {
     const result = A.login(db, (body || {}).name, (body || {}).password);
     if (!result.ok) bad(result.error, 401);
-    return { ok: true, user: result.user };
+    /* داده‌ی اولیه‌ی همان کاربر همراه پاسخ ورود برمی‌گردد — با همان محدودیتی
+     * که مسیر عادی GET /api/bootstrap اعمال می‌کند. */
+    const full = A.normalizeUser(result.user, 0);
+    const previousSession = session, previousDb = db;
+    session = full;
+    try {
+      if (!A.isAdmin(full)) db = A.scopeDb(db, full);
+      return { ok: true, user: result.user, bootstrap: bootstrapPayload() };
+    } finally { session = previousSession; db = previousDb; }
   }
   if (id === 'logout' && method === 'POST') {
     /* خروج: نشست همین لایه پاک می‌شود؛ باطل‌کردن خودِ توکن در لایه‌ی میزبان است
@@ -5226,7 +5400,11 @@ function authRoute(method, id, body) {
     db.qcUsers = [];
     const row = A.saveUser(db, { name: b.name, password: b.password, role: 'admin', active: true, exts: '*', agents: '', teams: '' });
     saveDb();
-    return { ok: true, user: A.publicUser(A.normalizeUser(row, 0)) };
+    const admin = A.normalizeUser(row, 0);
+    const previous = session;
+    session = admin;
+    try { return { ok: true, user: A.publicUser(admin), bootstrap: bootstrapPayload() }; }
+    finally { session = previous; }
   }
   bad('not found', 404);
 }
@@ -5237,7 +5415,7 @@ function qcUsersRoute(method, id, body) {
   if (method === 'GET' && id == null) {
     return { users: clone(A.userMask(users)), required: A.authRequired(db), mode: A.authMode(db),
       teams: [...new Set(db.agents.map((a) => a.team))].sort(),
-      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false,
+      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, subgroup: a.subgroup || '', active: a.active !== false,
         qcAgents: A.splitList(a.qcAgents) }))) };
   }
   if (method === 'GET' && id != null) {
@@ -5257,7 +5435,7 @@ function qcUsersRoute(method, id, body) {
     A.syncAgentQcColumn(db, A.normalizeUser(row, 0), (body && body.syncColumn && (body.exts !== undefined || body.agents !== undefined || body.teams !== undefined)) ? 'sync' : 'keep');
     saveDb();
     return { ok: true, user: clone(A.userMask([A.normalizeUser(row, 0)])[0]), users: clone(A.userMask(A.normalizeUsers(db))),
-      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false,
+      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, subgroup: a.subgroup || '', active: a.active !== false,
         qcAgents: A.splitList(a.qcAgents) }))) };
   }
   if (method === 'DELETE' && id != null) {
@@ -5683,6 +5861,9 @@ window.QCExport = {
 
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
 
 <script>/* app.js */
@@ -6545,7 +6726,9 @@ const App = {
   async refreshCounts(force) {
     const request = ++this._countsRequest;
     const st = this.state || {};
-    if (!force && st.counts) { this.paintCounts(st.counts); return; }
+    /* counts.partial یعنی شمارشِ سبک (بدون خواندن تب‌های سنگین) آمده و برای
+     * کارشناس محدود، عدد درست نیست؛ در آن حالت یک‌بار از منبع محدودشده خوانده می‌شود. */
+    if (!force && st.counts && !st.counts.partial) { this.paintCounts(st.counts); return; }
     try {
       const counts = await api.get('/api/data/status');
       if (request !== this._countsRequest) return;
@@ -6605,8 +6788,13 @@ const App = {
   register(name, spec) { this.routes[name] = spec; },
 
   async boot() {
-    this.state = await api.get('/api/bootstrap');
-    const st = this.state;
+    const st = await api.get('/api/bootstrap');
+    await this.applyBootstrap(st);
+  },
+
+  /* اعمال پاسخ bootstrap (چه از مسیر عادی، چه همراه پاسخ ورود) */
+  async applyBootstrap(st) {
+    this.state = st;
     this.fiscalMonths = Array.isArray(st.fiscalMonths) ? st.fiscalMonths : [];
     this.auth = st.auth || { required: false, user: null };
     this.revision = Number(st.revision || 0);
@@ -6812,12 +7000,13 @@ const App = {
     api._unauthorized = false;
     this._rangeReady = false;
     this._started = false;
+    const prefetched = window.QCAuth && window.QCAuth.takeBootstrap ? window.QCAuth.takeBootstrap() : null;
     if (window.QCAuth) window.QCAuth.hideGate();
-    await this.start();
+    await this.start(prefetched);
   },
 
-  async start() {
-    try { await this.boot(); }
+  async start(prefetched) {
+    try { await (prefetched ? this.applyBootstrap(prefetched) : this.boot()); }
     catch (e) {
       $('#content').innerHTML = `<div class="card">${emptyState('fa-plug-circle-xmark', 'عدم اتصال به سرور', e.message,
         `<button class="btn ghost" onclick="location.reload()"><i class="fa-solid fa-rotate-right"></i> تلاش دوباره</button>`)}</div>`;
@@ -6938,8 +7127,25 @@ const QCAuth = {
     });
   },
 
+  /* bootstrap آماده‌ی همان ورود؛ App آن را به‌جای درخواست دوباره مصرف می‌کند. */
+  takeBootstrap() { const value = this._bootstrap || null; this._bootstrap = null; return value; },
+
   async ensure() {
     const api = window.UI ? window.UI.api : null;
+    /* اگر نشستی ذخیره شده باشد، اول «me» پرسیده می‌شود و فهرست حساب‌ها فقط
+     * وقتی گرفته می‌شود که نشست معتبر نباشد — یک درخواست کمتر هنگام باز شدن. */
+    const saved = this.restore();
+    if (saved) {
+      try {
+        const me = await api.get('/api/auth/me');
+        if (me && me.required && me.user) {
+          this.required = true; this.accounts = me.accounts || []; this.user = me.user;
+          this.mode = 'auto'; this.syncLocalSession(); return true;
+        }
+        if (me && !me.required) { this.required = false; this.clear(); return true; }
+      } catch (e) { /* نشست منقضی شده */ }
+      this.clear();
+    }
     let info = null;
     try { info = await api.get('/api/auth/accounts'); }
     catch (e) { info = { required: false, accounts: [], firstRun: false, orgName: '' }; }
@@ -6949,15 +7155,6 @@ const QCAuth = {
     this.mode = info.mode || 'auto';
     this.orgName = info.orgName || '';
     if (!this.required) { this.user = null; return true; }
-
-    const saved = this.restore();
-    if (saved) {
-      try {
-        const me = await api.get('/api/auth/me');
-        if (me && me.user) { this.user = me.user; this.syncLocalSession(); return true; }
-      } catch (e) { /* نشست منقضی شده */ }
-      this.clear();
-    }
     this.showGate();
     return false;
   },
@@ -6970,6 +7167,7 @@ const QCAuth = {
     const api = window.UI.api;
     const res = await api.post('/api/auth/login', { name: name, password: password });
     this.user = res.user; this.token = res.token || '';
+    this._bootstrap = res.bootstrap || null;
     this.persist(); this.syncLocalSession();
     return res.user;
   },
@@ -6978,6 +7176,12 @@ const QCAuth = {
     const api = window.UI.api;
     const res = await api.post('/api/auth/setup', { name: name, password: password });
     this.firstRun = false; this.required = true;
+    if (res && res.token && res.user) {
+      /* سرور و Apps Script تازه، توکن و داده‌ی اولیه را در همان پاسخ می‌دهند */
+      this.user = res.user; this.token = res.token; this._bootstrap = res.bootstrap || null;
+      this.persist(); this.syncLocalSession();
+      return res.user;
+    }
     return this.login(name, password).catch(() => res.user);
   },
 
@@ -7070,35 +7274,133 @@ window.QCAuth = QCAuth;
 
 
 <script>/* capture.js */
-/* عکس کامل پرونده: تمام سوابق/جداول؛ بدون قطع‌شدن در ناحیه‌ی اسکرول. */
-(function(){
+/* capture.js — خروجی تصویر و PDF از یک بخش از صفحه (پرونده‌ی کارشناس)
+ *
+ * نکته‌ی مهم: نسخه‌ای که عکس گرفته می‌شود با «همان عرض» عنصر اصلی ساخته
+ * می‌شود. اگر عرض عوض شود، جدول‌ها دوباره می‌چینند و ستون‌ها جابه‌جا به نظر
+ * می‌رسند (باگ گزارش‌شده). ارتفاع عکس‌جای‌گرفته هم دقیقاً به اندازه‌ی خود
+ * canvas اصلی است، نه یک عدد ثابت.
+ */
+(function () {
 'use strict';
-async function download(source, filename, prepare) {
-  if (!source || !source.isConnected) throw new Error('پرونده‌ی آماده‌ای برای عکس وجود ندارد');
-  if (typeof window.html2canvas !== 'function') throw new Error('کتابخانه‌ی عکس بارگذاری نشده است');
-  const host=document.createElement('div');host.className='capture-host';host.dataset.theme=document.documentElement.dataset.theme||'dark';
-  const css=getComputedStyle(document.documentElement);
-  ['bg','bg-2','panel','panel-2','panel-soft','soft','line','line-soft','border','ink','ink-2','muted','brand','brand-soft','violet','violet-soft','good','good-soft','bad','bad-soft','warn','warn-soft'].forEach(key=>host.style.setProperty('--'+key,css.getPropertyValue('--'+key)));
-  const copy=source.cloneNode(true);host.appendChild(copy);
-  const originals=[...source.querySelectorAll('canvas')], canvases=[...copy.querySelectorAll('canvas')];
-  originals.forEach((canvas,index)=>{
-    const image=document.createElement('img');image.src=canvas.toDataURL('image/png');
-    image.style.cssText='width:100%;height:260px;object-fit:contain';canvases[index].replaceWith(image);
+
+const CSS_VARS = ['bg', 'bg-2', 'panel', 'panel-2', 'panel-soft', 'soft', 'line', 'line-soft', 'border',
+  'ink', 'ink-2', 'muted', 'brand', 'brand-soft', 'violet', 'violet-soft', 'good', 'good-soft', 'bad',
+  'bad-soft', 'warn', 'warn-soft'];
+
+function themeBackground() {
+  return getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0b1220';
+}
+
+/* جای canvasها تصویر ثابت می‌گذاریم؛ ابعاد از خود canvas گرفته می‌شود تا
+ * نسبت تصویر با چیزی که کاربر می‌بیند یکی بماند. */
+function freezeCanvases(source, copy) {
+  const originals = [...source.querySelectorAll('canvas')];
+  const copies = [...copy.querySelectorAll('canvas')];
+  originals.forEach((canvas, index) => {
+    const target = copies[index];
+    if (!target) return;
+    let url = '';
+    try { url = canvas.toDataURL('image/png'); } catch (e) { url = ''; }
+    if (!url) return;
+    const rect = canvas.getBoundingClientRect();
+    const image = document.createElement('img');
+    image.src = url;
+    image.style.cssText = 'display:block;max-width:100%;height:auto;' +
+      (rect.width ? `width:${Math.round(rect.width)}px;` : 'width:100%;');
+    target.replaceWith(image);
   });
-  if(prepare)prepare(copy);
+}
+
+/* عنصر کلون‌شده با عرض ثابت، تا چیدمان جدول‌ها دقیقاً مثل صفحه بماند. */
+function buildHost(source, prepare) {
+  const host = document.createElement('div');
+  host.className = 'capture-host';
+  host.dataset.theme = document.documentElement.dataset.theme || 'dark';
+  const css = getComputedStyle(document.documentElement);
+  CSS_VARS.forEach((key) => host.style.setProperty('--' + key, css.getPropertyValue('--' + key)));
+  const copy = source.cloneNode(true);
+  host.appendChild(copy);
+  freezeCanvases(source, copy);
+  if (prepare) prepare(copy);
+  const rect = source.getBoundingClientRect();
+  /* عرض عکس = عرض واقعی کارت‌ها (حداقل ۱۲۰۰ برای خوانایی جدول‌ها)؛ ثابت‌بودن
+   * همین عرض است که از جابه‌جایی ستون‌ها در خروجی جلوگیری می‌کند. */
+  const width = Math.min(1600, Math.max(1200, Math.round(rect.width || source.scrollWidth || 1200)));
+  host.style.width = width + 'px';
+  copy.style.width = width + 'px';
   document.body.appendChild(host);
+  return { host, copy, width };
+}
+
+async function toCanvas(source, prepare) {
+  if (!source || !source.isConnected) throw new Error('پرونده‌ی آماده‌ای برای خروجی وجود ندارد');
+  if (typeof window.html2canvas !== 'function') throw new Error('کتابخانه‌ی عکس بارگذاری نشده است');
+  const { host, width } = buildHost(source, prepare);
   try {
     if (document.fonts && document.fonts.ready) await document.fonts.ready;
-    const width=host.scrollWidth,height=host.scrollHeight;
-    const scale=Math.min(1.5,30000/height,4000/width,Math.sqrt(24000000/(width*height)));
-    if(scale<0.45)UI.toast.info('این بازه سوابق زیادی دارد؛ تصویر کامل طولانی است. برای بررسی ریز مقادیر، خروجی اکسل هم قابل دانلود است.',6000);
-    const canvas=await html2canvas(host,{backgroundColor:getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),scale,useCORS:true,logging:false,width,height,windowWidth:1600,windowHeight:Math.max(1000,height)});
-    const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('ساخت فایل عکس ممکن نشد')),'image/png'));
-    const url=URL.createObjectURL(blob),anchor=document.createElement('a');anchor.href=url;anchor.download=filename.replace(/[\\/:*?"<>|]/g,'-')+'.png';document.body.appendChild(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
-    return { width:canvas.width,height:canvas.height };
-  }finally{host.remove();}
+    const height = Math.max(host.scrollHeight, 200);
+    const scale = Math.max(0.3, Math.min(1.6, 30000 / height, 4000 / width, Math.sqrt(24000000 / (width * height))));
+    if (scale < 0.45) UI.toast.info('این بازه سوابق زیادی دارد؛ تصویر کامل طولانی است. برای بررسی ریز مقادیر، خروجی اکسل هم قابل دانلود است.', 6000);
+    return await html2canvas(host, {
+      backgroundColor: themeBackground(), scale, useCORS: true, logging: false,
+      width, height, windowWidth: width + 80, windowHeight: Math.max(1000, height)
+    });
+  } finally { host.remove(); }
 }
-window.QCCapture={download};
+
+function fileName(name, extension) {
+  return String(name || 'کارنامه').replace(/[\\/:*?"<>|]/g, '-') + '.' + extension;
+}
+
+async function download(source, filename, prepare) {
+  const canvas = await toCanvas(source, prepare);
+  const blob = await new Promise((resolve, reject) => canvas.toBlob((b) => b ? resolve(b) : reject(new Error('ساخت فایل عکس ممکن نشد')), 'image/png'));
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName(filename, 'png');
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+  return { width: canvas.width, height: canvas.height };
+}
+
+/* PDF از همان تصویر ساخته می‌شود: متن فارسی به‌صورت گرافیکی می‌ماند و نیازی
+ * به فونت فارسی داخل jsPDF نیست. تصویر بلند به صفحه‌های A4 بریده می‌شود. */
+async function downloadPdf(source, filename, prepare) {
+  const lib = window.jspdf && (window.jspdf.jsPDF || window.jspdf);
+  if (!lib) throw new Error('کتابخانه‌ی PDF بارگذاری نشده است');
+  const canvas = await toCanvas(source, prepare);
+  const pdf = new lib({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 18;
+  const imageWidth = pageWidth - margin * 2;
+  const ratio = imageWidth / canvas.width;
+  const sliceHeight = Math.max(200, Math.floor((pageHeight - margin * 2) / ratio));
+  const background = themeBackground();
+  let offset = 0, page = 0;
+  while (offset < canvas.height) {
+    const height = Math.min(sliceHeight, canvas.height - offset);
+    const slice = document.createElement('canvas');
+    slice.width = canvas.width;
+    slice.height = height;
+    const context = slice.getContext('2d');
+    context.fillStyle = background;
+    context.fillRect(0, 0, slice.width, slice.height);
+    context.drawImage(canvas, 0, offset, canvas.width, height, 0, 0, canvas.width, height);
+    if (page) pdf.addPage();
+    pdf.addImage(slice.toDataURL('image/jpeg', 0.94), 'JPEG', margin, margin, imageWidth, height * ratio);
+    page++;
+    offset += height;
+  }
+  pdf.save(fileName(filename, 'pdf'));
+  return { pages: page, width: canvas.width, height: canvas.height };
+}
+
+window.QCCapture = { download, downloadPdf, toCanvas };
 })();
 
 </script>
@@ -9951,22 +10253,23 @@ async function render(root, arg) {
       <div class="field"><label>از تاریخ بررسی</label><div class="date-f"><input class="input" id="pFrom" dir="ltr" value="${esc(App.dateRange.from)}"><button class="cal-btn" id="pFromCal" type="button" aria-label="تقویم شروع"><i class="fa-regular fa-calendar"></i></button></div></div>
       <div class="field"><label>تا تاریخ بررسی</label><div class="date-f"><input class="input" id="pTo" dir="ltr" value="${esc(App.dateRange.to)}"><button class="cal-btn" id="pToCal" type="button" aria-label="تقویم پایان"><i class="fa-regular fa-calendar"></i></button></div></div>
       <button class="btn soft" id="pRangeApply">اعمال بازه</button><span class="profile-period" id="pLoadedPeriod"></span>
-      <div class="toolbar-actions"><button class="btn success-soft" id="pXls" disabled><i class="fa-solid fa-file-excel"></i> اکسل</button><button class="btn primary" id="pImage" disabled><i class="fa-solid fa-image"></i> دانلود عکس کامل</button></div></div>
+      <div class="toolbar-actions"><button class="btn success-soft" id="pXls" disabled><i class="fa-solid fa-file-excel"></i> اکسل</button><button class="btn soft" id="pPdf" disabled><i class="fa-solid fa-file-pdf"></i> PDF</button><button class="btn primary" id="pImage" disabled><i class="fa-solid fa-image"></i> تصویر</button></div></div>
       <div class="profile-content" id="pBody"></div>`,{className:'profile-modal',lg:true,onClose(){profileId++;curAgent=null;curData=null;profileBody=null;profileModal=null;historyCalls=[];App.clearCharts();}});
     profileBody=$('#pBody',profileModal);
     const apply=()=>App.setDateRange({from:$('#pFrom').value.trim(),to:$('#pTo').value.trim()});
     $('#pRangeApply').addEventListener('click',apply);
     JCal.attach($('#pFromCal'),{input:$('#pFrom'),onPick:apply});JCal.attach($('#pToCal'),{input:$('#pTo'),onPick:apply});
     $('#pXls').addEventListener('click',exportExcel);
+    $('#pPdf').addEventListener('click',exportPdf);
+    const captureName=()=>`${curData.agent.name} — ${curData.scope.from||'ابتدا'} تا ${curData.scope.to||'انتها'}`;
+    const beforeCapture=()=>{App.charts.forEach(chart=>{if(chart.update)chart.update('none');});};
     $('#pImage').addEventListener('click',async()=>{
       if(!curData || !profileBody)return;
-      const button=$('#pImage'),data=curData,frozenCalls=historyCalls.slice();button.disabled=true;
+      const button=$('#pImage');button.disabled=true;
       try{
-        App.charts.forEach(chart=>{if(chart.update)chart.update('none');});
-        await QCCapture.download(profileBody,`${data.agent.name} — ${data.scope.from||'ابتدا'} تا ${data.scope.to||'انتها'}`,copy=>{
-          frozenCalls.forEach((row,index)=>{const detail=copy.querySelector('#pCallDetails-'+index);if(detail){detail.hidden=false;detail.firstElementChild.innerHTML=callDetail(row,index);}});
-          copy.querySelectorAll('.rating-detail-row').forEach(row=>{row.hidden=false;});
-        });toast.success('عکس کامل پرونده در بازه‌ی نمایش‌داده‌شده آماده شد');
+        beforeCapture();
+        await QCCapture.download(profileBody,captureName(),revealAll);
+        toast.success('عکس کامل پرونده در بازه‌ی نمایش‌داده‌شده آماده شد');
       }catch(e){toast.error(e.message);}finally{if(button.isConnected)button.disabled=!curData;}
     });
   }
@@ -9981,14 +10284,14 @@ async function render(root, arg) {
   async function load(name) {
     const body = profileBody, request = ++profileId;
     if (!body || !body.isConnected) return;
-    curData = null; $('#pXls').disabled = true; $('#pImage').disabled=true;
+    curData = null; $('#pXls').disabled = true; $('#pImage').disabled=true; if($('#pPdf'))$('#pPdf').disabled=true;
     body.innerHTML = `<div class="loading-page"><div class="spinner"></div></div>`;
     const q = periodQ(); q.set('ident', name);
     try {
       const data = await api.get('/api/portfolio?' + q.toString());
       if (request !== profileId || !body.isConnected) return;
       App.clearCharts();
-      curAgent = name; curData = data; $('.modal-head h3',profileModal).textContent='پروفایل عملکرد — '+data.agent.name; $('#pXls').disabled = false;$('#pImage').disabled=false;
+      curAgent = name; curData = data; $('.modal-head h3',profileModal).textContent='پروفایل عملکرد — '+data.agent.name; $('#pXls').disabled = false;$('#pImage').disabled=false;if($('#pPdf'))$('#pPdf').disabled=false;
       const scope=data.scope || {from:App.dateRange.from,to:App.dateRange.to};data.scope=scope;
       $('#pFrom').value=scope.from;$('#pTo').value=scope.to;
       const periodOr=scope.from||scope.to?'از '+fa(scope.from||'ابتدا')+' تا '+fa(scope.to||'انتها'):'همه تاریخ‌ها';
@@ -10002,24 +10305,30 @@ async function render(root, arg) {
   }
 
   /* ------------------------------ رندر ------------------------------ */
+  /* در نسخه‌ی عکس/PDF هیچ جزئیاتی پنهان نماند */
+  const revealAll = (copy) => { copy.querySelectorAll('.call-detail-row,.rating-detail-row,[hidden]').forEach((node) => { node.hidden = false; }); };
+
   const kpi = (icon, label, val, sub, cls) => `
     <div class="kpi ${cls || ''}">
       <div class="kpi-ic"><i class="fa-solid ${icon}"></i></div>
       <div><div class="kpi-val">${val}</div><div class="kpi-lbl">${label}</div>${sub ? `<div style="font-size:11px;color:var(--muted);margin-top:4px">${sub}</div>` : ''}</div>
     </div>`;
 
+  /* سوابق تیکت/سوشال: جزئیات هر ردیف همان‌جا باز است؛ دکمه‌ی اضافه لازم نیست. */
   function ticketTable(rows) {
     if (!rows.length) return emptyState('fa-ticket', 'بدون سوابق تیکت', '');
-    return `<table class="tbl"><thead><tr><th>کد تیکت</th><th>تاریخ بررسی</th><th>نمره</th><th class="no-capture">جزئیات</th></tr></thead>
-      <tbody>${rows.slice().sort((a, b) => (b.id - a.id)).map(r => `<tr>
-        <td>${esc(r.ticketCode)}</td><td dir="ltr">${fa(r.reviewDate)}</td><td>${scorePill(r.score)}</td><td class="no-capture"><button class="btn ghost sm" data-rating-toggle>جزئیات</button></td></tr><tr class="rating-detail-row" hidden><td colspan="4">${ticketDetail(r)}</td></tr>`).join('')}</tbody></table>`;
+    return `<table class="tbl history-tbl"><thead><tr><th>کد تیکت</th><th>تاریخ بررسی</th><th>نمره</th></tr></thead>
+      <tbody>${rows.slice().sort((a, b) => (b.id - a.id)).map(r => `<tr class="history-main">
+        <td>${esc(r.ticketCode)}</td><td dir="ltr">${fa(r.reviewDate)}</td><td>${scorePill(r.score)}</td></tr>
+        <tr class="rating-detail-row"><td colspan="3">${ticketDetail(r)}</td></tr>`).join('')}</tbody></table>`;
   }
   function socialTable(rows) {
     if (!rows.length) return emptyState('fa-comments', 'بدون سوابق سوشال', '');
     const slaTxt = (s) => s.slaStatus === 'رعایت شده' ? '<span class="badge ok">رعایت</span>' : s.slaStatus === 'رعایت نشده' ? '<span class="badge bad">رد شده</span>' : '—';
-    return `<table class="tbl"><thead><tr><th>تاریخ بررسی</th><th>SLA</th><th>نمره</th><th class="no-capture">جزئیات</th></tr></thead>
-      <tbody>${rows.slice().sort((a, b) => (b.id - a.id)).map(r => `<tr>
-        <td dir="ltr">${fa(r.reviewDate)}</td><td>${slaTxt(r)}</td><td>${scorePill(r.score)}</td><td class="no-capture"><button class="btn ghost sm" data-rating-toggle>جزئیات</button></td></tr><tr class="rating-detail-row" hidden><td colspan="4">${socialDetail(r)}</td></tr>`).join('')}</tbody></table>`;
+    return `<table class="tbl history-tbl"><thead><tr><th>تاریخ بررسی</th><th>SLA</th><th>نمره</th></tr></thead>
+      <tbody>${rows.slice().sort((a, b) => (b.id - a.id)).map(r => `<tr class="history-main">
+        <td dir="ltr">${fa(r.reviewDate)}</td><td>${slaTxt(r)}</td><td>${scorePill(r.score)}</td></tr>
+        <tr class="rating-detail-row"><td colspan="3">${socialDetail(r)}</td></tr>`).join('')}</tbody></table>`;
   }
   function ticketDetail(r){return `<div class="detail-row">QC: ${esc(r.qcAgent||'—')} · تاریخ ایجاد: ${fa(r.ticketDate)} · ردلاین: ${QCReports.hasRedline(r,'ticket')?'۱':'-'}<br>
       پیگیری: ${triValue(r.q1)} · یادداشت: ${triValue(r.q2)} · دلیل بستن: ${triValue(r.q3)} · اکشن CRM: ${triValue(r.q4)}<div style="white-space:pre-wrap">${esc(r.comment||'')}</div></div>`;}
@@ -10032,13 +10341,17 @@ async function render(root, arg) {
       const aj = C.parseDate(a.reviewDate), bj = C.parseDate(b.reviewDate);
       return aj && bj ? C.jalaliCmp(bj, aj) : (bj ? 1 : aj ? -1 : 0);
     });
-    return `<table class="tbl" id="pCallHistory"><thead><tr><th>لید</th><th>نمره</th><th>ردلاین</th><th>جزئیات بیشتر</th></tr></thead>
-      <tbody>${historyCalls.map((r, index) => `<tr>
-        <td class="cell-main">${esc(r.leadName || '—')}</td><td>${scorePill(r.score)}</td>
-        <td>${callRedlineBadge(r, index)}</td>
-        <td><button type="button" class="btn ghost sm" data-call-detail="${index}" aria-expanded="false" aria-controls="pCallDetails-${index}">
-          <i class="fa-solid fa-chevron-down"></i> جزئیات بیشتر</button></td></tr>
-        <tr class="call-detail-row" id="pCallDetails-${index}" hidden><td colspan="4"></td></tr>`).join('')}</tbody></table>`;
+    /* هر تماس یک بلوک کامل: سربرگ (لید/نمره/ردلاین) + جدول معیارها، همه باز. */
+    return `<div class="call-log" id="pCallHistory">${historyCalls.map((r, index) => `
+      <div class="call-log-item">
+        <div class="call-log-head">
+          <span class="call-log-lead">${esc(r.leadName || '—')}</span>
+          <span class="call-log-meta" dir="ltr">${esc(fa(r.reviewDate || ''))}</span>
+          <span class="call-log-tags">${FORM_TYPE_FA[r.formType] ? `<span class="tag-team">${esc(FORM_TYPE_FA[r.formType])}</span>` : ''}
+            ${scorePill(r.score)} ${callRedlineBadge(r, index)}</span>
+        </div>
+        <div class="call-log-body" id="pCallDetails-${index}">${callDetail(r, index)}</div>
+      </div>`).join('')}</div>`;
   }
   function callDetail(row, index) {
     const keys = [...new Set(QCReports.criteriaKeys([row], row.formType, QCParse).concat(Object.keys(row.elements||{})))];
@@ -10085,6 +10398,93 @@ async function render(root, arg) {
     }).filter(Boolean).join('');
 
     return `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:14px;margin-bottom:16px">${cards}</div>`;
+  }
+
+  /* ---------- کارنامه: نقاط قوت / ضعف / بهبود ----------
+   * همه‌چیز از همان داده‌ی پرونده و با قاعده‌ی ساده و قابل توضیح ساخته می‌شود:
+   * نرخ موفقیت هر معیار (با حداقل ۳ ریت)، ردلاین، SLA، میانگین نمره‌ها و
+   * روند ماه‌های آخر. هیچ متن دلبخواهی تولید نمی‌شود.
+   */
+  function scorecard(d) {
+    const T = d.tickets, S = d.socials, Ph = d.calls;
+    const bands = UI.scoreBands ? UI.scoreBands() : [90, 75, 60];
+    const criteria = [];
+    (Ph.byTypeRates || []).forEach((bt) => {
+      (bt.rates || []).forEach((r) => {
+        if (!r || r.total < 3 || r.successRate === '' || r.successRate == null) return;
+        criteria.push({ form: bt.form, label: r.label || QCParse.labelOf(bt.form, r.key), rate: r.successRate, ok: r.ok, total: r.total });
+      });
+    });
+    const strong = criteria.filter((c) => c.rate >= 90).sort((a, b) => b.rate - a.rate);
+    const weak = criteria.filter((c) => c.rate < 75).sort((a, b) => a.rate - b.rate);
+    /* اگر معیاری به ۹۰٪ نرسید، بهترین معیارهای بالای ۸۰٪ را به‌عنوان قوت نشان بده */
+    const goodish = criteria.filter((c) => c.rate >= 80 && c.rate < 90).sort((a, b) => b.rate - a.rate).slice(0, 2);
+
+    const all = T.rows.concat(S.rows, Ph.rows);
+    const overall = QCReports.avgScore(all);
+    const monthScores = (d.monthly && d.monthly.calls || []).filter((m) => m.avgScore !== '' && m.count >= 3)
+      .slice(-4).map((m) => ({ month: m.monthFa || m.key, score: m.avgScore }));
+    const trend = monthScores.length >= 2
+      ? monthScores[monthScores.length - 1].score - monthScores[0].score : null;
+
+    const goods = [], bads = [], fixes = [];
+    const add = (list, text) => { if (list.length < 6) list.push(text); };
+
+    /* --- قوت --- */
+    if (overall !== '' && overall >= bands[1]) add(goods, `میانگین کل نمرات ${fa(overall)} از ۱۰۰ — بالاتر از حد انتظار (${fa(bands[1])}).`);
+    strong.slice(0, 4).forEach((c) => add(goods, `«${esc(c.label)}» با ${fa(c.rate)}٪ رعایت در ${fa(c.total)} ریت — نقطه‌ی قوت پایدار.`));
+    if (trend != null && trend >= 5) add(goods, `روند نمره‌ی تماس در ${fa(monthScores.length)} ماه اخیر ${fa(Math.round(trend))} واحد رشد داشته است.`);
+    if (!Ph.redlineCount && Ph.count >= 3) add(goods, `هیچ ردلاینی در ${fa(Ph.count)} ریت تماس ثبت نشده است.`);
+    if (!T.redlineZero && T.count >= 3) add(goods, `تیکت‌ها بدون ردلاین ارزیابی شده‌اند (${fa(T.count)} ریت).`);
+    if (S.slaReal !== '' && S.slaReal >= 85) add(goods, `SLA سوشال ${fa(S.slaReal)}٪ — پاسخ‌گویی به‌موقع.`);
+    if (!goods.length && goodish.length) goodish.forEach((c) => add(goods, `«${esc(c.label)}» با ${fa(c.rate)}٪ رعایت — قابل تقویت تا سطح عالی.`));
+    if (!goods.length && T.avgScore !== '' && T.avgScore >= bands[1]) add(goods, `میانگین نمره‌ی تیکت ${fa(T.avgScore)} — بالاتر از حد انتظار.`);
+    if (!goods.length && S.avgScore !== '' && S.avgScore >= bands[1]) add(goods, `میانگین نمره‌ی سوشال ${fa(S.avgScore)} — بالاتر از حد انتظار.`);
+    if (!goods.length && Ph.avgScore !== '' && Ph.avgScore >= bands[1]) add(goods, `میانگین نمره‌ی تماس ${fa(Ph.avgScore)} — بالاتر از حد انتظار.`);
+    if (!goods.length && S.unanswered === 0 && S.count >= 3) add(goods, `همه‌ی ${fa(S.count)} پیام سوشال پاسخ داده شده‌اند.`);
+    if (!goods.length) add(goods, 'هنوز داده‌ی کافی برای معرفی نقطه‌ی قوت در این بازه نیست؛ بازه را گسترده‌تر کنید.');
+
+    /* --- ضعف --- */
+    weak.slice(0, 4).forEach((c) => add(bads, `«${esc(c.label)}» فقط ${fa(c.rate)}٪ رعایت (${fa(c.ok)} از ${fa(c.total)}) — ضعیف‌ترین معیار این بازه.`));
+    if (Ph.redlineCount) add(bads, `${fa(Ph.redlineCount)} ردلاین در ریت تماس؛ هر ردلاین یعنی نمره‌ی صفر روی همان تماس.`);
+    if (T.redlineZero) add(bads, `${fa(T.redlineZero)} تیکت با ردلاین — نیاز به بازبینی روند بستن و پیگیری.`);
+    if (S.slaReal !== '' && S.slaReal < 75) add(bads, `SLA سوشال ${fa(S.slaReal)}٪ — بخش قابل توجهی از پاسخ‌ها خارج از زمان مجاز.`);
+    if (S.unanswered) add(bads, `${fa(S.unanswered)} سوشال بی‌پاسخ مانده است.`);
+    if (trend != null && trend <= -5) add(bads, `روند نمره‌ی تماس در ماه‌های اخیر ${fa(Math.abs(Math.round(trend)))} واحد افت کرده است.`);
+    if (overall !== '' && overall < bands[2]) add(bads, `میانگین کل ${fa(overall)} پایین‌تر از حد مطلوب (${fa(bands[2])}) است.`);
+    if (!bads.length) add(bads, 'در این بازه ضعف شاخصی دیده نمی‌شود؛ همان معیارهای بالای ۹۰٪ را حفظ کنید.');
+
+    /* --- بهبود --- */
+    weak.slice(0, 3).forEach((c) => add(fixes, `تمرین و بازبینی تماس روی «${esc(c.label)}»؛ هدف: رساندن رعایت به بالای ۸۵٪ در دوره‌ی بعد.`));
+    if (Ph.redlineCount) add(fixes, 'بازخوانی علت هر ردلاین با کارشناس QC و ثبت اقدام اصلاحی برای همان لید.');
+    if (T.redlineZero) add(fixes, 'قبل از بستن تیکت، چک‌لیست پیگیری و دلیل بستن را کامل کنید تا ردلاین تکرار نشود.');
+    if (S.slaReal !== '' && S.slaReal < 85) add(fixes, 'کاهش زمان پاسخ سوشال؛ اولویت با پیام‌های نزدیک به مرز SLA.');
+    if (monthScores.length >= 2 && trend != null && trend < 0) add(fixes, 'بررسی ماهانه‌ی نمره‌ها با تمرکز روی ماه‌های کاهشی و ثبت دلیل افت.');
+    add(fixes, 'هدف دوره‌ی بعد: حفظ معیارهای بالای ۹۰٪ و رساندن ضعیف‌ترین معیار به حداقل ۸۰٪.');
+
+    const grade = overall === '' ? { label: 'بدون نمره', cls: 'gray' }
+      : overall >= bands[0] ? { label: 'عالی', cls: 'ok' }
+        : overall >= bands[1] ? { label: 'خوب', cls: 'info' }
+          : overall >= bands[2] ? { label: 'نیاز به بهبود', cls: 'warn' } : { label: 'ضعیف', cls: 'bad' };
+
+    const col = (icon, title, items, cls) => `
+      <div class="sc-col ${cls}">
+        <div class="sc-col-head"><i class="fa-solid ${icon}"></i><b>${title}</b></div>
+        <ul>${items.map((t) => `<li>${t}</li>`).join('')}</ul>
+      </div>`;
+
+    return `<div class="card scorecard">
+      <div class="card-head"><div class="head-icon"><i class="fa-solid fa-award"></i></div>
+        <div><h3>کارنامه‌ی عملکرد</h3><div class="sub">جمع‌بندی ${fa(T.count + S.count + Ph.count)} ریت — ${fa(criteria.length)} معیار با داده‌ی کافی</div></div>
+        <div class="spacer"></div>
+        <span class="badge ${grade.cls} sc-grade">${grade.label}${overall === '' ? '' : ' · ' + fa(overall)}</span>
+      </div>
+      <div class="sc-grid">
+        ${col('fa-thumbs-up', 'نقاط قوت', goods, 'good')}
+        ${col('fa-triangle-exclamation', 'نقاط ضعف', bads, 'bad')}
+        ${col('fa-lightbulb', 'پیشنهاد بهبود', fixes, 'info')}
+      </div>
+    </div>`;
   }
 
   /* ---------- کارت ردلاین‌های کارشناس با علت ---------- */
@@ -10150,6 +10550,8 @@ async function render(root, arg) {
       <div class="profile-summary"><div class="summary-block"><small>میانگین کل نمرات معتبر</small><strong>${QCReports.avgScore(T.rows.concat(S.rows,Ph.rows))===''?'—':fa(QCReports.avgScore(T.rows.concat(S.rows,Ph.rows)))}</strong></div>
         <div class="summary-block"><small>تعداد کل ریت‌ها</small><strong>${fa(T.count+S.count+Ph.count)}</strong></div><div class="summary-block"><small>ریت‌های نمره‌دار</small><strong>${fa(T.scoredCount+S.scoredCount+Ph.scoredCount)}</strong></div>
         <div class="summary-block"><small>ردلاین‌ها؛ تیکت / سوشال / تماس</small><strong>${fa(T.redlineZero)} / ${fa(S.rows.filter(r=>QCReports.hasRedline(r,'social')).length)} / ${fa(Ph.redlineCount)}</strong></div></div>
+
+      ${scorecard(d)}
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:16px">
         ${kpi('fa-ticket', 'ارزیابی تیکت', `${fa(T.count)}`,
           T.avgScore === '' ? '' : `میانگین ${scorePill(T.avgScore)}`, T.redlineZero > 0 ? 'warn' : '')}
@@ -10168,22 +10570,25 @@ async function render(root, arg) {
       <div class="card" style="margin-bottom:16px">
         <div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-chart-line"></i></div>
           <div><h3>روند ماهانه نمره‌ها</h3><div class="sub">میانگین هر ماه شمسی به تفکیک منبع</div></div></div>
-        <div class="chart-box" style="height:260px"><canvas id="pmChart"></canvas></div>
+        <div class="chart-box" style="height:190px"><canvas id="pmChart"></canvas></div>
       </div>` : ''}
 
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">
-        <div class="card">
-          <div class="card-head"><div class="head-icon"><i class="fa-solid fa-ticket"></i></div><div><h3>سوابق تیکت (${fa(T.count)})</h3></div></div>
-          <div class="table-wrap" style="max-height:340px;overflow-y:auto">${ticketTable(T.rows)}</div>
+      <div class="history-stack">
+        <div class="card full-row">
+          <div class="card-head"><div class="head-icon"><i class="fa-solid fa-ticket"></i></div>
+            <div><h3>سوابق تیکت (${fa(T.count)})</h3><div class="sub">جزئیات هر ریت همان‌جا باز است</div></div></div>
+          <div class="table-wrap history-wrap">${ticketTable(T.rows)}</div>
         </div>
-        <div class="card">
-          <div class="card-head teal"><div class="head-icon"><i class="fa-solid fa-comments"></i></div><div><h3>سوابق سوشال (${fa(S.count)})</h3></div></div>
-          <div class="table-wrap" style="max-height:340px;overflow-y:auto">${socialTable(S.rows)}</div>
+        <div class="card full-row">
+          <div class="card-head teal"><div class="head-icon"><i class="fa-solid fa-comments"></i></div>
+            <div><h3>سوابق سوشال (${fa(S.count)})</h3><div class="sub">SLA، زمان پاسخ و جزئیات هر بررسی</div></div></div>
+          <div class="table-wrap history-wrap">${socialTable(S.rows)}</div>
         </div>
-        <div class="card" style="grid-column:1/-1;min-width:0">
-          <div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-headset"></i></div><div><h3>سوابق ریت تماس (${fa(Ph.count)})</h3></div></div>
-          <div class="card-pad" style="border-bottom:1px solid var(--border);padding:9px 14px;font-size:12px">${typeRows}</div>
-          <div class="table-wrap" style="max-height:340px;overflow-y:auto">${callTable(Ph.rows)}</div>
+        <div class="card full-row">
+          <div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-headset"></i></div>
+            <div><h3>سوابق ریت تماس (${fa(Ph.count)})</h3><div class="sub">همه‌ی تماس‌ها با معیارهای همان فرم، بدون باز کردن جداگانه</div></div></div>
+          <div class="card-pad history-types">${typeRows}</div>
+          <div class="table-wrap history-wrap">${callTable(Ph.rows)}</div>
         </div>
       </div>
 
@@ -10210,17 +10615,6 @@ async function render(root, arg) {
 
     body.insertAdjacentHTML('beforeend', `<div class="profile-image-note">گزارش عملکرد ${esc(a.name)} · ${esc(periodLabel)}<br>مبنا: تاریخ بررسی هر ریت. نمره‌ی خالی صفر نیست؛ میانگین بر نمره‌های معتبر وزن‌دار است. 1 = رعایت، 0 = عدم رعایت، - = موضوعیت نداشته و خارج از مخرج نرخ؛ — = ثبت‌نشده. اقدام‌ها جدا از بازه‌ی ارزیابی‌اند.</div>`);
     bindCallRedlines($('#pCallHistory', body) || body, historyCalls);
-    $$('[data-call-detail]', body).forEach((button) => button.addEventListener('click', () => {
-      const index = Number(button.dataset.callDetail), detail = $('#pCallDetails-' + index, body);
-      const expanded = button.getAttribute('aria-expanded') === 'true';
-      button.setAttribute('aria-expanded', String(!expanded)); detail.hidden = expanded;
-      if (!expanded && !detail.firstElementChild.innerHTML) {
-        detail.firstElementChild.innerHTML = callDetail(historyCalls[index], index);
-        bindCallRedlines(detail, historyCalls);
-      }
-    }));
-
-    $$('[data-rating-toggle]',body).forEach(button=>button.addEventListener('click',()=>{const row=button.closest('tr').nextElementSibling;row.hidden=!row.hidden;}));
     if (d.actions.length || true) {
       const wrap = $('#pActionsWrap');
       $('#pAddAction').addEventListener('click', () => {
@@ -10309,6 +10703,27 @@ async function render(root, arg) {
     window.QCExport.sheets(`${a.name} — پرونده`, [
       { name: 'تیکت', rows: rowsT }, { name: 'سوشال', rows: rowsS }, ...callSheets
     ]);
+  }
+
+  /* ------------------------------ PDF ------------------------------
+   * PDF از همان تصویر کامل پرونده ساخته می‌شود تا متن فارسی درست بماند؛
+   * تصویر بلند به صفحه‌های A4 بریده می‌شود.
+   */
+  async function exportPdf() {
+    if (!curData || !profileBody) return;
+    const button = $('#pPdf');
+    if (button) { button.disabled = true; button.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> ساخت PDF…'; }
+    const label = button ? button.innerHTML : '';
+    try {
+      App.charts.forEach((chart) => { if (chart.update) chart.update('none'); });
+      const name = `${curData.agent.name} — کارنامه ${curData.scope.from || 'ابتدا'} تا ${curData.scope.to || 'انتها'}`;
+      const out = await QCCapture.downloadPdf(profileBody, name, revealAll);
+      toast.success(`فایل PDF آماده شد (${fa(out.pages)} صفحه)`);
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      if (button && button.isConnected) { button.disabled = !curData; button.innerHTML = label; }
+    }
   }
 
   App.onDateRangeChange(refresh);
@@ -10859,7 +11274,6 @@ async function render(root) {
       if (request !== loadId || !body.isConnected) return;
       App.clearCharts();
       renderAnalysis(an);
-      drawCharts(an);
       lastAnalysis = an;
     } catch (e) {
       if (request !== loadId || !body.isConnected) return;
@@ -10884,40 +11298,8 @@ async function render(root) {
       ${kpi('fa-headphones', 'دارای زمان شنود', fa(k.listeningCalls || 0), '#f472b6')}
     </div>`;
 
-    /* نمودارها */
-    const chartsRow = F.team ? `
-    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(360px,1fr));margin-bottom:16px">
-      <div class="card"><div class="card-head"><div class="head-icon"><i class="fa-solid fa-chart-area"></i></div><div><h3>روند ماهانه</h3><div class="sub">میانگین نمره و تعداد ریت در هر ماه</div></div></div>
-        <div class="ch-box" style="height:240px"><canvas id="chMonthly"></canvas></div></div>
-      <div class="card"><div class="card-head"><div class="head-icon"><i class="fa-solid fa-chart-column"></i></div><div><h3 id="chElTitle">نرخ موفقیت معیارها</h3><div class="sub">درصد رعایت هر معیار در تماس‌های ارزیابی‌شده</div></div></div>
-        <div class="ch-box" style="height:240px"><canvas id="chElements"></canvas></div></div>
-    </div>` : '';
-
-    /* جدول معیارها — با تگ نوع فرم که انتخاب شده */
-    let ratesSection = '';
+    /* جدول‌های ستون افقی (هیت‌مپ) — تنها نمای معیارها */
     const forms = form ? [form] : ['tele', 'account', 'mlm'];
-    for (const ft of forms) {
-      const rates = (an.elementRates && an.elementRates[ft]) || [];
-      const ratesWithData = rates.filter((r) => r.total > 0);
-      if (!ratesWithData.length) continue;
-      const sorted = ratesWithData.slice().sort((a, b) => (a.successRate === '' ? 101 : a.successRate) - (b.successRate === '' ? 101 : b.successRate));
-      ratesSection += `
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-head"><div class="head-icon"><i class="fa-solid fa-list-check"></i></div>
-          <div><h3>نرخ موفقیت معیارها — ${FORM_FA[ft]}</h3>
-          <div class="sub">مرتب‌شده از ضعیف‌ترین؛ هر ردیف = درصد رعایت آن معیار در ${fa(sorted.length)} تست</div></div></div>
-        <div class="card-pad" style="display:flex;flex-direction:column;gap:9px">
-          ${sorted.map((r) => `
-            <div style="display:flex;align-items:center;gap:10px">
-              <div style="flex:0 0 280px;font-size:12px">${esc(r.label)} <span style="color:var(--muted);font-size:10px">(${fa(r.ok)}/${fa(r.total)})</span></div>
-              <div style="flex:1;height:8px;background:rgba(148,163,184,.12);border-radius:999px;overflow:hidden">
-                <div style="width:${r.successRate === '' ? 0 : r.successRate}%;height:100%;border-radius:999px;background:${scoreColorHex(r.successRate === '' ? -1 : r.successRate)}"></div>
-              </div>
-              <div style="flex:0 0 54px;text-align:center;font-weight:600">${r.successRate === '' ? '—' : fa(r.successRate) + '٪'}</div>
-            </div>`).join('')}
-        </div>
-      </div>`;
-    }
 
     /* هیت‌مپ خطا */
     let heatSection = '';
@@ -11003,7 +11385,7 @@ async function render(root) {
         </div>
       </div>`;
 
-    body.innerHTML = kpiRow + chartsRow + ratesSection + heatSection + leaderSection + redlineSection + commentSection;
+    body.innerHTML = kpiRow + heatSection + leaderSection + redlineSection + commentSection;
     body.style.display = 'flex';
     body.style.flexDirection = 'column';
     body.style.gap = '0';
@@ -11018,92 +11400,65 @@ async function render(root) {
     });
   }
 
-  function drawCharts(an) {
-    if (!F.team) return; // دو نمودار ابتدایی در حالت «همه تیم‌ها» حذف شده‌اند.
-    /* روند ماهانه */
-    const monthly = an.monthly || [];
-    const labels = monthly.map((m) => m.month.replace('1405/', '').replace(/^1404/, '04/').replace(/^0*/, '') + ' ماه');
-    const c1 = $('#chMonthly');
-    if (c1 && monthly.length) {
-      App.chart(c1, {
-        type: 'line',
-        data: {
-          labels: monthly.map((m) => m.month),
-          datasets: [
-            { label: 'میانگین نمره', data: monthly.map((m) => m.avgScore === '' ? null : m.avgScore), borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,.12)', fill: true, tension: 0.35, yAxisID: 'y' },
-            { label: 'تعداد ریت', data: monthly.map((m) => m.count), borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,.1)', fill: true, tension: 0.35, yAxisID: 'y1' }
-          ]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: true, rtl: true }, tooltip: { rtl: true } },
-          scales: {
-            y: { min: 0, max: 100, position: 'right', grid: { color: 'rgba(34,48,79,.5)' } },
-            y1: { min: 0, position: 'left', grid: { drawOnChartArea: false } }
-          }
-        }
-      });
-    } else if (c1) {
-      c1.parentElement.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px 0">دیتای ماهانه در این بازه نیست</div>';
-    }
-    /* نمودار ستونی معیارها — فرم جاری */
-    const curF = F.form || 'mlm';
-    const ratesAll = (an.elementRates && an.elementRates[curF]) || [];
-    const withD = ratesAll.filter((r) => r.total > 0);
-    const c2 = $('#chElements');
-    const title = $('#chElTitle');
-    if (title) title.textContent = 'نرخ موفقیت معیارها — ' + (FORM_FA[curF] || curF);
-    if (c2 && withD.length) {
-      const scoreColor = scoreColorRgba;
-      App.chart(c2, {
-        type: 'bar',
-        data: {
-          labels: withD.map((r) => r.label),
-          datasets: [{ data: withD.map((r) => r.successRate), backgroundColor: withD.map((r) => scoreColor(r.successRate)), borderRadius: 6, borderSkipped: false }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ' رعایت: ' + fa(c.parsed.y) + '٪' }, rtl: true } },
-          scales: { y: { min: 0, max: 100, grid: { color: 'rgba(34,48,79,.5)' } }, x: { grid: { display: false }, ticks: { maxRotation: 65, font: { size: 10 } } } }
-        }
-      });
-    } else if (c2) {
-      c2.parentElement.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px 0">دیتای معیار برای این فرم نیست</div>';
-    }
+  /* خروجی اکسل تحلیل — ۵ شیت
+   * داده‌ی صفحه سبک است (بدون تفکیک معیار و ماهانه)؛ فقط هنگام گرفتن اکسل
+   * یک‌بار نسخه‌ی کامل (`full=1`) گرفته می‌شود تا تحلیل روزمره کند نشود. */
+  let fullCache = { key: '', data: null };
+  async function fullAnalysis() {
+    const p = new URLSearchParams();
+    if (F.form) p.set('form', F.form);
+    if (F.team) p.set('team', F.team);
+    const av = msAgents.getValues(); if (av.length) p.set('agent', av.join(','));
+    p.set('full', '1');
+    const key = p.toString();
+    if (fullCache.key === key && fullCache.data) return fullCache.data;
+    const data = await api.get('/api/calls/analysis?' + key);
+    fullCache = { key, data };
+    return data;
   }
 
-  /* خروجی اکسل تحلیل — ۵ شیت */
-  $('#btnXls').addEventListener('click', () => {
-    const an = lastAnalysis;
-    if (!an) return toast.info('ابتدا تحلیل بارگذاری شود');
-    const sheets = [];
-    sheets.push({ name: 'رتبه‌بندی', rows: [
-      ['کارشناس', 'تیم', 'تعداد ریت', 'میانگین نمره', 'ردلاین'],
-      ...(an.leaderboard || []).map((x) => [x.name, x.team, x.count, x.avgScore === '' ? '' : x.avgScore, x.redlines])
-    ]});
-    for (const ft of ['tele', 'account', 'mlm']) {
-      const fa = FORM_FA[ft];
-      const rates = (an.elementRates && an.elementRates[ft]) || [];
-      if (!rates.filter((r) => r.total > 0).length) continue;
-      sheets.push({ name: fa + ' - معیارها', rows: [
-        ['معیار', 'کلید', 'رعایت شده', 'رعایت نشده', 'نرخ موفقیت٪'],
-        ...rates.filter((r) => r.total > 0).map((r) => [r.label, r.key, r.ok, r.bad, r.successRate === '' ? '' : r.successRate])
+  $('#btnXls').addEventListener('click', async (e) => {
+    const base = lastAnalysis;
+    if (!base) return toast.info('ابتدا تحلیل بارگذاری شود');
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    const label = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> آماده‌سازی…';
+    try {
+      let an = base;
+      try { an = await fullAnalysis(); } catch (err) { an = base; }
+      const sheets = [];
+      sheets.push({ name: 'رتبه‌بندی', rows: [
+        ['کارشناس', 'تیم', 'تعداد ریت', 'میانگین نمره', 'ردلاین'],
+        ...(an.leaderboard || []).map((x) => [x.name, x.team, x.count, x.avgScore === '' ? '' : x.avgScore, x.redlines])
       ]});
+      for (const ft of ['tele', 'account', 'mlm']) {
+        const formLabel = FORM_FA[ft];
+        const rates = (an.elementRates && an.elementRates[ft]) || [];
+        if (!rates.filter((r) => r.total > 0).length) continue;
+        sheets.push({ name: formLabel + ' - معیارها', rows: [
+          ['معیار', 'کلید', 'رعایت شده', 'رعایت نشده', 'نرخ موفقیت٪'],
+          ...rates.filter((r) => r.total > 0).map((r) => [r.label, r.key, r.ok, r.bad, r.successRate === '' ? '' : r.successRate])
+        ]});
+      }
+      sheets.push({ name: 'ردلاین‌ها', rows: [
+        ['کارشناس', 'تیم', 'نمره', 'علت', 'لید', 'تلفن لید', 'تاریخ', 'فایل'],
+        ...(an.redlines || []).map((r) => [r.expertName, r.formType, r.score, r.reason, r.leadName, r.leadPhone, r.date, r.sourceFile || ''])
+      ]});
+      sheets.push({ name: 'کامنت‌های QC', rows: [
+        ['کارشناس', 'تیم', 'نمره', 'کامنت', 'لید', 'تلفن لید', 'تاریخ'],
+        ...(an.comments || []).map((r) => [r.expertName, r.formType, r.score, r.comment, r.leadName, r.leadPhone, r.date])
+      ]});
+      sheets.push({ name: 'ماهانه', rows: [
+        ['ماه', 'تعداد ریت', 'میانگین', 'ردلاین'],
+        ...(an.monthly || []).map((m) => [m.month, m.count, m.avgScore === '' ? '' : m.avgScore, m.redlines])
+      ]});
+      window.QCExport.sheets('تحلیل ریت تماس', sheets);
+      toast.success('فایل اکسل تحلیل دانلود شد (' + fa(sheets.length) + ' شیت)');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = label;
     }
-    sheets.push({ name: 'ردلاین‌ها', rows: [
-      ['کارشناس', 'تیم', 'نمره', 'علت', 'لید', 'تلفن لید', 'تاریخ', 'فایل'],
-      ...(an.redlines || []).map((r) => [r.expertName, r.formType, r.score, r.reason, r.leadName, r.leadPhone, r.date, r.sourceFile || ''])
-    ]});
-    sheets.push({ name: 'کامنت‌های QC', rows: [
-      ['کارشناس', 'تیم', 'نمره', 'کامنت', 'لید', 'تلفن لید', 'تاریخ'],
-      ...(an.comments || []).map((r) => [r.expertName, r.formType, r.score, r.comment, r.leadName, r.leadPhone, r.date])
-    ]});
-    sheets.push({ name: 'ماهانه', rows: [
-      ['ماه', 'تعداد ریت', 'میانگین', 'ردلاین'],
-      ...(an.monthly || []).map((m) => [m.month, m.count, m.avgScore === '' ? '' : m.avgScore, m.redlines])
-    ]});
-    window.QCExport.sheets('تحلیل ریت تماس', sheets);
-    toast.success('فایل اکسل تحلیل دانلود شد (' + fa(sheets.length) + ' شیت)');
   });
 
   App.onDateRangeChange(load);
@@ -11141,9 +11496,9 @@ function rangeSource() {
 }
 
 function render(root) {
-  const src = rangeSource();
-  if (STANDALONE) return renderLauncher(root, src);
+  if (STANDALONE) return renderStandalone(root);
 
+  const src = rangeSource();
   root.innerHTML = `
     <div class="page-head">
       <div class="ph-ic"><i class="fa-solid fa-phone"></i></div>
@@ -11173,53 +11528,162 @@ function render(root) {
   $('#crReload').addEventListener('click', () => { frame.src = rangeSource(); });
 }
 
-/* حالت Apps Script: لانچر به‌جای فریم تو‌در‌تو */
-function renderLauncher(root, src) {
+/* ---------------------------------------------------------------------------
+ * نسخه‌ی Apps Script: ابزار را از خودِ سامانه می‌گیریم و داخل یک iframe محلی
+ * (srcdoc) نشان می‌دهیم. باز کردن آدرس وب‌اپ در تب جدید در بعضی استقرارها به
+ * «Sorry, unable to open the file at this time» می‌خورد؛ این مسیر به آن وابسته نیست.
+ * ------------------------------------------------------------------------- */
+let reportHtmlCache = null;   // HTML ابزار (یک‌بار در هر بارگذاری صفحه)
+let reportHtmlPending = false;
+let reportTarget = null;      // آخرین #crWrap زنده؛ رندر مجدد مسیر آن را عوض می‌کند
+
+function renderStandalone(root) {
+  const params = new URLSearchParams();
+  if (App.dateRange.from) params.set('qcFrom', App.dateRange.from);
+  if (App.dateRange.to) params.set('qcTo', App.dateRange.to);
+  params.set('qcTheme', App.theme === 'light' ? 'light' : 'dark');
+
   root.innerHTML = `
     <div class="page-head">
       <div class="ph-ic"><i class="fa-solid fa-phone"></i></div>
       <div>
         <h2>گزارش تماس</h2>
-        <p>ابزار مستقل گزارش روزانه‌ی تماس تیم‌ها / شرکای بیمه بازار</p>
+        <p>ابزار روزانه‌ی تماس تیم‌ها — داخل خود سامانه باز می‌شود؛ بازه‌ی تاریخ و حالت رنگ همراه آن می‌آیند.</p>
       </div>
+      <div class="spacer"></div>
+      <button class="btn ghost" id="crReload"><i class="fa-solid fa-rotate"></i> تازه‌سازی</button>
+      <a class="btn soft" id="crNewTab" href="${esc(rangeSource())}" target="_blank" rel="noopener" title="اگر در تب جدید باز نشد، همین صفحه را استفاده کنید">
+        <i class="fa-solid fa-up-right-from-square"></i> تب جدید</a>
     </div>
-
-    <div class="card">
-      <div class="card-head brand">
-        <div class="head-icon"><i class="fa-solid fa-up-right-from-square"></i></div>
-        <div><h3>باز کردن ابزار گزارش تماس</h3>
-          <div class="sub">در نسخه‌ی گوگل‌شیت این ابزار در صفحه‌ی خودش باز می‌شود — بازه‌ی تاریخ و حالت رنگ همراهش منتقل می‌شود</div></div>
+    <div class="card cr-frame-card">
+      <div class="cr-embed-bar">
+        <span class="cr-embed-state" id="crEmbedState"><i class="fa-solid fa-circle-notch spin"></i> در حال آماده‌سازی ابزار…</span>
+        <div class="spacer"></div>
+        <span class="cr-embed-hint">بازه‌ی فعلی: <b id="crRange">${esc(App.dateRangeLabel())}</b></span>
       </div>
-      <div class="card-pad cr-launch">
-        <div class="cr-launch-actions">
-          <a class="btn primary lg" id="crOpenTab" href="${esc(src)}" target="_blank" rel="noopener">
-            <i class="fa-solid fa-arrow-up-right-from-square"></i> باز کردن گزارش تماس (تب جدید)</a>
-          <a class="btn soft lg" id="crOpenTop" href="${esc(src)}" target="_top" rel="noopener">
-            <i class="fa-solid fa-window-restore"></i> باز کردن در همین صفحه</a>
-        </div>
-        <div class="cr-launch-info">
-          <div class="note"><i class="fa-solid fa-circle-info"></i>
-            بازه‌ی فعلی سامانه (<b id="crRange">${esc(App.dateRangeLabel())}</b>) و حالت
-            <b>${esc(App.theme === 'dark' ? 'تاریک' : 'روشن')}</b> به‌صورت خودکار به ابزار گزارش تماس منتقل می‌شود.</div>
-          <div class="note warn"><i class="fa-solid fa-shield-halved"></i>
-            گوگل اجازه نمی‌دهد یک وب‌اپ داخل فریمِ همان وب‌اپ باز شود (خطای <code>refused to connect</code>)؛
-            به همین دلیل این ابزار در صفحه‌ی مستقل باز می‌شود و داخل خودش دکمه‌ی «بازگشت به سامانه» دارد.</div>
-          <div class="note"><i class="fa-solid fa-database"></i>
-            داده‌ی این ابزار در تب‌های <code>Call_Report_Experts</code> و <code>Call_Report_Access</code> شیت ذخیره می‌شود،
-            پس روی هر دستگاهی که وارد شوید همان فهرست کارشناسان و دسترسی‌ها را می‌بینید.</div>
-        </div>
+      <div id="crWrap" class="cr-embed-wrap">
+        <div class="loading-page"><div class="spinner"></div></div>
       </div>
     </div>`;
 
+  const wrap = $('#crWrap', root);
+  reportTarget = wrap;
+  let frame = null;
+
+  function setState(html, cls) {
+    const el = $('#crEmbedState', root);
+    if (!el) return;
+    el.className = 'cr-embed-state' + (cls ? ' ' + cls : '');
+    el.innerHTML = html;
+  }
+
+  function bridgeScript() {
+    /* google.script.run داخل srcdoc وجود ندارد؛ ذخیره‌ی تنظیمات به والد پاس داده می‌شود. */
+    return `<script>
+(function () {
+  if (window.google && window.google.script && google.script.run) return;
+  window.google = window.google || {};
+  window.google.script = window.google.script || {};
+  var run = function () {
+    var api = { _ok: null, _fail: null };
+    api.withSuccessHandler = function (fn) { api._ok = fn; return api; };
+    api.withFailureHandler = function (fn) { api._fail = fn; return api; };
+    api.saveCallReportSetting = function (key, value) {
+      try { window.parent.postMessage({ type: 'qc:callreport-save', key: key, value: value }, '*'); } catch (e) {}
+      if (api._ok) setTimeout(function () { api._ok({}); }, 0);
+      return api;
+    };
+    return api;
+  };
+  window.google.script.run = run();
+})();
+<\/script>`;
+  }
+
+  function paint(html) {
+    const target = reportTarget && reportTarget.isConnected ? reportTarget : wrap;
+    if (!target || !target.isConnected) return;
+    const doc = String(html || '');
+    const withParams = `<script>window.__QC_CALL_REPORT_PARAMS__ = ${JSON.stringify('?' + params.toString())};<\/script>`;
+    const full = doc.indexOf('<head>') >= 0
+      ? doc.replace('<head>', '<head>' + bridgeScript() + withParams)
+      : bridgeScript() + withParams + doc;
+    frame = document.createElement('iframe');
+    frame.className = 'cr-embed-frame';
+    frame.title = 'گزارش تماس روزانه تیم‌ها';
+    frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-downloads');
+    frame.addEventListener('load', () => {
+      setState('<i class="fa-solid fa-circle-check"></i> ابزار آماده است', 'ok');
+      try {
+        frame.contentWindow.postMessage({ type: 'crmqc:theme', theme: App.theme }, '*');
+        frame.contentWindow.postMessage({ type: 'crmqc:date-range', range: App.dateRange }, '*');
+      } catch (e) { /* بی‌اثر */ }
+    });
+    target.innerHTML = '';
+    target.appendChild(frame);
+    frame.srcdoc = full;
+  }
+
+  function fallback(message) {
+    const target = reportTarget && reportTarget.isConnected ? reportTarget : wrap;
+    if (!target || !target.isConnected) return;
+    setState('<i class="fa-solid fa-triangle-exclamation"></i> باز نشد', 'bad');
+    target.innerHTML = `<div class="card-pad cr-embed-fallback">
+      <div class="note bad"><i class="fa-solid fa-circle-exclamation"></i> ${esc(message || 'بارگذاری ابزار ممکن نشد')}</div>
+      <p>اگر باز کردن در تب جدید هم پیام <b>Sorry, unable to open the file at this time</b> داد، یعنی استقرار
+        (Deploy) وب‌اپ برای همین حساب در دسترس نیست. یک‌بار از Apps Script گزینه‌ی
+        <b>Deploy → New deployment → Web app</b> را با دسترسی مناسب بسازید و دوباره تلاش کنید.</p>
+      <button class="btn primary" id="crRetry"><i class="fa-solid fa-rotate-right"></i> تلاش دوباره</button>
+    </div>`;
+    const retry = $('#crRetry', target);
+    if (retry) retry.addEventListener('click', () => load(true));
+  }
+
+  function load(force) {
+    if (!(window.google && google.script && google.script.run)) { fallback('اتصال به Apps Script برقرار نیست'); return; }
+    if (!force && reportHtmlCache) { paint(reportHtmlCache); return; }
+    if (!force && reportHtmlPending) return; // پاسخ در راه است؛ همان را می‌کشیم
+    reportHtmlPending = true;
+    const target = reportTarget;
+    target.innerHTML = '<div class="loading-page"><div class="spinner"></div></div>';
+    setState('<i class="fa-solid fa-circle-notch spin"></i> در حال آماده‌سازی ابزار…');
+    google.script.run
+      .withSuccessHandler((html) => {
+        reportHtmlPending = false;
+        if (!html) { fallback('نسخه‌ی مستقر، تابع گزارش تماس را ندارد؛ Code.gs جدید را جای‌گذاری کنید'); return; }
+        reportHtmlCache = html;
+        try { paint(html); } catch (e) { fallback(e.message); }
+      })
+      .withFailureHandler((error) => { reportHtmlPending = false; fallback(error && error.message); })
+      .getCallReportHtml();
+  }
+
+  /* ذخیره‌ی تنظیمات ابزار (کارشناسان/دسترسی‌ها) از داخل iframe به شیت */
+  const onMessage = (event) => {
+    /* صفحه که عوض شود، گوش‌دهنده خودش بازنشسته می‌شود */
+    if (!root.isConnected) { window.removeEventListener('message', onMessage); return; }
+    const data = event.data || {};
+    if (data.type !== 'qc:callreport-save') return;
+    if (!(window.google && google.script && google.script.run)) return;
+    google.script.run
+      .withFailureHandler(() => UI.toast('ذخیره تنظیمات گزارش تماس در شیت ناموفق بود', 'error'))
+      .saveCallReportSetting(data.key, data.value);
+  };
+
   const refresh = () => {
-    const next = rangeSource();
-    $('#crOpenTab', root).href = next;
-    const top = $('#crOpenTop', root);
-    if (top) top.href = next;
     const label = $('#crRange', root);
     if (label) label.textContent = App.dateRangeLabel();
+    const link = $('#crNewTab', root);
+    if (link) link.href = rangeSource();
+    params.set('qcTheme', App.theme);
+    if (App.dateRange.from) params.set('qcFrom', App.dateRange.from); else params.delete('qcFrom');
+    if (App.dateRange.to) params.set('qcTo', App.dateRange.to); else params.delete('qcTo');
+    try { if (frame && frame.contentWindow) frame.contentWindow.postMessage({ type: 'crmqc:date-range', range: App.dateRange }, '*'); } catch (e) {}
   };
   App.onDateRangeChange(refresh);
+  window.addEventListener('message', onMessage);
+  $('#crReload', root).addEventListener('click', () => load(true));
+  load();
 }
 
 App.register('callreport', { title: 'گزارش تماس', render });
@@ -11310,21 +11774,26 @@ async function render(root) {
       </div>
 
       <!-- ماه‌های مالی (بند ۲) -->
-      <div class="card">
+      <div class="card fm-card">
         <div class="card-head brand"><div class="head-icon"><i class="fa-solid fa-calendar-days"></i></div>
-          <div><h3>ماه‌های مالی</h3><div class="sub">بازه‌های آماده‌ی فیلتر تاریخ بالا — از چندم تا چندم و نام ماه مالی</div></div></div>
+          <div><h3>ماه‌های مالی</h3><div class="sub">بازه‌های آماده‌ی فیلتر تاریخ بالا — نام دوره و بازه‌ی شروع/پایان (جلالی)</div></div>
+          <div class="spacer"></div>
+          <label class="fm-year">سال مالی
+            <input class="input" id="fmYear" dir="ltr" inputmode="numeric" placeholder="1405"></label>
+        </div>
         <div class="card-pad">
-          <div class="table-scroll" style="max-height:290px">
+          <div class="table-scroll fm-scroll">
             <table class="tbl fm-tbl">
               <thead><tr><th>نام ماه مالی</th><th>از تاریخ</th><th>تا تاریخ</th><th>یادداشت</th><th></th></tr></thead>
               <tbody id="fmBody"></tbody>
             </table>
           </div>
+          <div class="fm-summary" id="fmSummary"></div>
           <div class="fm-actions">
-            <button class="btn soft sm" id="fmAdd"><i class="fa-solid fa-plus"></i> افزودن ماه مالی</button>
-            <button class="btn ghost sm" id="fmAuto"><i class="fa-solid fa-wand-magic-sparkles"></i> ساخت خودکار ۱۲ ماه</button>
+            <button class="btn soft" id="fmAdd"><i class="fa-solid fa-plus"></i> افزودن ماه مالی</button>
+            <button class="btn ghost" id="fmAuto"><i class="fa-solid fa-wand-magic-sparkles"></i> ساخت ۱۲ ماه سال</button>
             <div class="spacer"></div>
-            <button class="btn primary sm" id="fmSave"><i class="fa-solid fa-floppy-disk"></i> ذخیره ماه‌های مالی</button>
+            <button class="btn primary" id="fmSave"><i class="fa-solid fa-floppy-disk"></i> ذخیره ماه‌های مالی</button>
           </div>
           <div class="note" style="margin:12px 0 0"><i class="fa-solid fa-table"></i>
             همین جدول در تب <code>Fiscal_Months</code> گوگل‌شیت هم نوشته می‌شود؛ می‌توانید تاریخ‌ها را مستقیم روی شیت بنویسید یا ویرایش کنید و سامانه در خواندن بعدی آن‌ها را به «بازه آماده» تبدیل می‌کند.</div>
@@ -11434,66 +11903,173 @@ async function render(root) {
   /* ------------------------------------------------------ ماه‌های مالی */
   let fiscal = (App.fiscalMonths || []).map((m) => Object.assign({}, m));
   const fmBody = $('#fmBody');
+  const fmYear = $('#fmYear');
+  const todayJ = C.todayJalali();
+  if (fmYear) fmYear.value = String(todayJ.jy);
+
+  /* یک عدد معتبر جلالی برای شروع/پایان دوره؛ فرمت‌های رایج هم پذیرفته می‌شوند. */
+  function normDate(value) {
+    const d = C.parseDate(String(value || '').trim());
+    return d ? C.formatJalali(d) : '';
+  }
+  /* کلید عددی مرتب‌سازی تاریخ جلالی (بدون پرتاب خطا روی تاریخ خالی) */
+  function dateKey(value) {
+    const d = C.parseDate(normDate(value));
+    return d ? d.jy * 10000 + d.jm * 100 + d.jd : 0;
+  }
+  function daysOf(m) {
+    const from = C.parseDate(m.from), to = C.parseDate(m.to);
+    if (!from || !to) return 0;
+    const g1 = C.toGregorian(from.jy, from.jm, from.jd);
+    const g2 = C.toGregorian(to.jy, to.jm, to.jd);
+    if (!g1 || !g2) return 0;
+    const ms = Date.UTC(g2.gy, g2.gm - 1, g2.gd) - Date.UTC(g1.gy, g1.gm - 1, g1.gd);
+    return Math.round(ms / 86400000) + 1;
+  }
+
+  /* اعتبارسنجی مشترک: هم برای ذخیره، هم برای نشان دادن خطا زیر جدول */
+  function validateFiscal(rows) {
+    const errors = [];
+    const names = new Set();
+    rows.forEach((m, i) => {
+      const tag = m.name ? '«' + m.name + '»' : 'ردیف ' + fa(i + 1);
+      const from = normDate(m.from), to = normDate(m.to);
+      m.from = from || m.from; m.to = to || m.to;
+      if (!m.name) errors.push({ i, text: 'نام ماه مالی برای ' + (i + 1) + 'مین ردیف خالی است' });
+      else if (names.has(m.name)) errors.push({ i, text: tag + ' تکراری است' });
+      if (m.name) names.add(m.name);
+      if (!from) errors.push({ i, text: 'تاریخ شروع ' + tag + ' نامعتبر است (مثال: 1405/07/01)' });
+      if (!to) errors.push({ i, text: 'تاریخ پایان ' + tag + ' نامعتبر است' });
+      if (from && to && C.jalaliCmp(C.parseDate(from), C.parseDate(to)) > 0) {
+        errors.push({ i, text: 'در ' + tag + ' تاریخ پایان قبل از شروع است' });
+      }
+    });
+    const sorted = rows.slice().sort((a, b) => dateKey(a.from) - dateKey(b.from));
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1], cur = sorted[i];
+      const prevTo = C.parseDate(normDate(prev.to)), curFrom = C.parseDate(normDate(cur.from));
+      if (prevTo && curFrom && C.jalaliCmp(prevTo, curFrom) >= 0) {
+        errors.push({ i: rows.indexOf(cur), text: 'بازه‌ی «' + (cur.name || '—') + '» با «' + (prev.name || '—') + '» هم‌پوشانی دارد' });
+      }
+    }
+    return errors;
+  }
+
   function renderFiscal() {
     if (!fiscal.length) {
-      fmBody.innerHTML = `<tr><td colspan="5" class="fm-empty">هنوز ماه مالی تعریف نشده — یک ردیف اضافه کنید یا ۱۲ ماه را خودکار بسازید.</td></tr>`;
+      fmBody.innerHTML = `<tr><td colspan="5" class="fm-empty">هنوز ماه مالی تعریف نشده — یک ردیف اضافه کنید یا ۱۲ ماه سال را خودکار بسازید.</td></tr>`;
+      paintFiscalSummary();
       return;
     }
     fmBody.innerHTML = fiscal.map((m, i) => `
       <tr data-i="${i}">
         <td><input class="input fm-name" value="${esc(m.name || '')}" placeholder="مثلاً مهر ۱۴۰۵"></td>
-        <td><div class="date-f"><input class="input fm-from" dir="ltr" inputmode="numeric" value="${esc(m.from || '')}" placeholder="1405-07-01">
+        <td><div class="date-f"><input class="input fm-from" dir="ltr" inputmode="numeric" value="${esc(m.from || '')}" placeholder="1405/07/01">
           <button type="button" class="cal-btn" data-cal="from" data-i="${i}" aria-label="تقویم شروع"><i class="fa-regular fa-calendar"></i></button></div></td>
-        <td><div class="date-f"><input class="input fm-to" dir="ltr" inputmode="numeric" value="${esc(m.to || '')}" placeholder="1405-07-30">
+        <td><div class="date-f"><input class="input fm-to" dir="ltr" inputmode="numeric" value="${esc(m.to || '')}" placeholder="1405/07/30">
           <button type="button" class="cal-btn" data-cal="to" data-i="${i}" aria-label="تقویم پایان"><i class="fa-regular fa-calendar"></i></button></div></td>
         <td><input class="input fm-note" value="${esc(m.note || '')}" placeholder="اختیاری"></td>
         <td class="fm-del"><button class="btn ghost sm" data-del="${i}" title="حذف"><i class="fa-solid fa-trash-can"></i></button></td>
       </tr>`).join('');
-    $$('[data-del]', fmBody).forEach((b) => b.addEventListener('click', () => { fiscal.splice(+b.dataset.del, 1); renderFiscal(); }));
+    $$('[data-del]', fmBody).forEach((b) => b.addEventListener('click', () => {
+      fiscal = collectFiscal(); fiscal.splice(+b.dataset.del, 1); renderFiscal();
+    }));
     $$('.cal-btn', fmBody).forEach((b) => {
-      const row = fiscal[+b.dataset.i] || {};
       const input = b.parentElement.querySelector('input');
-      JCal.attach(b, { input: input, onPick: () => { row[b.dataset.cal] = input.value; } });
+      JCal.attach(b, { input: input, onPick: () => { paintFiscalSummary(); } });
     });
+    $$('.fm-name, .fm-from, .fm-to', fmBody).forEach((el) => el.addEventListener('change', paintFiscalSummary));
+    paintFiscalSummary();
   }
+
+  /* خلاصه + خطاها زیر جدول؛ بدون اینکه چیزی را بی‌صدا پاک کند. */
+  function paintFiscalSummary() {
+    const box = $('#fmSummary');
+    if (!box) return;
+    const rows = collectFiscal();
+    if (!rows.length) { box.className = 'fm-summary'; box.innerHTML = ''; return; }
+    const errors = validateFiscal(rows);
+    const sorted = rows.slice().sort((a, b) => dateKey(a.from) - dateKey(b.from));
+    const total = rows.reduce((sum, m) => sum + daysOf(m), 0);
+    const chips = sorted.map((m) => `<span class="fm-chip"><b>${esc(m.name || '—')}</b>
+      <span dir="ltr">${esc(normDate(m.from) || '—')} → ${esc(normDate(m.to) || '—')}</span>
+      ${daysOf(m) ? `<em>${fa(daysOf(m))} روز</em>` : ''}</span>`).join('');
+    box.className = 'fm-summary' + (errors.length ? ' has-err' : '');
+    box.innerHTML = `<div class="fm-chips">${chips}</div>
+      <div class="fm-total">${fa(rows.length)} دوره · مجموع ${fa(total)} روز</div>
+      ${errors.length ? `<div class="fm-err"><i class="fa-solid fa-circle-exclamation"></i>
+        <ul>${errors.slice(0, 5).map((e) => `<li>${esc(e.text)}</li>`).join('')}</ul></div>` : ''}`;
+  }
+
   function collectFiscal() {
-    return $$('tr[data-i]', fmBody).map((tr) => ({
-      id: (fiscal[+tr.dataset.i] || {}).id || '',
-      name: $('.fm-name', tr).value.trim(),
-      from: C.formatJalali(C.parseDate($('.fm-from', tr).value)) || $('.fm-from', tr).value.trim(),
-      to: C.formatJalali(C.parseDate($('.fm-to', tr).value)) || $('.fm-to', tr).value.trim(),
-      note: $('.fm-note', tr).value.trim()
-    })).filter((m) => m.name || m.from || m.to);
+    return $$('tr[data-i]', fmBody).map((tr) => {
+      const rawFrom = $('.fm-from', tr).value.trim(), rawTo = $('.fm-to', tr).value.trim();
+      return {
+        id: (fiscal[+tr.dataset.i] || {}).id || '',
+        name: $('.fm-name', tr).value.trim(),
+        from: normDate(rawFrom) || rawFrom,
+        to: normDate(rawTo) || rawTo,
+        note: $('.fm-note', tr).value.trim()
+      };
+    }).filter((m) => m.name || m.from || m.to);
   }
-  $('#fmAdd').addEventListener('click', () => { fiscal = collectFiscal(); fiscal.push({ id: '', name: '', from: '', to: '', note: '' }); renderFiscal(); });
+
+  $('#fmAdd').addEventListener('click', () => {
+    fiscal = collectFiscal();
+    /* پیشنهاد هوشمند: دوره‌ی بعد از آخرین دوره (یا ماه جاری) */
+    const last = fiscal.slice().sort((a, b) => dateKey(a.to) - dateKey(b.to)).pop();
+    let next = null;
+    const lastTo = last ? C.parseDate(normDate(last.to)) : null;
+    if (lastTo) next = C.jalaliMonthAdd(lastTo.jy, lastTo.jm, 1);
+    else next = { jy: todayJ.jy, jm: todayJ.jm };
+    const range = C.jalaliMonthRange(next.jy, next.jm);
+    fiscal.push({ id: '', name: C.jalaliMonthLabel(next.jy, next.jm), from: C.formatJalali(range.from), to: C.formatJalali(range.to), note: '' });
+    renderFiscal();
+  });
+
   $('#fmAuto').addEventListener('click', () => {
     fiscal = collectFiscal();
-    const t = C.todayJalali();
-    const start = C.jalaliMonthAdd(t.jy, 1, 0);
+    const year = Number(String(fmYear && fmYear.value || '').replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))) || todayJ.jy;
+    let added = 0, skipped = 0;
     for (let m = 1; m <= 12; m++) {
-      const r = C.jalaliMonthRange(start.jy, m);
-      const label = C.jalaliMonthLabel(start.jy, m);
-      if (fiscal.some((x) => x.from === C.formatJalali(r.from))) continue;
-      fiscal.push({ id: '', name: label, from: C.formatJalali(r.from), to: C.formatJalali(r.to), note: '' });
+      const r = C.jalaliMonthRange(year, m);
+      const from = C.formatJalali(r.from), to = C.formatJalali(r.to);
+      if (fiscal.some((x) => normDate(x.from) === from && normDate(x.to) === to)) { skipped++; continue; }
+      if (fiscal.some((x) => normDate(x.from) === from)) { skipped++; continue; }
+      fiscal.push({ id: '', name: C.jalaliMonthLabel(year, m), from, to, note: '' });
+      added++;
     }
+    fiscal.sort((a, b) => dateKey(a.from) - dateKey(b.from));
     renderFiscal();
-    toast('۱۲ ماه سال جاری ساخته شد — نام و تاریخ‌ها را در صورت نیاز ویرایش کنید', 'info');
+    toast(added ? `${fa(added)} ماه سال ${fa(year)} اضافه شد${skipped ? ` (${fa(skipped)} ردیف از قبل بود)` : ''}` : `همه‌ی ماه‌های ${fa(year)} از قبل وجود دارند`,
+      added ? 'success' : 'info');
   });
+
   $('#fmSave').addEventListener('click', async () => {
     const rows = collectFiscal();
-    for (const m of rows) {
-      if (!m.name) { toast('نام ماه مالی نمی‌تواند خالی باشد', 'error'); return; }
-      if (!C.parseDate(m.from) || !C.parseDate(m.to)) { toast('تاریخ «' + m.name + '» نامعتبر است', 'error'); return; }
+    const errors = validateFiscal(rows);
+    if (errors.length) {
+      paintFiscalSummary();
+      toast(errors[0].text, 'error');
+      const badRow = fmBody.querySelector(`tr[data-i="${errors[0].i}"] .fm-name`);
+      if (badRow) badRow.focus();
+      return;
     }
-    const btn = $('#fmSave'); btn.disabled = true;
+    rows.sort((a, b) => dateKey(a.from) - dateKey(b.from));
+    const btn = $('#fmSave');
+    btn.disabled = true;
+    const label = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> ذخیره…';
     try {
       await api.put('/api/fiscal-months', { months: rows });
       await App.boot();
       fiscal = (App.fiscalMonths || []).map((m) => Object.assign({}, m));
       renderFiscal();
+      if (App.buildFiscalOptions) App.buildFiscalOptions();
       toast('ماه‌های مالی ذخیره شد — در «بازه آماده» بالای صفحه در دسترس‌اند', 'success');
     } catch (e) { toast(e.message, 'error'); }
     btn.disabled = false;
+    btn.innerHTML = label;
   });
   renderFiscal();
 
@@ -12156,19 +12732,33 @@ App.register('agents', { title: 'مدیریت کارشناسان', render });
 const { $, $$, api, esc, fa, toast, confirmDlg } = UI;
 const P = window.QCParse;
 const LABEL = { tele:'Telesales', account:'Account', mlm:'MLM / BNPL' };
-/* فقط این چهار تیم؛ هر تیم تنظیم المان‌های اختصاصی خودش را دارد. */
-const TEAMS = [
+/* تیم‌های شناخته‌شده اول می‌آیند؛ هر تیم دیگری که در «مدیریت کارشناسان» باشد
+ * هم لیست می‌شود تا همان‌جا المان‌های اختصاصی خودش را داشته باشد. */
+const BASE_TEAMS = [
   { team:'Account', title:'اکانت' },
   { team:'Tele sales', title:'تله' },
   { team:'BNPL', title:'بی ان پی ال' },
   { team:'MLM', title:'ام ال ام' }
 ];
-const TEAM_TITLE = Object.fromEntries(TEAMS.map(t => [t.team, t.title]));
+const TEAM_TITLE = Object.fromEntries(BASE_TEAMS.map(t => [t.team, t.title]));
+
+/* برای هر تیم: زیرعنوان = فرم + تعداد المان فعال؛ بقیه تیم‌های شیت هم اضافه می‌شوند. */
+function buildTeams(listed, config) {
+  const seen = new Set(BASE_TEAMS.map(t => P.teamKey(t.team)));
+  const extra = (listed || []).filter(t => t && !seen.has(P.teamKey(t))).map(t => ({ team:t, title:P.displayTeam(t) }));
+  const teams = BASE_TEAMS.concat(extra);
+  return teams.map(t => {
+    const form = P.teamForm(t.team) || 'tele';
+    const hasOwn = !!(config && config.teams && config.teams[P.teamKey(t.team)]);
+    const count = P.definitionsFor(form, t.team, config).filter(d => d.active !== false).length;
+    return { team:t.team, form, title:t.title, own:hasOwn, count, formLabel:LABEL[form] || form };
+  });
+}
 async function render(root) {
   const response = await api.get('/api/criteria');
   if (!root.isConnected) return;
   let config = response.config, selected = { form:'account', team:'Account' }, dirty = false, definitions = [];
-  const options = TEAMS.map(t => ({ team:t.team, form:P.teamForm(t.team) || 'tele', title:t.title, sub:t.team }));
+  let options = buildTeams(response.teams, config);
   root.innerHTML = `<div class="page-head"><div class="ph-ic"><i class="fa-solid fa-sliders"></i></div>
     <div><h2>تغییر المان‌ها</h2><p>نام نمایشی، ستون اکسل و المان‌های فعال ریت تماس هر تیم</p></div></div>
     <div class="note"><i class="fa-solid fa-shield-halved"></i><span>مقادیر واقعی فرم <b>1 / 0 / -</b> مبنای نرخ‌ها هستند. «-» در مخرج نرخ نیست و سلول خالی صفر محسوب نمی‌شود. نمره‌ی کلیِ اصلی اکسل و ریت‌های قبلی بازنویسی نمی‌شوند.</span></div>
@@ -12178,23 +12768,32 @@ async function render(root) {
         <div><h3 id="criteriaTitle"></h3><div class="sub" id="criteriaCaption"></div></div><div class="spacer"></div>
         <button class="btn soft" id="criterionAdd"><i class="fa-solid fa-plus"></i> المان جدید</button></div>
         <div class="card-pad"><div class="field" id="criteriaFormSlot"><label>نوع فرم این تیم</label><select class="input" id="criteriaForm">${Object.keys(LABEL).map(f=>`<option value="${f}">${LABEL[f]}</option>`).join('')}</select></div></div>
-        <div class="table-wrap"><table class="tbl"><thead><tr><th>نام المان در گزارش</th><th>نام ستون در اکسل دیتا</th><th>عملیات</th></tr></thead><tbody id="criteriaRows"></tbody></table></div>
+        <div class="table-wrap"><table class="tbl"><thead><tr><th>نام فارسی المان <span class="th-en">label</span></th><th>سرتیتر انگلیسی ستون در فایل دیتا <span class="th-en">excelKey</span></th><th>عملیات</th></tr></thead><tbody id="criteriaRows"></tbody></table></div>
         <div class="card-pad"><div class="criteria-status" id="criteriaStatus"></div><div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
           <button class="btn primary" id="criteriaSave"><i class="fa-solid fa-floppy-disk"></i> ذخیره تغییرات</button>
           <button class="btn ghost" id="criteriaCancel">لغو تغییرات</button><button class="btn success-soft" id="criteriaTemplate"><i class="fa-solid fa-file-excel"></i> نمونه اکسل این فرم</button></div>
           <details class="criteria-retired"><summary>المان‌های حذف‌شده؛ حفظ شناسه برای سوابق</summary><div id="criteriaRetired"></div></details></div>
       </div></div>`;
-  $('#criteriaTeams',root).innerHTML = options.map((o,index)=>`<button class="criteria-team" data-option="${index}"><i class="fa-solid ${o.form==='tele'?'fa-phone':o.form==='account'?'fa-building-columns':'fa-cart-shopping'}"></i><span>${esc(o.title)}<small>${esc(o.sub)}</small></span></button>`).join('');
+  function paintTeams(){
+    options = buildTeams(response.teams, config);
+    $('#criteriaTeams',root).innerHTML = options.map((o,index)=>`<button class="criteria-team${o.team===selected.team?' active':''}" data-option="${index}" title="${esc(o.team)} — ${esc(o.formLabel)}">
+      <i class="fa-solid ${o.form==='tele'?'fa-phone':o.form==='account'?'fa-building-columns':'fa-cart-shopping'}"></i>
+      <span>${esc(o.title)}<small>${esc(o.formLabel)} · ${fa(o.count)} المان${o.own?' · اختصاصی':''}</small></span></button>`).join('');
+    $$('#criteriaTeams button',root).forEach(button=>button.addEventListener('click',()=>choose(options[Number(button.dataset.option)])));
+  }
   function changed(){ dirty=true; $('#criteriaStatus',root).textContent='تغییرات هنوز ذخیره نشده‌اند'; }
   function readInputs(){ $$('#criteriaRows tr',root).forEach(row=>{
     const definition = definitions.find(d=>d.key===row.dataset.key);
     if(definition){definition.label=$('[data-label]',row).value;definition.excelKey=$('[data-column]',row).value;}
   }); }
   function paint(){
+    const ownEntry = config.teams && config.teams[P.teamKey(selected.team)];
     $('#criteriaTitle',root).textContent = TEAM_TITLE[selected.team] || P.displayTeam(selected.team);
+    $('#criteriaTitle',root).insertAdjacentHTML('beforeend',
+      ` <span class="badge ${ownEntry?'info':'gray'}" style="vertical-align:middle;font-weight:600">${ownEntry?'تنظیم اختصاصی تیم':'ارث‌بری از پیش‌فرض '+esc(LABEL[selected.form]||'')}</span>`);
     $('#criteriaCaption',root).textContent = 'نسخه '+fa(config.version||0)+' · '+fa(definitions.filter(d=>d.active!==false).length)+' المان فعال · تغییر نام ستون برای ورودی‌های بعدی؛ نام قبلی نیز شناخته می‌شود';
     $('#criteriaForm',root).value=selected.form; $('#criteriaFormSlot',root).hidden=!selected.team;
-    $$('#criteriaTeams button',root).forEach(button=>{const o=options[Number(button.dataset.option)];button.classList.toggle('active',o.team===selected.team&&(!o.team?o.form===selected.form:true));});
+    $$('#criteriaTeams button',root).forEach(button=>{const o=options[Number(button.dataset.option)];button.classList.toggle('active',o&&o.team===selected.team);});
     $('#criteriaRows',root).innerHTML=definitions.filter(d=>d.active!==false).map(d=>`<tr class="criteria-row" data-key="${esc(d.key)}">
       <td><input class="input" data-label value="${esc(d.label)}" aria-label="نام المان"></td><td><input class="input" data-column dir="auto" value="${esc(d.excelKey)}" aria-label="نام ستون اکسل"></td>
       <td><button class="btn danger-soft sm" data-delete="${esc(d.key)}" aria-label="حذف ${esc(d.label)}"><i class="fa-solid fa-trash-can"></i></button></td></tr>`).join('') || '<tr><td colspan="3">المانی فعال نیست؛ نمره‌ی اصلی محفوظ است و نرخ المان محاسبه نمی‌شود.</td></tr>';
@@ -12213,7 +12812,7 @@ async function render(root) {
     definitions=JSON.parse(JSON.stringify(P.definitionsFor(selected.form,selected.team,config)));dirty=false;
     $('#criteriaStatus',root).textContent='تنظیمات ذخیره‌شده';paint();
   }
-  $$('#criteriaTeams button',root).forEach(button=>button.addEventListener('click',()=>choose(options[Number(button.dataset.option)])));
+  paintTeams();
   $('#criteriaForm',root).addEventListener('change',()=>{readInputs();selected.form=$('#criteriaForm',root).value;definitions=P.defaults(selected.form);changed();paint();});
   $('#criterionAdd',root).addEventListener('click',()=>{readInputs();definitions.push({key:'custom_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),label:'المان جدید',excelKey:'new_criterion_'+(definitions.length+1),active:true});changed();paint();});
   $('#criteriaCancel',root).addEventListener('click',()=>{dirty=false;choose(selected);});
@@ -12222,7 +12821,7 @@ async function render(root) {
     try{
       const result=await api.put('/api/criteria',{team:selected.team,form:selected.form,elements:definitions,version:config.version||0});
       config=result.config;dirty=false;await App.boot();definitions=JSON.parse(JSON.stringify(P.definitionsFor(selected.form,selected.team,config)));
-      $('#criteriaStatus',root).textContent='ذخیره شد؛ گزارش‌ها و ورودی‌های بعدی از این تنظیمات استفاده می‌کنند';paint();toast.success('تنظیمات المان‌ها ذخیره شد');
+      $('#criteriaStatus',root).textContent='ذخیره شد؛ گزارش‌ها و ورودی‌های بعدی از این تنظیمات استفاده می‌کنند';paint();paintTeams();toast.success('تنظیمات المان‌ها ذخیره شد و روی تب Elements شیت نوشته می‌شود');
     }catch(e){toast.error(e.message);}finally{button.disabled=false;}
   });
   $('#criteriaTemplate',root).addEventListener('click',()=>{
@@ -12230,6 +12829,7 @@ async function render(root) {
     QCExport.sheets('نمونه ریت '+LABEL[selected.form],[{name:'دیتا',rows:[['tele_expert_name','review_date','score','lead_name','lead_phone','red_line',...active.map(d=>d.excelKey)],['نام واقعی کارشناس','1405/06/20',100,'نام شریک','09120000000',0,...active.map(()=>1)]]}]);
   });
   choose(options[0]);
+  paintTeams();
 }
 
 App.register('criteria',{title:'تغییر المان‌ها',render});
@@ -12533,6 +13133,27 @@ function editor(user) {
             <span>همه‌ی کارشناسان</span></label>
         </div>
 
+        <div class="qc-subset" id="quSubset">
+          <div class="qc-subset-head">
+            <span class="qc-subset-ic"><i class="fa-solid fa-sitemap"></i></span>
+            <div><b>زیرمجموعه — ست‌کردن از مدیریت کارشناسان</b>
+              <div class="sub">نام، تیم و داخلی را از همان فهرست برمی‌دارد؛ لازم نیست دستی چیزی تایپ شود.</div></div>
+            <div class="spacer"></div>
+            <span class="badge info" id="quSubCount">—</span>
+          </div>
+          <div class="qc-subset-row">
+            <label class="qc-subset-f"><span>زیرمجموعه (Subgroup)</span>
+              <select class="input" id="quSubPick"><option value="">همه‌ی زیرمجموعه‌ها</option></select></label>
+            <label class="qc-subset-f"><span>تیم</span>
+              <select class="input" id="quTeamPick"><option value="">همه‌ی تیم‌ها</option></select></label>
+            <label class="qc-subset-mode" title="اگر تیک باشد، انتخاب‌های فعلی پاک و فقط همین زیرمجموعه ست می‌شود">
+              <input type="checkbox" id="quReplace" checked><span>جایگزینی انتخاب فعلی</span></label>
+            <button type="button" class="btn soft" id="quApplySubset">
+              <i class="fa-solid fa-arrow-down-long"></i> ست از مدیریت کارشناسان</button>
+          </div>
+          <div class="qc-subset-hint" id="quSubsetHint">یک زیرمجموعه یا تیم انتخاب کنید؛ دکمه، همه‌ی کارشناسان همان گروه را تیک می‌زند.</div>
+        </div>
+
         <div class="qc-team-filter" id="quTeams" role="group" aria-label="فیلتر تیم"></div>
         <div class="qc-picker" id="quPicker">
           <div class="qc-picked" id="quPicked"></div>
@@ -12658,6 +13279,8 @@ function editor(user) {
         ? '<i class="fa-solid fa-circle-check"></i> فقط ارزیابی‌های همین کارشناسان در داشبورد، گزارش‌ها و سوابق دیده می‌شود.'
         : '<i class="fa-solid fa-triangle-exclamation"></i> دسترسی خالی یعنی این کارشناس هیچ داده‌ای نمی‌بیند.';
 
+    if (typeof paintSubsetCount === 'function' && $('#quSubCount', m)) paintSubsetCount();
+
     const scopeBtn = $('#quScope', m);
     if (scopeBtn) {
       const scopedNow = [...activeTeams].filter((key) => {
@@ -12669,6 +13292,86 @@ function editor(user) {
       scopeBtn.disabled = !activeTeams.size;
     }
   }
+
+  /* --------------------------------------------------- زیرمجموعه‌ها (بند ۱)
+   * زیرمجموعه‌ی هر کارشناس همان فیلد «subgroup» تب Agents است و از صفحه‌ی
+   * «مدیریت کارشناسان» ویرایش می‌شود. این بخش فقط انتخاب را سریع می‌کند و
+   * تنظیمات دستی قبلی (تیک‌های آزاد + داخلی‌های اضافه) دست‌نخورده می‌ماند. */
+  const subgroupsOf = (a) => String((a && a.subgroup) || '').trim();
+  const subList = [...new Set(state.agents.map(subgroupsOf).filter((x) => x && x !== '—'))]
+    .sort((x, y) => x.localeCompare(y, 'fa'));
+
+  function fillSubsetPickers() {
+    const subSel = $('#quSubPick', m), teamSel = $('#quTeamPick', m);
+    if (subSel) {
+      subSel.innerHTML = '<option value="">همه‌ی زیرمجموعه‌ها</option>' + subList.map((name) => {
+        const count = state.agents.filter((a) => subgroupsOf(a) === name).length;
+        return `<option value="${esc(name)}">${esc(name)} (${fa(count)})</option>`;
+      }).join('');
+    }
+    if (teamSel) {
+      teamSel.innerHTML = '<option value="">همه‌ی تیم‌ها</option>' + teamList.map((t) =>
+        `<option value="${esc(t.key)}">${esc(t.label)} (${fa(t.agents.length)})</option>`).join('');
+    }
+    paintSubsetCount();
+  }
+
+  function subsetTargets() {
+    const subSel = $('#quSubPick', m), teamSel = $('#quTeamPick', m);
+    const sub = subSel ? subSel.value : '';
+    const team = teamSel ? teamSel.value : '';
+    if (!sub && !team) return null;
+    return state.agents.filter((a) => {
+      if (sub && subgroupsOf(a) !== sub) return false;
+      if (team && teamKeyOf(a.team) !== team) return false;
+      return true;
+    });
+  }
+
+  function paintSubsetCount() {
+    const el = $('#quSubCount', m), hint = $('#quSubsetHint', m), btn = $('#quApplySubset', m);
+    if (!el) return;
+    const targets = subsetTargets();
+    if (!targets) {
+      el.textContent = '—';
+      if (hint) hint.innerHTML = subList.length
+        ? 'یک زیرمجموعه یا تیم انتخاب کنید؛ دکمه، همه‌ی کارشناسان همان گروه را تیک می‌زند.'
+        : 'هنوز زیرمجموعه‌ای در «مدیریت کارشناسان» ثبت نشده — ستون «زیرمجموعه» را همان‌جا پر کنید.';
+      if (btn) btn.disabled = true;
+      return;
+    }
+    const withExt = targets.filter((a) => a.ext != null && a.ext !== '').length;
+    el.textContent = fa(targets.length) + ' کارشناس';
+    if (btn) btn.disabled = !targets.length;
+    if (hint) {
+      hint.innerHTML = targets.length
+        ? `<i class="fa-solid fa-circle-info"></i> ${fa(withExt)} نفر داخلی ثبت‌شده دارند` +
+          (withExt < targets.length ? ` و ${fa(targets.length - withExt)} نفر بدون داخلی‌اند (با نام ثبت می‌شوند).` : '.')
+        : '<i class="fa-solid fa-triangle-exclamation"></i> برای این ترکیب کارشناسی پیدا نشد.';
+    }
+  }
+
+  function applySubset() {
+    const targets = subsetTargets();
+    if (!targets || !targets.length) { toast('اول یک زیرمجموعه یا تیم انتخاب کنید', 'error'); return; }
+    const replace = $('#quReplace', m).checked;
+    if (replace) picked.clear();
+    targets.forEach((a) => picked.add(a.name));
+    /* داخلی‌های اضافه‌ی قبلی پاک نمی‌شوند؛ فقط زیرمجموعه اضافه/جایگزین می‌شود. */
+    renderList();
+    refreshCount();
+    paintSubsetCount();
+    const subSel = $('#quSubPick', m), teamSel = $('#quTeamPick', m);
+    const teamOption = teamSel.selectedOptions && teamSel.selectedOptions[0];
+    const label = subSel.value || (teamOption && teamOption.value ? teamOption.textContent.replace(/\s*\([^)]*\)\s*$/, '') : '');
+    toast(fa(targets.length) + ' کارشناس' + (label ? ' از «' + label + '»' : '') +
+      ' ست شد — داخلی‌ها خودکار از همان فهرست برداشته شدند', 'success');
+  }
+
+  fillSubsetPickers();
+  $('#quSubPick', m).addEventListener('change', paintSubsetCount);
+  $('#quTeamPick', m).addEventListener('change', paintSubsetCount);
+  $('#quApplySubset', m).addEventListener('click', applySubset);
 
   renderTeams();
   renderList();

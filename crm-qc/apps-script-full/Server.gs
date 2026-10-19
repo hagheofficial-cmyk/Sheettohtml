@@ -221,11 +221,7 @@ function doGet(e) {
   // parsed as an Apps Script scriptlet.
   var page = e && e.parameter && e.parameter.page;
   if (page === 'call-report') {
-    var callHtml = HtmlService.createHtmlOutputFromFile('CallReport').getContent()
-      .replace('__QC_CALL_REPORT_STORAGE_B64__', Utilities.base64Encode(
-        Utilities.newBlob(JSON.stringify(readCallReportSettings_()), 'application/json').getBytes()
-      ));
-    return withFavicon_(HtmlService.createHtmlOutput(callHtml)
+    return withFavicon_(HtmlService.createHtmlOutput(callReportHtml_())
       .setTitle('گزارش تماس روزانه')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1'));
   }
@@ -235,6 +231,27 @@ function doGet(e) {
   return withFavicon_(HtmlService.createHtmlOutput(indexHtml)
     .setTitle('سامانه یکپارچه کنترل کیفیت CRM')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1'));
+}
+
+/**
+ * HTML آماده‌ی «گزارش تماس» با تنظیمات ذخیره‌شده‌ی همان شیت.
+ *
+ * این تابع هم برای آدرس مستقل `?page=call-report` استفاده می‌شود و هم از داخل
+ * خود سامانه با google.script.run صدا زده می‌شود؛ در حالت دوم ابزار داخل یک
+ * iframe محلی (srcdoc) باز می‌شود و دیگر لازم نیست آدرس وب‌اپ در تب جدید
+ * باز شود — همان آدرسی که در بعضی استقرارها «Sorry, unable to open the file»
+ * می‌داد.
+ */
+function callReportHtml_() {
+  return HtmlService.createHtmlOutputFromFile('CallReport').getContent()
+    .replace('__QC_CALL_REPORT_STORAGE_B64__', Utilities.base64Encode(
+      Utilities.newBlob(JSON.stringify(readCallReportSettings_()), 'application/json').getBytes()
+    ));
+}
+
+/** فراخوانی از خود سامانه (google.script.run) */
+function getCallReportHtml() {
+  return callReportHtml_();
 }
 
 /* لوگوی سامانه روی سربرگ مرورگر — به‌جای آیکون پیش‌فرض Apps Script/اکستنشن. */
@@ -294,7 +311,7 @@ function crmqcApi(method, requestUrl, body, token) {
       var readInfo = {};
       /* خواندن جزئی: هر تب از کشِ خودش یا از شیت. مسیر نوشتنی فقط تب‌های موردنیاز
        * خودش را بارگذاری می‌کند، پس ثبت یک ریت دیگر کل شیت را نمی‌خواند. */
-      var wanted = (isRead || attempt > 0) ? null : wantedTabsFor_(method, pathOnly, body);
+      var wanted = attempt > 0 ? null : wantedTabsFor_(method, pathOnly, body);
       var before = normalizeDatabase_(readDatabase_(ss, wanted, readInfo));
 
       /* نشست: توکن از کش، نقش و دسترسی‌ها همیشه از داده‌ی تازه‌ی شیت */
@@ -323,6 +340,19 @@ function crmqcApi(method, requestUrl, body, token) {
         // Reads must not persist: a GET only re-derives in-memory defaults, and
         // writing from a cached snapshot could clobber a concurrent edit.
         var payload = jsonSafe_(result);
+        if (pathOnly === '/api/bootstrap' && payload && payload.counts) {
+          var loaded = readInfo.loaded || [];
+          var fullCounts = loaded.indexOf('tickets') >= 0 && loaded.indexOf('socials') >= 0 &&
+            loaded.indexOf('callFeedbacks') >= 0;
+          if (!fullCounts) {
+            /* شمارش کل شیت فقط برای کاربر نامحدود؛ برای کارشناس محدود، کلاینت
+             * خودش شمارش داده‌ی مجاز را از /api/data/status می‌گیرد. */
+            var unrestricted = !session || session.role === 'admin' || session.unrestricted;
+            payload.counts = unrestricted
+              ? Object.assign({}, payload.counts, fastCounts_(ss), { partial: false })
+              : Object.assign({}, payload.counts, { partial: true });
+          }
+        }
         if (analysisKey) writeAnalysisCache_(analysisKey, payload);
         return { status: 200, data: payload };
       }
@@ -331,6 +361,9 @@ function crmqcApi(method, requestUrl, body, token) {
       if (authPath && result && result.user && (pathOnly === '/api/auth/login' || pathOnly === '/api/auth/setup')) {
         result.token = issueToken_(result.user);
         session = refreshSession_(result.user, before);
+        /* داده‌ی اولیه همراه پاسخ ورود: کلاینت بلافاصله بعد از رمز، یک درخواست
+         * کامل دیگر نمی‌گیرد (صفحه‌ی ورود سریع باز می‌شود). */
+        result.bootstrap = bootstrapFor_(session, ss);
       }
 
       /* پاسخ پیش از هر دست‌کاریِ داده ساخته می‌شود تا بعداً بتوان خودِ db زنده را
@@ -369,6 +402,26 @@ function crmqcApi(method, requestUrl, body, token) {
     };
   } finally {
     if (locked) { try { lock.releaseLock(); } catch (ignored) {} }
+    try { window.LocalApi.setSession(null); } catch (ignored) {}
+  }
+}
+
+/* همان پاسخ GET /api/bootstrap برای یک نشست — با شمارش سبک (بدون خواندن
+ * ردیف‌های تب‌های سنگین) تا ورود سریع بماند. */
+function bootstrapFor_(session, ss) {
+  try {
+    window.LocalApi.setSession(session);
+    var payload = jsonSafe_(window.LocalApi.run('GET', '/api/bootstrap'));
+    if (payload && payload.counts) {
+      var unrestricted = !session || session.role === 'admin' || session.unrestricted;
+      payload.counts = unrestricted
+        ? Object.assign({}, payload.counts, fastCounts_(ss), { partial: false })
+        : Object.assign({}, payload.counts, { partial: true });
+    }
+    return payload;
+  } catch (err) {
+    return null;
+  } finally {
     try { window.LocalApi.setSession(null); } catch (ignored) {}
   }
 }
@@ -763,8 +816,29 @@ function markSummaryBuilt_() {
 }
 
 /* تب‌هایی که یک مسیر واقعاً لازم دارد؛ بقیه از شیت خوانده نمی‌شوند */
+/* تب‌های لازم هر مسیر. برای خواندن‌ها هم همین تصمیم گرفته می‌شود تا باز شدن
+ * صفحه‌ی ورود یا یک گزارش، همه‌ی تب‌های سنگین را از شیت نخواند. */
 function wantedTabsFor_(method, pathOnly, body) {
   var p = String(pathOnly || '');
+  var isRead = String(method || 'GET').toUpperCase() === 'GET';
+  if (isRead) {
+    /* ورود/خروج/نشست فقط کاربران و تنظیمات را لازم دارد */
+    if (p.indexOf('/api/auth/') === 0) return ['qcUsers', 'settings', 'qcAgents'];
+    /* بارگذاری اولیه: فقط تب‌های سبک؛ شمارنده‌های پایین صفحه با getLastRow
+     * (بدون خواندن ردیف‌ها) پر می‌شوند. */
+    if (p === '/api/bootstrap') return QC_GAS_SMALL_TABS.slice();
+    if (p.indexOf('/api/tickets') === 0) return withSmall_(['tickets']);
+    if (p.indexOf('/api/socials') === 0) return withSmall_(['socials']);
+    if (p.indexOf('/api/calls/analysis') === 0) return withSmall_(['callFeedbacks']);
+    if (p.indexOf('/api/calls') === 0) return withSmall_(['callFeedbacks']);
+    if (p.indexOf('/api/actions') === 0) return withSmall_(['agentActions']);
+    if (p.indexOf('/api/reminders') === 0) return withSmall_(['reminders']);
+    if (p.indexOf('/api/portfolio') === 0) return withSmall_(['tickets', 'socials', 'callFeedbacks', 'agentActions']);
+    if (p.indexOf('/api/qc-agents') === 0) return withSmall_([]);
+    if (p.indexOf('/api/agents') === 0) return withSmall_([]);
+    if (p.indexOf('/api/call-report') === 0) return ['callMeta'];
+    return null; // مسیرهای نامشخص: مثل قبل، همه‌ی تب‌ها
+  }
   var heavy;
   if (p.indexOf('/api/tickets') === 0) heavy = ['tickets'];
   else if (p.indexOf('/api/socials') === 0) heavy = ['socials'];
@@ -787,14 +861,48 @@ function wantedTabsFor_(method, pathOnly, body) {
     markSummaryDue_();
   }
 
-  /* وقتی خلاصه‌ی ماهانه قرار است در همین نوشتن بازسازی شود، همه‌ی ورودی‌هایش لازم‌اند */
+  /* وقتی خلاصه‌ی ماهانه قرار است در همین نوشتن بازسازی شود، همه‌ی ورودی‌هایش لازم‌اند.
+   * اما اگر این تب‌ها در کشِ همین نسخه باشند، خواندنشان از شیت هزینه‌ای ندارد؛
+   * وگرنه خلاصه به زمان دیگری موکول می‌شود تا ثبت ریت، شیت را نبلعد. */
   var inputs = ['tickets', 'socials', 'callFeedbacks', 'agentActions'];
   if (summaryDue_() && heavy.some(function (k) { return inputs.indexOf(k) >= 0; })) {
-    inputs.forEach(function (k) { if (heavy.indexOf(k) < 0) heavy.push(k); });
+    var missingInputs = inputs.filter(function (k) { return heavy.indexOf(k) < 0; });
+    if (tabsCached_(missingInputs)) {
+      missingInputs.forEach(function (k) { heavy.push(k); });
+    } else {
+      markSummaryDue_();
+    }
   }
   var wanted = QC_GAS_SMALL_TABS.slice();
   heavy.forEach(function (k) { if (wanted.indexOf(k) < 0) wanted.push(k); });
   return wanted;
+}
+
+/* آیا همه‌ی این تب‌ها همین حالا در کش هستند؟ (بدون هیچ خواندنی از شیت) */
+function tabsCached_(keys) {
+  if (!keys || !keys.length) return true;
+  try {
+    var hit = readTabsCache_(keys);
+    return keys.every(function (key) { return hit[key] !== undefined; });
+  } catch (err) { return false; }
+}
+
+/* تب‌های سبک + تب‌های سنگینِ همان مسیر (بدون تکرار) */
+function withSmall_(heavy) {
+  var wanted = QC_GAS_SMALL_TABS.slice();
+  (heavy || []).forEach(function (key) { if (wanted.indexOf(key) < 0) wanted.push(key); });
+  return wanted;
+}
+
+/* شمارنده‌ی پایین صفحه بدون خواندن ردیف‌ها: فقط آخرین سطر هر تب */
+function fastCounts_(ss) {
+  var sheets = sheetMap_(ss);
+  var count = function (name) {
+    var sheet = sheets[name];
+    return sheet ? Math.max(0, Number(sheet.getLastRow()) - 1) : 0;
+  };
+  return { tickets: count(QC_GAS_SHEETS.tickets), socials: count(QC_GAS_SHEETS.socials),
+    calls: count(QC_GAS_SHEETS.calls) };
 }
 
 /* انتشار کامل: همه‌ی تب‌ها زیر یک نسخه (راه‌اندازی، بازخوانی دستی، بازسازی خلاصه) */

@@ -94,7 +94,7 @@ for(const build of ['public','offline'])test(build+': new management, popup, sch
   $('#agentsBody tr[data-id="1"] [data-act="edit"]').click();$('#aE').value='۳۰۲۰';$('#aT').value='MLM';$('#aSave').click();await settle();await settle();
   const agents=await w.LocalApi.get('/api/agents');assert.equal(agents[0].ext,3020);assert.equal(agents[0].team,'MLM');
   w.App.applyTheme('light');assert.equal(w.document.documentElement.dataset.theme,'light');assert.equal(w.localStorage.getItem('crmqc.theme.v1'),'light');
-  await go(w,'criteria');assert.equal(w.document.querySelectorAll('#criteriaTeams button').length,4);
+  await go(w,'criteria');assert.ok(w.document.querySelectorAll('#criteriaTeams button').length>=4, 'چهار تیم پایه + تیم‌های مدیریت کارشناسان');
   [...w.document.querySelectorAll('#criteriaTeams button')].find(b=>b.textContent.includes('تله')).click();await settle();
   assert.ok($('#criteriaRows input[data-column]'));$('#criterionAdd').click();assert.equal($('#criteriaRows').children.length,16);
   const last=$('#criteriaRows').lastElementChild;last.querySelector('[data-label]').value='المان آزمایش';last.querySelector('[data-column]').value='test_col';
@@ -102,7 +102,7 @@ for(const build of ['public','offline'])test(build+': new management, popup, sch
   await go(w,'portfolio');await w.App.setDateRange(DAY);const row=$('#pAll tr[data-name="کارشناس الف"]');row.click();await settle();
   assert.ok($('.profile-modal'));assert.equal($('#content #pBody'),null);assert.ok($('#pBody').textContent.includes('کارشناس الف'));
   assert.equal($('#pFrom').value,DAY.from);assert.equal($('#pTo').value,DAY.to);assert.ok($('#pImage'));assert.ok($('#pXls'));
-  const snapshots=[];w.QCCapture.download=async(source,name,prepare)=>{const copy=source.cloneNode(true);prepare(copy);snapshots.push({copy,name});};
+  const snapshots=[];w.QCCapture.download=async(source,name,prepare)=>{const copy=source.cloneNode(true);if(prepare)prepare(copy);snapshots.push({copy,name});};
   $('#pImage').click();await settle();assert.ok(snapshots[0].name.includes('1405/06/20'));assert.equal(snapshots[0].copy.querySelectorAll('.call-detail-row[hidden]').length,0);
   assert.equal(snapshots[0].copy.querySelectorAll('.call-detail-table tbody tr').length,4);
   $('.profile-modal .x').click();assert.equal($('.profile-modal'),null);

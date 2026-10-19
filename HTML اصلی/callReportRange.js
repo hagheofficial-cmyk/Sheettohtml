@@ -56,7 +56,9 @@ window.addEventListener('message', (event) => {
   if(event.data.type === 'crmqc:date-range') apply(event.data.range || {});
 });
 window.addEventListener('DOMContentLoaded', () => apply(sourceRange));
-const query = new URLSearchParams(location.search);
+/* در حالت جاسازی‌شده (iframe داخلی سامانه) نشانی، search ندارد؛ پارامترها از
+ * همین متغیر خوانده می‌شوند تا بازه/تم اولیه هم منتقل شود. */
+const query = new URLSearchParams(window.__QC_CALL_REPORT_PARAMS__ || location.search);
 document.documentElement.dataset.theme=query.get('qcTheme') === 'light' ? 'light' : 'dark';
 apply({ from: query.get('qcFrom') || '', to: query.get('qcTo') || '' });
 })();

@@ -163,6 +163,32 @@ function route(method, url, body) {
   return dispatch(method, url, body);
 }
 
+/* یک شکل واحد برای bootstrap — ورود موفق هم همین را برمی‌گرداند تا کلاینت
+ * بلافاصله بعد از رمز، یک درخواست کامل دیگر نگیرد. */
+function bootstrapPayload() {
+  const auth = { required: A.authRequired(db), mode: A.authMode(db), accounts: A.accounts(db),
+    user: session ? A.publicUser(session) : null, admin: A.isAdmin(session) };
+  if (auth.required && !session) {
+    return clone({ auth: auth, agents: [], teams: [], qcAgents: [], lists: db.lists,
+      fiscalMonths: [], revision: db.revision || 0,
+      settings: { orgName: db.settings.orgName || 'سامانه کنترل کیفیت', scoreBands: db.settings.scoreBands,
+        defaultPreset: db.settings.defaultPreset, authMode: db.settings.authMode },
+      counts: { tickets: 0, socials: 0, calls: 0, callMeta: null } });
+  }
+  return clone({
+    auth: auth,
+    fiscalMonths: db.fiscalMonths || [],
+    revision: db.revision || 0,
+    qcUsers: A.isAdmin(session) ? A.userMask(A.normalizeUsers(db)) : undefined,
+    agents: db.agents.filter((a) => a.active),
+    teams: [...new Set(db.agents.filter((a) => a.active).map((a) => a.team))],
+    qcAgents: db.qcAgents,
+    lists: db.lists,
+    settings: db.settings,
+    counts: { tickets: db.tickets.length, socials: db.socials.length, calls: (db.callFeedbacks || []).length, callMeta: db.callImport || null }
+  });
+}
+
 function dispatch(method, url, body) {
   // کوئری را اول جدا کن — تاریخ‌ها شامل «/» هستند و نباید در مسیر شکسته شوند
   const [pathPart, qsAll] = url.slice(1).split('?');
@@ -187,31 +213,8 @@ function dispatch(method, url, body) {
 
   if (name === 'auth') return authRoute(method, id, body);
 
-  if (name === 'bootstrap' && method === 'GET') {
-    const auth = { required: A.authRequired(db), mode: A.authMode(db), accounts: A.accounts(db),
-      user: session ? A.publicUser(session) : null, admin: A.isAdmin(session) };
-    if (auth.required && !session) {
-      /* پیش از ورود هیچ داده‌ای لو نمی‌رود؛ فقط آنچه صفحه‌ی ورود لازم دارد. */
-      return { auth: auth, agents: [], teams: [], qcAgents: [], lists: clone(db.lists),
-        fiscalMonths: [], revision: db.revision || 0,
-        settings: { orgName: db.settings.orgName || 'سامانه کنترل کیفیت', scoreBands: db.settings.scoreBands,
-          defaultPreset: db.settings.defaultPreset, authMode: db.settings.authMode },
-        counts: { tickets: 0, socials: 0, calls: 0, callMeta: null } };
-    }
-    return {
-      auth: auth,
-      fiscalMonths: clone(db.fiscalMonths || []),
-      revision: db.revision || 0,
-      qcUsers: A.isAdmin(session) ? clone(A.userMask(A.normalizeUsers(db))) : undefined,
-      agents: clone(db.agents.filter((a) => a.active)),
-      teams: [...new Set(db.agents.filter((a) => a.active).map((a) => a.team))],
-      qcAgents: clone(db.qcAgents),
-      lists: clone(db.lists),
-      settings: clone(db.settings),
-      agentActions: clone(db.agentActions || {}),
-      counts: { tickets: db.tickets.length, socials: db.socials.length, calls: (db.callFeedbacks || []).length, callMeta: db.callImport || null }
-    };
-  }
+  if (name === 'bootstrap' && method === 'GET') return bootstrapPayload();
+
   if (name === 'tickets' && method === 'GET' && id == null) return list('tickets', q);
   if (name === 'tickets' && method === 'POST') {
     const n = normalizeTicket(body); if (typeof n === 'string') bad(n);
@@ -591,7 +594,15 @@ function authRoute(method, id, body) {
   if (id === 'login' && method === 'POST') {
     const result = A.login(db, (body || {}).name, (body || {}).password);
     if (!result.ok) bad(result.error, 401);
-    return { ok: true, user: result.user };
+    /* داده‌ی اولیه‌ی همان کاربر همراه پاسخ ورود برمی‌گردد — با همان محدودیتی
+     * که مسیر عادی GET /api/bootstrap اعمال می‌کند. */
+    const full = A.normalizeUser(result.user, 0);
+    const previousSession = session, previousDb = db;
+    session = full;
+    try {
+      if (!A.isAdmin(full)) db = A.scopeDb(db, full);
+      return { ok: true, user: result.user, bootstrap: bootstrapPayload() };
+    } finally { session = previousSession; db = previousDb; }
   }
   if (id === 'logout' && method === 'POST') {
     /* خروج: نشست همین لایه پاک می‌شود؛ باطل‌کردن خودِ توکن در لایه‌ی میزبان است
@@ -612,7 +623,11 @@ function authRoute(method, id, body) {
     db.qcUsers = [];
     const row = A.saveUser(db, { name: b.name, password: b.password, role: 'admin', active: true, exts: '*', agents: '', teams: '' });
     saveDb();
-    return { ok: true, user: A.publicUser(A.normalizeUser(row, 0)) };
+    const admin = A.normalizeUser(row, 0);
+    const previous = session;
+    session = admin;
+    try { return { ok: true, user: A.publicUser(admin), bootstrap: bootstrapPayload() }; }
+    finally { session = previous; }
   }
   bad('not found', 404);
 }
@@ -623,7 +638,7 @@ function qcUsersRoute(method, id, body) {
   if (method === 'GET' && id == null) {
     return { users: clone(A.userMask(users)), required: A.authRequired(db), mode: A.authMode(db),
       teams: [...new Set(db.agents.map((a) => a.team))].sort(),
-      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false,
+      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, subgroup: a.subgroup || '', active: a.active !== false,
         qcAgents: A.splitList(a.qcAgents) }))) };
   }
   if (method === 'GET' && id != null) {
@@ -643,7 +658,7 @@ function qcUsersRoute(method, id, body) {
     A.syncAgentQcColumn(db, A.normalizeUser(row, 0), (body && body.syncColumn && (body.exts !== undefined || body.agents !== undefined || body.teams !== undefined)) ? 'sync' : 'keep');
     saveDb();
     return { ok: true, user: clone(A.userMask([A.normalizeUser(row, 0)])[0]), users: clone(A.userMask(A.normalizeUsers(db))),
-      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false,
+      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, subgroup: a.subgroup || '', active: a.active !== false,
         qcAgents: A.splitList(a.qcAgents) }))) };
   }
   if (method === 'DELETE' && id != null) {

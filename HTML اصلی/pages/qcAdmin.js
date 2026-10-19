@@ -292,6 +292,27 @@ function editor(user) {
             <span>همه‌ی کارشناسان</span></label>
         </div>
 
+        <div class="qc-subset" id="quSubset">
+          <div class="qc-subset-head">
+            <span class="qc-subset-ic"><i class="fa-solid fa-sitemap"></i></span>
+            <div><b>زیرمجموعه — ست‌کردن از مدیریت کارشناسان</b>
+              <div class="sub">نام، تیم و داخلی را از همان فهرست برمی‌دارد؛ لازم نیست دستی چیزی تایپ شود.</div></div>
+            <div class="spacer"></div>
+            <span class="badge info" id="quSubCount">—</span>
+          </div>
+          <div class="qc-subset-row">
+            <label class="qc-subset-f"><span>زیرمجموعه (Subgroup)</span>
+              <select class="input" id="quSubPick"><option value="">همه‌ی زیرمجموعه‌ها</option></select></label>
+            <label class="qc-subset-f"><span>تیم</span>
+              <select class="input" id="quTeamPick"><option value="">همه‌ی تیم‌ها</option></select></label>
+            <label class="qc-subset-mode" title="اگر تیک باشد، انتخاب‌های فعلی پاک و فقط همین زیرمجموعه ست می‌شود">
+              <input type="checkbox" id="quReplace" checked><span>جایگزینی انتخاب فعلی</span></label>
+            <button type="button" class="btn soft" id="quApplySubset">
+              <i class="fa-solid fa-arrow-down-long"></i> ست از مدیریت کارشناسان</button>
+          </div>
+          <div class="qc-subset-hint" id="quSubsetHint">یک زیرمجموعه یا تیم انتخاب کنید؛ دکمه، همه‌ی کارشناسان همان گروه را تیک می‌زند.</div>
+        </div>
+
         <div class="qc-team-filter" id="quTeams" role="group" aria-label="فیلتر تیم"></div>
         <div class="qc-picker" id="quPicker">
           <div class="qc-picked" id="quPicked"></div>
@@ -417,6 +438,8 @@ function editor(user) {
         ? '<i class="fa-solid fa-circle-check"></i> فقط ارزیابی‌های همین کارشناسان در داشبورد، گزارش‌ها و سوابق دیده می‌شود.'
         : '<i class="fa-solid fa-triangle-exclamation"></i> دسترسی خالی یعنی این کارشناس هیچ داده‌ای نمی‌بیند.';
 
+    if (typeof paintSubsetCount === 'function' && $('#quSubCount', m)) paintSubsetCount();
+
     const scopeBtn = $('#quScope', m);
     if (scopeBtn) {
       const scopedNow = [...activeTeams].filter((key) => {
@@ -428,6 +451,86 @@ function editor(user) {
       scopeBtn.disabled = !activeTeams.size;
     }
   }
+
+  /* --------------------------------------------------- زیرمجموعه‌ها (بند ۱)
+   * زیرمجموعه‌ی هر کارشناس همان فیلد «subgroup» تب Agents است و از صفحه‌ی
+   * «مدیریت کارشناسان» ویرایش می‌شود. این بخش فقط انتخاب را سریع می‌کند و
+   * تنظیمات دستی قبلی (تیک‌های آزاد + داخلی‌های اضافه) دست‌نخورده می‌ماند. */
+  const subgroupsOf = (a) => String((a && a.subgroup) || '').trim();
+  const subList = [...new Set(state.agents.map(subgroupsOf).filter((x) => x && x !== '—'))]
+    .sort((x, y) => x.localeCompare(y, 'fa'));
+
+  function fillSubsetPickers() {
+    const subSel = $('#quSubPick', m), teamSel = $('#quTeamPick', m);
+    if (subSel) {
+      subSel.innerHTML = '<option value="">همه‌ی زیرمجموعه‌ها</option>' + subList.map((name) => {
+        const count = state.agents.filter((a) => subgroupsOf(a) === name).length;
+        return `<option value="${esc(name)}">${esc(name)} (${fa(count)})</option>`;
+      }).join('');
+    }
+    if (teamSel) {
+      teamSel.innerHTML = '<option value="">همه‌ی تیم‌ها</option>' + teamList.map((t) =>
+        `<option value="${esc(t.key)}">${esc(t.label)} (${fa(t.agents.length)})</option>`).join('');
+    }
+    paintSubsetCount();
+  }
+
+  function subsetTargets() {
+    const subSel = $('#quSubPick', m), teamSel = $('#quTeamPick', m);
+    const sub = subSel ? subSel.value : '';
+    const team = teamSel ? teamSel.value : '';
+    if (!sub && !team) return null;
+    return state.agents.filter((a) => {
+      if (sub && subgroupsOf(a) !== sub) return false;
+      if (team && teamKeyOf(a.team) !== team) return false;
+      return true;
+    });
+  }
+
+  function paintSubsetCount() {
+    const el = $('#quSubCount', m), hint = $('#quSubsetHint', m), btn = $('#quApplySubset', m);
+    if (!el) return;
+    const targets = subsetTargets();
+    if (!targets) {
+      el.textContent = '—';
+      if (hint) hint.innerHTML = subList.length
+        ? 'یک زیرمجموعه یا تیم انتخاب کنید؛ دکمه، همه‌ی کارشناسان همان گروه را تیک می‌زند.'
+        : 'هنوز زیرمجموعه‌ای در «مدیریت کارشناسان» ثبت نشده — ستون «زیرمجموعه» را همان‌جا پر کنید.';
+      if (btn) btn.disabled = true;
+      return;
+    }
+    const withExt = targets.filter((a) => a.ext != null && a.ext !== '').length;
+    el.textContent = fa(targets.length) + ' کارشناس';
+    if (btn) btn.disabled = !targets.length;
+    if (hint) {
+      hint.innerHTML = targets.length
+        ? `<i class="fa-solid fa-circle-info"></i> ${fa(withExt)} نفر داخلی ثبت‌شده دارند` +
+          (withExt < targets.length ? ` و ${fa(targets.length - withExt)} نفر بدون داخلی‌اند (با نام ثبت می‌شوند).` : '.')
+        : '<i class="fa-solid fa-triangle-exclamation"></i> برای این ترکیب کارشناسی پیدا نشد.';
+    }
+  }
+
+  function applySubset() {
+    const targets = subsetTargets();
+    if (!targets || !targets.length) { toast('اول یک زیرمجموعه یا تیم انتخاب کنید', 'error'); return; }
+    const replace = $('#quReplace', m).checked;
+    if (replace) picked.clear();
+    targets.forEach((a) => picked.add(a.name));
+    /* داخلی‌های اضافه‌ی قبلی پاک نمی‌شوند؛ فقط زیرمجموعه اضافه/جایگزین می‌شود. */
+    renderList();
+    refreshCount();
+    paintSubsetCount();
+    const subSel = $('#quSubPick', m), teamSel = $('#quTeamPick', m);
+    const teamOption = teamSel.selectedOptions && teamSel.selectedOptions[0];
+    const label = subSel.value || (teamOption && teamOption.value ? teamOption.textContent.replace(/\s*\([^)]*\)\s*$/, '') : '');
+    toast(fa(targets.length) + ' کارشناس' + (label ? ' از «' + label + '»' : '') +
+      ' ست شد — داخلی‌ها خودکار از همان فهرست برداشته شدند', 'success');
+  }
+
+  fillSubsetPickers();
+  $('#quSubPick', m).addEventListener('change', paintSubsetCount);
+  $('#quTeamPick', m).addEventListener('change', paintSubsetCount);
+  $('#quApplySubset', m).addEventListener('click', applySubset);
 
   renderTeams();
   renderList();

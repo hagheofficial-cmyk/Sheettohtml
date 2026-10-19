@@ -4,19 +4,33 @@
 const { $, $$, api, esc, fa, toast, confirmDlg } = UI;
 const P = window.QCParse;
 const LABEL = { tele:'Telesales', account:'Account', mlm:'MLM / BNPL' };
-/* فقط این چهار تیم؛ هر تیم تنظیم المان‌های اختصاصی خودش را دارد. */
-const TEAMS = [
+/* تیم‌های شناخته‌شده اول می‌آیند؛ هر تیم دیگری که در «مدیریت کارشناسان» باشد
+ * هم لیست می‌شود تا همان‌جا المان‌های اختصاصی خودش را داشته باشد. */
+const BASE_TEAMS = [
   { team:'Account', title:'اکانت' },
   { team:'Tele sales', title:'تله' },
   { team:'BNPL', title:'بی ان پی ال' },
   { team:'MLM', title:'ام ال ام' }
 ];
-const TEAM_TITLE = Object.fromEntries(TEAMS.map(t => [t.team, t.title]));
+const TEAM_TITLE = Object.fromEntries(BASE_TEAMS.map(t => [t.team, t.title]));
+
+/* برای هر تیم: زیرعنوان = فرم + تعداد المان فعال؛ بقیه تیم‌های شیت هم اضافه می‌شوند. */
+function buildTeams(listed, config) {
+  const seen = new Set(BASE_TEAMS.map(t => P.teamKey(t.team)));
+  const extra = (listed || []).filter(t => t && !seen.has(P.teamKey(t))).map(t => ({ team:t, title:P.displayTeam(t) }));
+  const teams = BASE_TEAMS.concat(extra);
+  return teams.map(t => {
+    const form = P.teamForm(t.team) || 'tele';
+    const hasOwn = !!(config && config.teams && config.teams[P.teamKey(t.team)]);
+    const count = P.definitionsFor(form, t.team, config).filter(d => d.active !== false).length;
+    return { team:t.team, form, title:t.title, own:hasOwn, count, formLabel:LABEL[form] || form };
+  });
+}
 async function render(root) {
   const response = await api.get('/api/criteria');
   if (!root.isConnected) return;
   let config = response.config, selected = { form:'account', team:'Account' }, dirty = false, definitions = [];
-  const options = TEAMS.map(t => ({ team:t.team, form:P.teamForm(t.team) || 'tele', title:t.title, sub:t.team }));
+  let options = buildTeams(response.teams, config);
   root.innerHTML = `<div class="page-head"><div class="ph-ic"><i class="fa-solid fa-sliders"></i></div>
     <div><h2>تغییر المان‌ها</h2><p>نام نمایشی، ستون اکسل و المان‌های فعال ریت تماس هر تیم</p></div></div>
     <div class="note"><i class="fa-solid fa-shield-halved"></i><span>مقادیر واقعی فرم <b>1 / 0 / -</b> مبنای نرخ‌ها هستند. «-» در مخرج نرخ نیست و سلول خالی صفر محسوب نمی‌شود. نمره‌ی کلیِ اصلی اکسل و ریت‌های قبلی بازنویسی نمی‌شوند.</span></div>
@@ -26,23 +40,32 @@ async function render(root) {
         <div><h3 id="criteriaTitle"></h3><div class="sub" id="criteriaCaption"></div></div><div class="spacer"></div>
         <button class="btn soft" id="criterionAdd"><i class="fa-solid fa-plus"></i> المان جدید</button></div>
         <div class="card-pad"><div class="field" id="criteriaFormSlot"><label>نوع فرم این تیم</label><select class="input" id="criteriaForm">${Object.keys(LABEL).map(f=>`<option value="${f}">${LABEL[f]}</option>`).join('')}</select></div></div>
-        <div class="table-wrap"><table class="tbl"><thead><tr><th>نام المان در گزارش</th><th>نام ستون در اکسل دیتا</th><th>عملیات</th></tr></thead><tbody id="criteriaRows"></tbody></table></div>
+        <div class="table-wrap"><table class="tbl"><thead><tr><th>نام فارسی المان <span class="th-en">label</span></th><th>سرتیتر انگلیسی ستون در فایل دیتا <span class="th-en">excelKey</span></th><th>عملیات</th></tr></thead><tbody id="criteriaRows"></tbody></table></div>
         <div class="card-pad"><div class="criteria-status" id="criteriaStatus"></div><div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
           <button class="btn primary" id="criteriaSave"><i class="fa-solid fa-floppy-disk"></i> ذخیره تغییرات</button>
           <button class="btn ghost" id="criteriaCancel">لغو تغییرات</button><button class="btn success-soft" id="criteriaTemplate"><i class="fa-solid fa-file-excel"></i> نمونه اکسل این فرم</button></div>
           <details class="criteria-retired"><summary>المان‌های حذف‌شده؛ حفظ شناسه برای سوابق</summary><div id="criteriaRetired"></div></details></div>
       </div></div>`;
-  $('#criteriaTeams',root).innerHTML = options.map((o,index)=>`<button class="criteria-team" data-option="${index}"><i class="fa-solid ${o.form==='tele'?'fa-phone':o.form==='account'?'fa-building-columns':'fa-cart-shopping'}"></i><span>${esc(o.title)}<small>${esc(o.sub)}</small></span></button>`).join('');
+  function paintTeams(){
+    options = buildTeams(response.teams, config);
+    $('#criteriaTeams',root).innerHTML = options.map((o,index)=>`<button class="criteria-team${o.team===selected.team?' active':''}" data-option="${index}" title="${esc(o.team)} — ${esc(o.formLabel)}">
+      <i class="fa-solid ${o.form==='tele'?'fa-phone':o.form==='account'?'fa-building-columns':'fa-cart-shopping'}"></i>
+      <span>${esc(o.title)}<small>${esc(o.formLabel)} · ${fa(o.count)} المان${o.own?' · اختصاصی':''}</small></span></button>`).join('');
+    $$('#criteriaTeams button',root).forEach(button=>button.addEventListener('click',()=>choose(options[Number(button.dataset.option)])));
+  }
   function changed(){ dirty=true; $('#criteriaStatus',root).textContent='تغییرات هنوز ذخیره نشده‌اند'; }
   function readInputs(){ $$('#criteriaRows tr',root).forEach(row=>{
     const definition = definitions.find(d=>d.key===row.dataset.key);
     if(definition){definition.label=$('[data-label]',row).value;definition.excelKey=$('[data-column]',row).value;}
   }); }
   function paint(){
+    const ownEntry = config.teams && config.teams[P.teamKey(selected.team)];
     $('#criteriaTitle',root).textContent = TEAM_TITLE[selected.team] || P.displayTeam(selected.team);
+    $('#criteriaTitle',root).insertAdjacentHTML('beforeend',
+      ` <span class="badge ${ownEntry?'info':'gray'}" style="vertical-align:middle;font-weight:600">${ownEntry?'تنظیم اختصاصی تیم':'ارث‌بری از پیش‌فرض '+esc(LABEL[selected.form]||'')}</span>`);
     $('#criteriaCaption',root).textContent = 'نسخه '+fa(config.version||0)+' · '+fa(definitions.filter(d=>d.active!==false).length)+' المان فعال · تغییر نام ستون برای ورودی‌های بعدی؛ نام قبلی نیز شناخته می‌شود';
     $('#criteriaForm',root).value=selected.form; $('#criteriaFormSlot',root).hidden=!selected.team;
-    $$('#criteriaTeams button',root).forEach(button=>{const o=options[Number(button.dataset.option)];button.classList.toggle('active',o.team===selected.team&&(!o.team?o.form===selected.form:true));});
+    $$('#criteriaTeams button',root).forEach(button=>{const o=options[Number(button.dataset.option)];button.classList.toggle('active',o&&o.team===selected.team);});
     $('#criteriaRows',root).innerHTML=definitions.filter(d=>d.active!==false).map(d=>`<tr class="criteria-row" data-key="${esc(d.key)}">
       <td><input class="input" data-label value="${esc(d.label)}" aria-label="نام المان"></td><td><input class="input" data-column dir="auto" value="${esc(d.excelKey)}" aria-label="نام ستون اکسل"></td>
       <td><button class="btn danger-soft sm" data-delete="${esc(d.key)}" aria-label="حذف ${esc(d.label)}"><i class="fa-solid fa-trash-can"></i></button></td></tr>`).join('') || '<tr><td colspan="3">المانی فعال نیست؛ نمره‌ی اصلی محفوظ است و نرخ المان محاسبه نمی‌شود.</td></tr>';
@@ -61,7 +84,7 @@ async function render(root) {
     definitions=JSON.parse(JSON.stringify(P.definitionsFor(selected.form,selected.team,config)));dirty=false;
     $('#criteriaStatus',root).textContent='تنظیمات ذخیره‌شده';paint();
   }
-  $$('#criteriaTeams button',root).forEach(button=>button.addEventListener('click',()=>choose(options[Number(button.dataset.option)])));
+  paintTeams();
   $('#criteriaForm',root).addEventListener('change',()=>{readInputs();selected.form=$('#criteriaForm',root).value;definitions=P.defaults(selected.form);changed();paint();});
   $('#criterionAdd',root).addEventListener('click',()=>{readInputs();definitions.push({key:'custom_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),label:'المان جدید',excelKey:'new_criterion_'+(definitions.length+1),active:true});changed();paint();});
   $('#criteriaCancel',root).addEventListener('click',()=>{dirty=false;choose(selected);});
@@ -70,7 +93,7 @@ async function render(root) {
     try{
       const result=await api.put('/api/criteria',{team:selected.team,form:selected.form,elements:definitions,version:config.version||0});
       config=result.config;dirty=false;await App.boot();definitions=JSON.parse(JSON.stringify(P.definitionsFor(selected.form,selected.team,config)));
-      $('#criteriaStatus',root).textContent='ذخیره شد؛ گزارش‌ها و ورودی‌های بعدی از این تنظیمات استفاده می‌کنند';paint();toast.success('تنظیمات المان‌ها ذخیره شد');
+      $('#criteriaStatus',root).textContent='ذخیره شد؛ گزارش‌ها و ورودی‌های بعدی از این تنظیمات استفاده می‌کنند';paint();paintTeams();toast.success('تنظیمات المان‌ها ذخیره شد و روی تب Elements شیت نوشته می‌شود');
     }catch(e){toast.error(e.message);}finally{button.disabled=false;}
   });
   $('#criteriaTemplate',root).addEventListener('click',()=>{
@@ -78,6 +101,7 @@ async function render(root) {
     QCExport.sheets('نمونه ریت '+LABEL[selected.form],[{name:'دیتا',rows:[['tele_expert_name','review_date','score','lead_name','lead_phone','red_line',...active.map(d=>d.excelKey)],['نام واقعی کارشناس','1405/06/20',100,'نام شریک','09120000000',0,...active.map(()=>1)]]}]);
   });
   choose(options[0]);
+  paintTeams();
 }
 
 App.register('criteria',{title:'تغییر المان‌ها',render});

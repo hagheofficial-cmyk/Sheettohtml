@@ -494,6 +494,16 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
 .cr-frame-card { padding:0; overflow:hidden; }
 #crWrap { position:relative; background:var(--bg-2,#0f172a); height:calc(100vh - 178px); min-height:560px; }
 #crFrame { width:100%; height:100%; border:0; display:block; }
+/* نسخه‌ی Apps Script: ابزار در فریم محلی (srcdoc) باز می‌شود */
+.cr-embed-bar { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--line-soft); background:var(--bg-2,#0f172a); font-size:12.5px; color:var(--muted); }
+.cr-embed-state { display:inline-flex; align-items:center; gap:7px; font-weight:700; color:var(--muted); }
+.cr-embed-state.ok { color:var(--good); }
+.cr-embed-state.bad { color:var(--bad); }
+.cr-embed-hint b { color:var(--text); }
+.cr-embed-wrap { height:calc(100vh - 226px); min-height:540px; }
+.cr-embed-frame { width:100%; height:100%; border:0; display:block; background:#0b1220; }
+.cr-embed-fallback { max-width:760px; margin:38px auto; }
+.cr-embed-fallback p { margin:14px 0 18px; line-height:2; color:var(--muted); }
 
 /* فیلترهای بدون خط جداکننده (وقتی داخل کارت‌اند) */
 .filters.plain { border-bottom:none; }
@@ -535,3 +545,89 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
   .global-range .date-f .input { width:142px; }
 }
 @media print { .global-range { display:none; } }
+
+/* ماه‌های مالی — جدول بزرگ‌تر و خواناتر */
+.fm-card .card-head { gap:12px; flex-wrap:wrap; }
+.fm-year { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); font-weight:700; }
+.fm-year .input { width:96px; height:38px; font-size:14px; text-align:center; }
+.fm-scroll { max-height:430px; }
+.fm-tbl { min-width:820px; }
+.fm-tbl thead th { font-size:12.5px; padding:12px 10px; }
+.fm-tbl td { padding:10px 10px; vertical-align:middle; }
+.fm-tbl .input { height:44px; font-size:14px; }
+.fm-tbl .date-f { min-width:168px; }
+.fm-tbl .date-f .input { padding-inline-end:40px; }
+.fm-tbl .cal-btn { width:32px; height:32px; font-size:14px; }
+.fm-tbl .fm-name { font-weight:700; min-width:170px; }
+.fm-tbl .fm-note { min-width:140px; }
+.fm-empty { text-align:center; color:var(--muted); padding:26px 10px !important; font-size:13px; }
+.fm-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:14px; }
+.fm-actions .btn { height:42px; }
+.fm-summary { margin-top:12px; display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.fm-chips { display:flex; flex-wrap:wrap; gap:8px; }
+.fm-chip { display:inline-flex; align-items:center; gap:7px; padding:6px 10px; border-radius:10px;
+  border:1px solid var(--line-soft); background:rgba(56,189,248,.06); font-size:11.5px; color:var(--muted); }
+.fm-chip b { color:var(--text); font-size:12px; }
+.fm-chip em { font-style:normal; color:var(--brand); font-weight:700; }
+.fm-total { font-size:11.5px; color:var(--muted); }
+.fm-summary.has-err .fm-chip { border-color:rgba(248,113,113,.35); }
+.fm-err { flex:1 1 100%; display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border-radius:10px;
+  border:1px solid rgba(248,113,113,.35); background:rgba(248,113,113,.07); color:#fca5a5; font-size:12px; }
+.fm-err ul { margin:0; padding-inline-start:16px; line-height:1.9; }
+
+/* زیرمجموعه‌ی کارشناس QC — ست‌کردن از مدیریت کارشناسان */
+.qc-subset { margin:10px 0 12px; border:1px solid var(--line-soft); border-radius:14px;
+  background:linear-gradient(180deg, rgba(56,189,248,.06), rgba(56,189,248,.015)); padding:12px 14px; }
+.qc-subset-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.qc-subset-head b { font-size:13px; }
+.qc-subset-head .sub { font-size:11px; color:var(--muted); margin-top:2px; }
+.qc-subset-ic { width:32px; height:32px; border-radius:10px; display:grid; place-items:center;
+  background:rgba(56,189,248,.14); color:#38bdf8; font-size:14px; flex:0 0 auto; }
+.qc-subset-row { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-top:10px; }
+.qc-subset-f { display:flex; flex-direction:column; gap:5px; font-size:11px; color:var(--muted); font-weight:700; min-width:180px; flex:1 1 180px; }
+.qc-subset-f .input { height:40px; font-size:13px; }
+.qc-subset-mode { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); height:40px; }
+.qc-subset-hint { margin-top:9px; font-size:11.5px; color:var(--muted); display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+
+/* المان‌ها — سرستون دوزبانه و شمارش هر تیم */
+.th-en { display:block; font-size:9.5px; font-weight:600; color:var(--muted); letter-spacing:.4px; opacity:.8; }
+.criteria-team small { display:block; font-size:10px; color:var(--muted); margin-top:2px; }
+
+/* ------------------------- پرونده کارشناس (بازطراحی) ------------------------- */
+.profile-modal .profile-content { font-size:13px; }
+.history-stack { display:flex; flex-direction:column; gap:14px; }
+.history-stack .full-row { min-width:0; width:100%; }
+.history-wrap { max-height:560px; overflow-y:auto; }
+.history-types { border-bottom:1px solid var(--border); padding:9px 14px; font-size:12px; display:flex; flex-wrap:wrap; gap:8px; }
+.history-tbl .history-main td { font-size:13px; }
+.history-tbl .rating-detail-row > td { padding:0 12px 10px; border-bottom:1px solid var(--line-soft); }
+.history-tbl .history-main > td { border-bottom:none; padding-bottom:4px; }
+
+/* هر تماس: بلوک کامل و باز */
+.call-log { display:flex; flex-direction:column; }
+.call-log-item { padding:10px 12px 12px; border-bottom:1px solid var(--line-soft); }
+.call-log-item:last-child { border-bottom:none; }
+.call-log-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:7px; }
+.call-log-lead { font-weight:800; font-size:13.5px; }
+.call-log-meta { font-size:11px; color:var(--muted); }
+.call-log-tags { margin-inline-start:auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.call-log-body .cell-sub { font-size:11px; color:var(--muted); margin-bottom:6px; }
+.call-detail-table { font-size:11.5px; }
+.call-detail-table th { white-space:nowrap; font-size:10.5px; }
+.call-detail-table td { text-align:center; white-space:nowrap; }
+.call-detail-table td:nth-child(-n+2) { text-align:right; }
+
+/* کارنامه: سه ستون قوت/ضعف/بهبود */
+.scorecard .sc-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding:12px 14px 14px; }
+.sc-col { border-radius:12px; padding:11px 12px; border:1px solid var(--line-soft); background:var(--panel-soft); }
+.sc-col.good { border-color:rgba(52,211,153,.28); background:rgba(52,211,153,.06); }
+.sc-col.bad { border-color:rgba(248,113,113,.28); background:rgba(248,113,113,.06); }
+.sc-col.info { border-color:rgba(56,189,248,.28); background:rgba(56,189,248,.06); }
+.sc-col-head { display:flex; align-items:center; gap:8px; font-size:12.5px; margin-bottom:8px; }
+.sc-col.good .sc-col-head i { color:var(--good); }
+.sc-col.bad .sc-col-head i { color:#f87171; }
+.sc-col.info .sc-col-head i { color:#38bdf8; }
+.sc-col ul { margin:0; padding-inline-start:16px; display:flex; flex-direction:column; gap:7px; }
+.sc-col li { font-size:12px; line-height:1.85; color:var(--text); }
+.sc-grade { font-size:12px; padding:6px 12px; }
+@media (max-width:900px) { .scorecard .sc-grid { grid-template-columns:1fr; } }

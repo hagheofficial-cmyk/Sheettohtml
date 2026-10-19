@@ -1124,34 +1124,46 @@ for (const build of ['public', 'offline']) {
       assert.ok(txt('#content').includes('Fiscal_Months'), 'راهنمای تب شیت');
     });
 
-    await t.test('گزارش تماس: در Node فریم هم‌ریشه و در Apps Script لانچر بدون iframe (بند ۱۱)', async () => {
+    await t.test('گزارش تماس: در Node فریم هم‌ریشه و در Apps Script داخل خود سامانه (srcdoc)', async () => {
       await go(w, 'callreport');
       await settle();
       assert.equal(doc.querySelectorAll('#content iframe').length, 1);
       assert.ok($('#crFrame') && $('#crWrap') && $('#crNewTab'), 'فریم و دکمه‌ی تب جدید');
       assert.ok($('#crFrame').getAttribute('src').includes('call-admin-report.html'));
 
-      /* همان صفحه در حالت Apps Script: لانچر به‌جای فریم تو‌در‌تو */
+      /* همان صفحه در حالت Apps Script: ابزار از google.script.run گرفته و در
+       * یک فریم محلی (srcdoc) نشان داده می‌شود؛ دیگر لازم نیست /exec باز شود. */
       w.APP_SCRIPT_MODE = true;
       w.APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfyc/exec';
+      let asked = 0;
+      w.google = { script: { run: (() => {
+        const api = {
+          _ok: null, _fail: null,
+          withSuccessHandler(fn) { api._ok = fn; return api; },
+          withFailureHandler(fn) { api._fail = fn; return api; },
+          getCallReportHtml() {
+            asked++;
+            setTimeout(() => { if (api._ok) api._ok('<html><head><title>گزارش تماس</title></head><body><div id="tool"></div></body></html>'); }, 0);
+            return api;
+          }
+        };
+        return api;
+      })() } };
       w.eval(fs.readFileSync(path.join(dir, 'pages', 'callReport.js'), 'utf8'));
       await go(w, 'dashboard'); await settle();
-      await go(w, 'callreport'); await settle();
-      assert.equal(doc.querySelectorAll('#content iframe').length, 0, 'دیگر iframe تودرتو ساخته نمی‌شود');
-      const tab = $('#crOpenTab'), top = $('#crOpenTop');
-      assert.ok(tab && top, 'دو راه باز کردن ابزار');
-      assert.equal(tab.getAttribute('target'), '_blank');
-      assert.equal(top.getAttribute('target'), '_top');
-      assert.ok(tab.getAttribute('href').includes('page=call-report'), tab.getAttribute('href'));
-      assert.ok(tab.getAttribute('href').includes('qcTheme='), 'حالت رنگ منتقل می‌شود');
-      assert.ok(txt('#content').includes('refused to connect'), 'دلیل فنی برای کاربر توضیح داده شده است');
-      assert.ok(txt('#content').includes('Call_Report_Experts'), 'اشاره به تب‌های داده‌ی ابزار');
-      assert.ok($('#crRange').textContent.length > 0, 'بازه‌ی فعال سامانه نشان داده می‌شود');
+      await go(w, 'callreport'); await settle(); await settle();
+      assert.equal(asked, 1, 'یک‌بار از Apps Script گرفته می‌شود');
+      const frame = doc.querySelector('#content iframe');
+      assert.ok(frame, 'فریم محلی ساخته می‌شود');
+      assert.ok(String(frame.getAttribute('srcdoc')).includes('گزارش تماس'), 'srcdoc از همان HTML ابزار پر می‌شود');
+      assert.ok(txt('#content').includes('بازه‌ی فعلی'), 'بازه‌ی فعال سامانه نشان داده می‌شود');
+      assert.ok($('#crNewTab').getAttribute('href').includes('page=call-report'));
 
       await w.App.setDateRange({ from: fx.current.from, to: fx.current.to, preset: 'fm:cur' });
       await settle();
-      assert.ok($('#crOpenTab').getAttribute('href').includes('qcFrom='), 'بازه‌ی تاریخ هم به ابزار منتقل می‌شود');
-      delete w.APP_SCRIPT_MODE; delete w.APP_SCRIPT_URL;
+      assert.ok($('#crNewTab').getAttribute('href').includes('qcFrom='), 'بازه‌ی تاریخ هم به ابزار منتقل می‌شود');
+      assert.equal(doc.querySelectorAll('#content iframe').length, 1, 'فریم تازه‌سازی/تکرار نمی‌شود');
+      delete w.APP_SCRIPT_MODE; delete w.APP_SCRIPT_URL; delete w.google;
     });
 
     await t.test('ستون‌های QC: ویرایش از شیت/اکسل هم دسترسی می‌دهد و ویرایش کاربر ذخیره می‌شود', async () => {

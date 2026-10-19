@@ -857,7 +857,9 @@ const App = {
   async refreshCounts(force) {
     const request = ++this._countsRequest;
     const st = this.state || {};
-    if (!force && st.counts) { this.paintCounts(st.counts); return; }
+    /* counts.partial یعنی شمارشِ سبک (بدون خواندن تب‌های سنگین) آمده و برای
+     * کارشناس محدود، عدد درست نیست؛ در آن حالت یک‌بار از منبع محدودشده خوانده می‌شود. */
+    if (!force && st.counts && !st.counts.partial) { this.paintCounts(st.counts); return; }
     try {
       const counts = await api.get('/api/data/status');
       if (request !== this._countsRequest) return;
@@ -917,8 +919,13 @@ const App = {
   register(name, spec) { this.routes[name] = spec; },
 
   async boot() {
-    this.state = await api.get('/api/bootstrap');
-    const st = this.state;
+    const st = await api.get('/api/bootstrap');
+    await this.applyBootstrap(st);
+  },
+
+  /* اعمال پاسخ bootstrap (چه از مسیر عادی، چه همراه پاسخ ورود) */
+  async applyBootstrap(st) {
+    this.state = st;
     this.fiscalMonths = Array.isArray(st.fiscalMonths) ? st.fiscalMonths : [];
     this.auth = st.auth || { required: false, user: null };
     this.revision = Number(st.revision || 0);
@@ -1124,12 +1131,13 @@ const App = {
     api._unauthorized = false;
     this._rangeReady = false;
     this._started = false;
+    const prefetched = window.QCAuth && window.QCAuth.takeBootstrap ? window.QCAuth.takeBootstrap() : null;
     if (window.QCAuth) window.QCAuth.hideGate();
-    await this.start();
+    await this.start(prefetched);
   },
 
-  async start() {
-    try { await this.boot(); }
+  async start(prefetched) {
+    try { await (prefetched ? this.applyBootstrap(prefetched) : this.boot()); }
     catch (e) {
       $('#content').innerHTML = `<div class="card">${emptyState('fa-plug-circle-xmark', 'عدم اتصال به سرور', e.message,
         `<button class="btn ghost" onclick="location.reload()"><i class="fa-solid fa-rotate-right"></i> تلاش دوباره</button>`)}</div>`;

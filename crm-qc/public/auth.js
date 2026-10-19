@@ -75,8 +75,25 @@ const QCAuth = {
     });
   },
 
+  /* bootstrap آماده‌ی همان ورود؛ App آن را به‌جای درخواست دوباره مصرف می‌کند. */
+  takeBootstrap() { const value = this._bootstrap || null; this._bootstrap = null; return value; },
+
   async ensure() {
     const api = window.UI ? window.UI.api : null;
+    /* اگر نشستی ذخیره شده باشد، اول «me» پرسیده می‌شود و فهرست حساب‌ها فقط
+     * وقتی گرفته می‌شود که نشست معتبر نباشد — یک درخواست کمتر هنگام باز شدن. */
+    const saved = this.restore();
+    if (saved) {
+      try {
+        const me = await api.get('/api/auth/me');
+        if (me && me.required && me.user) {
+          this.required = true; this.accounts = me.accounts || []; this.user = me.user;
+          this.mode = 'auto'; this.syncLocalSession(); return true;
+        }
+        if (me && !me.required) { this.required = false; this.clear(); return true; }
+      } catch (e) { /* نشست منقضی شده */ }
+      this.clear();
+    }
     let info = null;
     try { info = await api.get('/api/auth/accounts'); }
     catch (e) { info = { required: false, accounts: [], firstRun: false, orgName: '' }; }
@@ -86,15 +103,6 @@ const QCAuth = {
     this.mode = info.mode || 'auto';
     this.orgName = info.orgName || '';
     if (!this.required) { this.user = null; return true; }
-
-    const saved = this.restore();
-    if (saved) {
-      try {
-        const me = await api.get('/api/auth/me');
-        if (me && me.user) { this.user = me.user; this.syncLocalSession(); return true; }
-      } catch (e) { /* نشست منقضی شده */ }
-      this.clear();
-    }
     this.showGate();
     return false;
   },
@@ -107,6 +115,7 @@ const QCAuth = {
     const api = window.UI.api;
     const res = await api.post('/api/auth/login', { name: name, password: password });
     this.user = res.user; this.token = res.token || '';
+    this._bootstrap = res.bootstrap || null;
     this.persist(); this.syncLocalSession();
     return res.user;
   },
@@ -115,6 +124,12 @@ const QCAuth = {
     const api = window.UI.api;
     const res = await api.post('/api/auth/setup', { name: name, password: password });
     this.firstRun = false; this.required = true;
+    if (res && res.token && res.user) {
+      /* سرور و Apps Script تازه، توکن و داده‌ی اولیه را در همان پاسخ می‌دهند */
+      this.user = res.user; this.token = res.token; this._bootstrap = res.bootstrap || null;
+      this.persist(); this.syncLocalSession();
+      return res.user;
+    }
     return this.login(name, password).catch(() => res.user);
   },
 

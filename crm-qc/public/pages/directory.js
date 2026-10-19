@@ -79,21 +79,26 @@ async function render(root) {
       </div>
 
       <!-- ماه‌های مالی (بند ۲) -->
-      <div class="card">
+      <div class="card fm-card">
         <div class="card-head brand"><div class="head-icon"><i class="fa-solid fa-calendar-days"></i></div>
-          <div><h3>ماه‌های مالی</h3><div class="sub">بازه‌های آماده‌ی فیلتر تاریخ بالا — از چندم تا چندم و نام ماه مالی</div></div></div>
+          <div><h3>ماه‌های مالی</h3><div class="sub">بازه‌های آماده‌ی فیلتر تاریخ بالا — نام دوره و بازه‌ی شروع/پایان (جلالی)</div></div>
+          <div class="spacer"></div>
+          <label class="fm-year">سال مالی
+            <input class="input" id="fmYear" dir="ltr" inputmode="numeric" placeholder="1405"></label>
+        </div>
         <div class="card-pad">
-          <div class="table-scroll" style="max-height:290px">
+          <div class="table-scroll fm-scroll">
             <table class="tbl fm-tbl">
               <thead><tr><th>نام ماه مالی</th><th>از تاریخ</th><th>تا تاریخ</th><th>یادداشت</th><th></th></tr></thead>
               <tbody id="fmBody"></tbody>
             </table>
           </div>
+          <div class="fm-summary" id="fmSummary"></div>
           <div class="fm-actions">
-            <button class="btn soft sm" id="fmAdd"><i class="fa-solid fa-plus"></i> افزودن ماه مالی</button>
-            <button class="btn ghost sm" id="fmAuto"><i class="fa-solid fa-wand-magic-sparkles"></i> ساخت خودکار ۱۲ ماه</button>
+            <button class="btn soft" id="fmAdd"><i class="fa-solid fa-plus"></i> افزودن ماه مالی</button>
+            <button class="btn ghost" id="fmAuto"><i class="fa-solid fa-wand-magic-sparkles"></i> ساخت ۱۲ ماه سال</button>
             <div class="spacer"></div>
-            <button class="btn primary sm" id="fmSave"><i class="fa-solid fa-floppy-disk"></i> ذخیره ماه‌های مالی</button>
+            <button class="btn primary" id="fmSave"><i class="fa-solid fa-floppy-disk"></i> ذخیره ماه‌های مالی</button>
           </div>
           <div class="note" style="margin:12px 0 0"><i class="fa-solid fa-table"></i>
             همین جدول در تب <code>Fiscal_Months</code> گوگل‌شیت هم نوشته می‌شود؛ می‌توانید تاریخ‌ها را مستقیم روی شیت بنویسید یا ویرایش کنید و سامانه در خواندن بعدی آن‌ها را به «بازه آماده» تبدیل می‌کند.</div>
@@ -203,66 +208,173 @@ async function render(root) {
   /* ------------------------------------------------------ ماه‌های مالی */
   let fiscal = (App.fiscalMonths || []).map((m) => Object.assign({}, m));
   const fmBody = $('#fmBody');
+  const fmYear = $('#fmYear');
+  const todayJ = C.todayJalali();
+  if (fmYear) fmYear.value = String(todayJ.jy);
+
+  /* یک عدد معتبر جلالی برای شروع/پایان دوره؛ فرمت‌های رایج هم پذیرفته می‌شوند. */
+  function normDate(value) {
+    const d = C.parseDate(String(value || '').trim());
+    return d ? C.formatJalali(d) : '';
+  }
+  /* کلید عددی مرتب‌سازی تاریخ جلالی (بدون پرتاب خطا روی تاریخ خالی) */
+  function dateKey(value) {
+    const d = C.parseDate(normDate(value));
+    return d ? d.jy * 10000 + d.jm * 100 + d.jd : 0;
+  }
+  function daysOf(m) {
+    const from = C.parseDate(m.from), to = C.parseDate(m.to);
+    if (!from || !to) return 0;
+    const g1 = C.toGregorian(from.jy, from.jm, from.jd);
+    const g2 = C.toGregorian(to.jy, to.jm, to.jd);
+    if (!g1 || !g2) return 0;
+    const ms = Date.UTC(g2.gy, g2.gm - 1, g2.gd) - Date.UTC(g1.gy, g1.gm - 1, g1.gd);
+    return Math.round(ms / 86400000) + 1;
+  }
+
+  /* اعتبارسنجی مشترک: هم برای ذخیره، هم برای نشان دادن خطا زیر جدول */
+  function validateFiscal(rows) {
+    const errors = [];
+    const names = new Set();
+    rows.forEach((m, i) => {
+      const tag = m.name ? '«' + m.name + '»' : 'ردیف ' + fa(i + 1);
+      const from = normDate(m.from), to = normDate(m.to);
+      m.from = from || m.from; m.to = to || m.to;
+      if (!m.name) errors.push({ i, text: 'نام ماه مالی برای ' + (i + 1) + 'مین ردیف خالی است' });
+      else if (names.has(m.name)) errors.push({ i, text: tag + ' تکراری است' });
+      if (m.name) names.add(m.name);
+      if (!from) errors.push({ i, text: 'تاریخ شروع ' + tag + ' نامعتبر است (مثال: 1405/07/01)' });
+      if (!to) errors.push({ i, text: 'تاریخ پایان ' + tag + ' نامعتبر است' });
+      if (from && to && C.jalaliCmp(C.parseDate(from), C.parseDate(to)) > 0) {
+        errors.push({ i, text: 'در ' + tag + ' تاریخ پایان قبل از شروع است' });
+      }
+    });
+    const sorted = rows.slice().sort((a, b) => dateKey(a.from) - dateKey(b.from));
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1], cur = sorted[i];
+      const prevTo = C.parseDate(normDate(prev.to)), curFrom = C.parseDate(normDate(cur.from));
+      if (prevTo && curFrom && C.jalaliCmp(prevTo, curFrom) >= 0) {
+        errors.push({ i: rows.indexOf(cur), text: 'بازه‌ی «' + (cur.name || '—') + '» با «' + (prev.name || '—') + '» هم‌پوشانی دارد' });
+      }
+    }
+    return errors;
+  }
+
   function renderFiscal() {
     if (!fiscal.length) {
-      fmBody.innerHTML = `<tr><td colspan="5" class="fm-empty">هنوز ماه مالی تعریف نشده — یک ردیف اضافه کنید یا ۱۲ ماه را خودکار بسازید.</td></tr>`;
+      fmBody.innerHTML = `<tr><td colspan="5" class="fm-empty">هنوز ماه مالی تعریف نشده — یک ردیف اضافه کنید یا ۱۲ ماه سال را خودکار بسازید.</td></tr>`;
+      paintFiscalSummary();
       return;
     }
     fmBody.innerHTML = fiscal.map((m, i) => `
       <tr data-i="${i}">
         <td><input class="input fm-name" value="${esc(m.name || '')}" placeholder="مثلاً مهر ۱۴۰۵"></td>
-        <td><div class="date-f"><input class="input fm-from" dir="ltr" inputmode="numeric" value="${esc(m.from || '')}" placeholder="1405-07-01">
+        <td><div class="date-f"><input class="input fm-from" dir="ltr" inputmode="numeric" value="${esc(m.from || '')}" placeholder="1405/07/01">
           <button type="button" class="cal-btn" data-cal="from" data-i="${i}" aria-label="تقویم شروع"><i class="fa-regular fa-calendar"></i></button></div></td>
-        <td><div class="date-f"><input class="input fm-to" dir="ltr" inputmode="numeric" value="${esc(m.to || '')}" placeholder="1405-07-30">
+        <td><div class="date-f"><input class="input fm-to" dir="ltr" inputmode="numeric" value="${esc(m.to || '')}" placeholder="1405/07/30">
           <button type="button" class="cal-btn" data-cal="to" data-i="${i}" aria-label="تقویم پایان"><i class="fa-regular fa-calendar"></i></button></div></td>
         <td><input class="input fm-note" value="${esc(m.note || '')}" placeholder="اختیاری"></td>
         <td class="fm-del"><button class="btn ghost sm" data-del="${i}" title="حذف"><i class="fa-solid fa-trash-can"></i></button></td>
       </tr>`).join('');
-    $$('[data-del]', fmBody).forEach((b) => b.addEventListener('click', () => { fiscal.splice(+b.dataset.del, 1); renderFiscal(); }));
+    $$('[data-del]', fmBody).forEach((b) => b.addEventListener('click', () => {
+      fiscal = collectFiscal(); fiscal.splice(+b.dataset.del, 1); renderFiscal();
+    }));
     $$('.cal-btn', fmBody).forEach((b) => {
-      const row = fiscal[+b.dataset.i] || {};
       const input = b.parentElement.querySelector('input');
-      JCal.attach(b, { input: input, onPick: () => { row[b.dataset.cal] = input.value; } });
+      JCal.attach(b, { input: input, onPick: () => { paintFiscalSummary(); } });
     });
+    $$('.fm-name, .fm-from, .fm-to', fmBody).forEach((el) => el.addEventListener('change', paintFiscalSummary));
+    paintFiscalSummary();
   }
+
+  /* خلاصه + خطاها زیر جدول؛ بدون اینکه چیزی را بی‌صدا پاک کند. */
+  function paintFiscalSummary() {
+    const box = $('#fmSummary');
+    if (!box) return;
+    const rows = collectFiscal();
+    if (!rows.length) { box.className = 'fm-summary'; box.innerHTML = ''; return; }
+    const errors = validateFiscal(rows);
+    const sorted = rows.slice().sort((a, b) => dateKey(a.from) - dateKey(b.from));
+    const total = rows.reduce((sum, m) => sum + daysOf(m), 0);
+    const chips = sorted.map((m) => `<span class="fm-chip"><b>${esc(m.name || '—')}</b>
+      <span dir="ltr">${esc(normDate(m.from) || '—')} → ${esc(normDate(m.to) || '—')}</span>
+      ${daysOf(m) ? `<em>${fa(daysOf(m))} روز</em>` : ''}</span>`).join('');
+    box.className = 'fm-summary' + (errors.length ? ' has-err' : '');
+    box.innerHTML = `<div class="fm-chips">${chips}</div>
+      <div class="fm-total">${fa(rows.length)} دوره · مجموع ${fa(total)} روز</div>
+      ${errors.length ? `<div class="fm-err"><i class="fa-solid fa-circle-exclamation"></i>
+        <ul>${errors.slice(0, 5).map((e) => `<li>${esc(e.text)}</li>`).join('')}</ul></div>` : ''}`;
+  }
+
   function collectFiscal() {
-    return $$('tr[data-i]', fmBody).map((tr) => ({
-      id: (fiscal[+tr.dataset.i] || {}).id || '',
-      name: $('.fm-name', tr).value.trim(),
-      from: C.formatJalali(C.parseDate($('.fm-from', tr).value)) || $('.fm-from', tr).value.trim(),
-      to: C.formatJalali(C.parseDate($('.fm-to', tr).value)) || $('.fm-to', tr).value.trim(),
-      note: $('.fm-note', tr).value.trim()
-    })).filter((m) => m.name || m.from || m.to);
+    return $$('tr[data-i]', fmBody).map((tr) => {
+      const rawFrom = $('.fm-from', tr).value.trim(), rawTo = $('.fm-to', tr).value.trim();
+      return {
+        id: (fiscal[+tr.dataset.i] || {}).id || '',
+        name: $('.fm-name', tr).value.trim(),
+        from: normDate(rawFrom) || rawFrom,
+        to: normDate(rawTo) || rawTo,
+        note: $('.fm-note', tr).value.trim()
+      };
+    }).filter((m) => m.name || m.from || m.to);
   }
-  $('#fmAdd').addEventListener('click', () => { fiscal = collectFiscal(); fiscal.push({ id: '', name: '', from: '', to: '', note: '' }); renderFiscal(); });
+
+  $('#fmAdd').addEventListener('click', () => {
+    fiscal = collectFiscal();
+    /* پیشنهاد هوشمند: دوره‌ی بعد از آخرین دوره (یا ماه جاری) */
+    const last = fiscal.slice().sort((a, b) => dateKey(a.to) - dateKey(b.to)).pop();
+    let next = null;
+    const lastTo = last ? C.parseDate(normDate(last.to)) : null;
+    if (lastTo) next = C.jalaliMonthAdd(lastTo.jy, lastTo.jm, 1);
+    else next = { jy: todayJ.jy, jm: todayJ.jm };
+    const range = C.jalaliMonthRange(next.jy, next.jm);
+    fiscal.push({ id: '', name: C.jalaliMonthLabel(next.jy, next.jm), from: C.formatJalali(range.from), to: C.formatJalali(range.to), note: '' });
+    renderFiscal();
+  });
+
   $('#fmAuto').addEventListener('click', () => {
     fiscal = collectFiscal();
-    const t = C.todayJalali();
-    const start = C.jalaliMonthAdd(t.jy, 1, 0);
+    const year = Number(String(fmYear && fmYear.value || '').replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))) || todayJ.jy;
+    let added = 0, skipped = 0;
     for (let m = 1; m <= 12; m++) {
-      const r = C.jalaliMonthRange(start.jy, m);
-      const label = C.jalaliMonthLabel(start.jy, m);
-      if (fiscal.some((x) => x.from === C.formatJalali(r.from))) continue;
-      fiscal.push({ id: '', name: label, from: C.formatJalali(r.from), to: C.formatJalali(r.to), note: '' });
+      const r = C.jalaliMonthRange(year, m);
+      const from = C.formatJalali(r.from), to = C.formatJalali(r.to);
+      if (fiscal.some((x) => normDate(x.from) === from && normDate(x.to) === to)) { skipped++; continue; }
+      if (fiscal.some((x) => normDate(x.from) === from)) { skipped++; continue; }
+      fiscal.push({ id: '', name: C.jalaliMonthLabel(year, m), from, to, note: '' });
+      added++;
     }
+    fiscal.sort((a, b) => dateKey(a.from) - dateKey(b.from));
     renderFiscal();
-    toast('۱۲ ماه سال جاری ساخته شد — نام و تاریخ‌ها را در صورت نیاز ویرایش کنید', 'info');
+    toast(added ? `${fa(added)} ماه سال ${fa(year)} اضافه شد${skipped ? ` (${fa(skipped)} ردیف از قبل بود)` : ''}` : `همه‌ی ماه‌های ${fa(year)} از قبل وجود دارند`,
+      added ? 'success' : 'info');
   });
+
   $('#fmSave').addEventListener('click', async () => {
     const rows = collectFiscal();
-    for (const m of rows) {
-      if (!m.name) { toast('نام ماه مالی نمی‌تواند خالی باشد', 'error'); return; }
-      if (!C.parseDate(m.from) || !C.parseDate(m.to)) { toast('تاریخ «' + m.name + '» نامعتبر است', 'error'); return; }
+    const errors = validateFiscal(rows);
+    if (errors.length) {
+      paintFiscalSummary();
+      toast(errors[0].text, 'error');
+      const badRow = fmBody.querySelector(`tr[data-i="${errors[0].i}"] .fm-name`);
+      if (badRow) badRow.focus();
+      return;
     }
-    const btn = $('#fmSave'); btn.disabled = true;
+    rows.sort((a, b) => dateKey(a.from) - dateKey(b.from));
+    const btn = $('#fmSave');
+    btn.disabled = true;
+    const label = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> ذخیره…';
     try {
       await api.put('/api/fiscal-months', { months: rows });
       await App.boot();
       fiscal = (App.fiscalMonths || []).map((m) => Object.assign({}, m));
       renderFiscal();
+      if (App.buildFiscalOptions) App.buildFiscalOptions();
       toast('ماه‌های مالی ذخیره شد — در «بازه آماده» بالای صفحه در دسترس‌اند', 'success');
     } catch (e) { toast(e.message, 'error'); }
     btn.disabled = false;
+    btn.innerHTML = label;
   });
   renderFiscal();
 

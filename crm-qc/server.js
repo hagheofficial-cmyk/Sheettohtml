@@ -400,6 +400,33 @@ async function handleApi(req, res, pathname, query) {
   return await dispatchApi(req, res, pathname, query, body, session);
 }
 
+/* یک شکل واحد برای bootstrap: صفحه‌ی ورود، ورود موفق و بارگذاری اولیه همه از
+ * همین استفاده می‌کنند تا رفت‌وبرگشت تکراری حذف شود. */
+function bootstrapPayload(db, session) {
+  const auth = { required: Access.authRequired(db), mode: Access.authMode(db), accounts: Access.accounts(db),
+    user: session ? Access.publicUser(session) : null, admin: Access.isAdmin(session) };
+  if (auth.required && !session) {
+    /* پیش از ورود هیچ داده‌ای برنمی‌گردد؛ فقط آنچه صفحه‌ی ورود لازم دارد. */
+    return { auth: auth, agents: [], teams: [], qcAgents: [], lists: db.lists,
+      fiscalMonths: [], revision: Number(db.revision || 0),
+      settings: { orgName: db.settings.orgName || 'سامانه کنترل کیفیت', scoreBands: db.settings.scoreBands,
+        defaultPreset: db.settings.defaultPreset, authMode: db.settings.authMode },
+      counts: { tickets: 0, socials: 0, calls: 0, callMeta: null } };
+  }
+  return {
+    auth: auth,
+    fiscalMonths: db.fiscalMonths || [],
+    revision: Number(db.revision || 0),
+    qcUsers: Access.isAdmin(session) ? Access.userMask(Access.normalizeUsers(db)) : undefined,
+    agents: db.agents.filter((a) => a.active),
+    teams: [...new Set(db.agents.filter((a) => a.active).map((a) => a.team))],
+    qcAgents: db.qcAgents,
+    lists: db.lists,
+    settings: db.settings,
+    counts: { tickets: db.tickets.length, socials: db.socials.length, calls: (db.callFeedbacks || []).length, callMeta: db.callImport || null }
+  };
+}
+
 async function dispatchApi(req, res, pathname, query, body, session) {
   const parts = pathname.split('/').filter(Boolean); // ['api', ...]
   const method = req.method;
@@ -525,31 +552,7 @@ async function dispatchApi(req, res, pathname, query, body, session) {
   }
 
   /* bootstrap: همه داده‌های مرجع */
-  if (pathname === '/api/bootstrap' && method === 'GET') {
-    const auth = { required: Access.authRequired(db), mode: Access.authMode(db), accounts: Access.accounts(db),
-      user: session ? Access.publicUser(session) : null, admin: Access.isAdmin(session) };
-    if (auth.required && !session) {
-      /* پیش از ورود هیچ داده‌ای برنمی‌گردد؛ فقط آنچه صفحه‌ی ورود لازم دارد. */
-      return ok(res, { auth: auth, agents: [], teams: [], qcAgents: [], lists: db.lists,
-        fiscalMonths: [], revision: Number(db.revision || 0),
-        settings: { orgName: db.settings.orgName || 'سامانه کنترل کیفیت', scoreBands: db.settings.scoreBands,
-          defaultPreset: db.settings.defaultPreset, authMode: db.settings.authMode },
-        counts: { tickets: 0, socials: 0, calls: 0, callMeta: null } });
-    }
-    return ok(res, {
-      auth: auth,
-      fiscalMonths: db.fiscalMonths || [],
-      revision: Number(db.revision || 0),
-      qcUsers: Access.isAdmin(session) ? Access.userMask(Access.normalizeUsers(db)) : undefined,
-      agents: db.agents.filter((a) => a.active),
-      teams: [...new Set(db.agents.filter((a) => a.active).map((a) => a.team))],
-      qcAgents: db.qcAgents,
-      lists: db.lists,
-      settings: db.settings,
-      agentActions: db.agentActions || {},
-      counts: { tickets: db.tickets.length, socials: db.socials.length, calls: (db.callFeedbacks || []).length, callMeta: db.callImport || null }
-    });
-  }
+  if (pathname === '/api/bootstrap' && method === 'GET') return ok(res, bootstrapPayload(db, session));
 
   /* ---- بک‌اپ کامل / بازیابی ---- */
   if (pathname === '/api/backup' && method === 'GET') {
@@ -1055,7 +1058,11 @@ async function dispatchApi(req, res, pathname, query, body, session) {
     if (parts[2] === 'login' && method === 'POST') {
       const result = Access.login(db, body.name, body.password);
       if (!result.ok) return send(res, 401, { error: result.error });
-      return ok(res, { ok: true, user: result.user, token: issueToken(result.user) });
+      /* پاسخ ورود، خودِ داده‌ی اولیه را هم دارد تا کلاینت یک bootstrap کامل
+       * جداگانه نگیرد (در هر ورود یک رفت‌وبرگشت کمتر). */
+      const full = Access.normalizeUser(result.user, 0);
+      const view = Access.isAdmin(full) ? db : Access.scopeDb(db, full);
+      return ok(res, { ok: true, user: result.user, token: issueToken(result.user), bootstrap: bootstrapPayload(view, full) });
     }
     if (parts[2] === 'logout' && method === 'POST') {
       dropToken(str(body.token) || tokenOf(req));
@@ -1072,7 +1079,9 @@ async function dispatchApi(req, res, pathname, query, body, session) {
       db.qcUsers = [];
       const row = Access.saveUser(db, { name: body.name, password: body.password, role: 'admin', active: true, exts: '*' });
       saveStore();
-      return ok(res, { ok: true, user: Access.publicUser(Access.normalizeUser(row, 0)) });
+      const admin = Access.normalizeUser(row, 0);
+      return ok(res, { ok: true, user: Access.publicUser(admin), token: issueToken(admin),
+        bootstrap: bootstrapPayload(db, admin) });
     }
     return notFound(res);
   }
@@ -1083,7 +1092,7 @@ async function dispatchApi(req, res, pathname, query, body, session) {
     if (parts.length === 2 && method === 'GET') {
       return ok(res, { users: Access.userMask(users), required: Access.authRequired(db), mode: Access.authMode(db),
         teams: [...new Set(db.agents.map((a) => a.team))].sort(),
-        agents: db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false,
+        agents: db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, subgroup: a.subgroup || '', active: a.active !== false,
           qcAgents: Access.splitList(a.qcAgents) })) });
     }
     /* شناسه‌ی کاربر هم در بدنه و هم در مسیر (/api/qc-users/u2) پذیرفته می‌شود —
@@ -1101,7 +1110,7 @@ async function dispatchApi(req, res, pathname, query, body, session) {
       if (before && before !== row.name) dropSessionsOf(before);
       return ok(res, { ok: true, user: Access.userMask([Access.normalizeUser(row, 0)])[0],
         users: Access.userMask(Access.normalizeUsers(db)),
-        agents: db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false,
+        agents: db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, subgroup: a.subgroup || '', active: a.active !== false,
           qcAgents: Access.splitList(a.qcAgents) })) });
     }
     if (parts.length === 3 && method === 'DELETE') {

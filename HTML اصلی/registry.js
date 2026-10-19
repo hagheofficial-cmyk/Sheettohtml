@@ -65,6 +65,7 @@ function save(db, body, id) {
     }
     db.agents[db.agents.indexOf(old)] = row;
   } else { row.id = nextId(db); db.agents.push(row); }
+  if (P.clearResolveCache) P.clearResolveCache();
   return row;
 }
 function bulk(db, rows) {
@@ -88,6 +89,7 @@ function removeAll(db, body) {
   const removed = (db.agents || []).length;
   db.seq = db.seq || {}; db.seq.agent = Math.max(db.seq.agent || 1, Math.max(0, ...(db.agents || []).map(a => Number(a.id) || 0)) + 1);
   db.agents = []; db.registryCleared = true;
+  if (P.clearResolveCache) P.clearResolveCache();
   return { ok: true, removed, historyPreserved: true };
 }
 return { save, bulk, removeAll, extension };

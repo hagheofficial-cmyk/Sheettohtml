@@ -74,6 +74,9 @@
 .capture-host [data-call-detail],.capture-host .pDel,.capture-host #pAddAction,.capture-host .no-capture { display:none !important; }
 .capture-host .card,.capture-host .grid { break-inside:avoid; }
 .capture-host .grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+.capture-host .history-wrap { max-height:none !important; overflow:visible !important; }
+.capture-host .history-stack .full-row { width:100% !important; }
+.capture-host .call-log-body { display:block !important; }
 .capture-host .capture-title { padding:15px 20px;margin-bottom:18px;border-bottom:2px solid var(--brand);font-weight:800;font-size:21px; }
 .capture-host .capture-title small { display:block;color:var(--muted);font-weight:400;font-size:12px; }
 .criteria-layout { display:grid;grid-template-columns:250px minmax(0,1fr);gap:17px; }

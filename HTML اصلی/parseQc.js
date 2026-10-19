@@ -225,13 +225,32 @@ function teamForm(s) {
   return null;
 }
 function displayTeam(s) { return teamForm(s) === 'tele' ? 'Telesales' : String(s || ''); }
+/* تطبیق نام کارشناس با کش: گزارش‌ها برای هر ردیف نام را resolve می‌کنند و
+ * بدون کش، فیلتر یک کارشناس روی چند هزار ردیف × ده‌ها نام، چند ثانیه طول می‌کشید.
+ * کش به «همان آرایه‌ی agents» گره خورده و با تغییر تعداد عضو یا صریحاً با
+ * clearResolveCache() پاک می‌شود. */
+let resolveCacheAgents = null, resolveCacheSize = -1, resolveCache = new Map();
+function clearResolveCache() { resolveCacheAgents = null; resolveCacheSize = -1; resolveCache = new Map(); }
 function resolveExpert(agents, rawName) {
   const name = normName(rawName);
   if (!name) return { agent: null, ambiguous: false };
-  const exact = (agents || []).filter(a => a.name === String(rawName).trim());
-  if (exact.length === 1) return { agent: exact[0], ambiguous: false };
-  const matches = (agents || []).filter(a => [a.name].concat(a.aliases || []).some(n => nameKeyOf(n) === nameKeyOf(name)));
-  return { agent: matches.length === 1 ? matches[0] : null, ambiguous: matches.length > 1 };
+  const list = agents || [];
+  if (resolveCacheAgents !== list || resolveCacheSize !== list.length) {
+    resolveCacheAgents = list; resolveCacheSize = list.length; resolveCache = new Map();
+  }
+  const key = nameKeyOf(name);
+  const hit = resolveCache.get(key);
+  if (hit) return hit;
+  const exact = list.filter(a => a.name === String(rawName).trim());
+  let result;
+  if (exact.length === 1) {
+    result = { agent: exact[0], ambiguous: false };
+  } else {
+    const matches = list.filter(a => [a.name].concat(a.aliases || []).some(n => nameKeyOf(n) === key));
+    result = { agent: matches.length === 1 ? matches[0] : null, ambiguous: matches.length > 1 };
+  }
+  resolveCache.set(key, result);
+  return result;
 }
 function defaults(type) {
   const keys = type === 'tele' ? TELE_CRITERIA : type === 'mlm' ? MLM_CRITERIA : ACCOUNT_CRITERIA;
@@ -337,6 +356,7 @@ function importDiagnostics(rows, agents) {
 }
 
 return {
+  clearResolveCache: clearResolveCache,
   PARSER_VERSION: 3, anyToJalali, parseRows, formTypeOfFileName, sniffFormType, normName, isRedline, callRowKey,
   criteriaFor, criteriaLabelsFor, labelOf, definitionsFor, defaults, resolver, validateConfig, saveTeamConfig, hasConfiguration,
   elementValue, teamKey, teamForm, displayTeam, nameKey: nameKeyOf, resolveExpert, importDiagnostics, setConfig: cfg => { browserConfig = cfg || null; },

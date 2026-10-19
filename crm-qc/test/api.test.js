@@ -305,3 +305,31 @@ test('write responses carry the new revision header (no extra revision round tri
   const after = await (await fetch(server.origin + '/api/revision')).json();
   assert.equal(Number(after.revision), revision, 'همان نسخه‌ای که در پاسخ آمد');
 });
+
+/* سرعت ورود: پاسخ /api/auth/login خودِ داده‌ی اولیه را هم می‌دهد تا کلاینت بعد
+ * از رمز، یک /api/bootstrap کامل دیگر نگیرد. */
+test('login response already carries the bootstrap payload (one round trip fewer)', async (t) => {
+  const server = await startServer();
+  t.after(() => server.close());
+  const setup = await (await fetch(server.origin + '/api/auth/setup', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'مدیر سیستم', password: 'admin-1234' })
+  })).json();
+  assert.ok(setup.token, 'توکن در پاسخ راه‌اندازی');
+  assert.ok(setup.bootstrap && setup.bootstrap.auth && setup.bootstrap.auth.user, 'bootstrap در پاسخ راه‌اندازی');
+
+  const login = await (await fetch(server.origin + '/api/auth/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'مدیر سیستم', password: 'admin-1234' })
+  })).json();
+  assert.equal(login.user.role, 'admin');
+  assert.ok(login.token, 'توکن ورود');
+  assert.ok(login.bootstrap, 'داده‌ی اولیه همراه ورود');
+  assert.equal(login.bootstrap.auth.user.name, 'مدیر سیستم');
+  const fresh = await (await fetch(server.origin + '/api/bootstrap', {
+    headers: { Authorization: 'Bearer ' + login.token }
+  })).json();
+  assert.deepEqual(login.bootstrap.teams, fresh.teams, 'همان چیزی که مسیر عادی bootstrap می‌دهد');
+  assert.equal(login.bootstrap.qcUsers.length, 1);
+  assert.equal(login.bootstrap.agentActions, undefined, 'داده‌ی سنگین اقدام‌ها از بار اولیه حذف شده است');
+});

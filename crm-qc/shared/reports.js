@@ -50,9 +50,9 @@
     var teamSet = valueSet(q.team), agentSet = valueSet(q.agent);
     if (teamSet) teamSet = new Set(Array.from(teamSet).map(P.teamKey));
     return (rows || []).map(function (r) {
-      if (!data) return r;
+      if (!data || !data.agents || !data.agents.length) return r;
       var field = r.expertName !== undefined ? 'expertName' : 'agentName';
-      var match = P.resolveExpert(data.agents || [], r[field]).agent;
+      var match = P.resolveExpert(data.agents, r[field]).agent;
       return match && match.name !== r[field] ? Object.assign({}, r, { [field]: match.name }) : r;
     }).filter(function (r) {
       if ((q.from || q.to) && !inRange(r.reviewDate, q.from, q.to)) return false;
@@ -96,7 +96,21 @@
       .concat(Array.from(present).filter(function (k) { return (ordered || []).indexOf(k) === -1; }));
   }
   function configuredCriteria(data, supplied) {
-    return Object.assign({}, P.resolver((data.settings || {}).callCriteria), supplied || {}, { rowTeam: r => rowTeam(data, r), elementValue: (r,k) => P.elementValue(Object.assign({},r,{team:r.criteriaTeam||r.team||rowTeam(data,r)}),k,(data.settings||{}).callCriteria||null) });
+    const base = P.resolver((data.settings || {}).callCriteria);
+    const memo = new Map();
+    const cached = (key, make) => { if (memo.has(key)) return memo.get(key); const value = make(); memo.set(key, value); return value; };
+    const wrapped = {
+      config: base.config,
+      definitionsFor: (type, team) => cached('d|' + type + '|' + (team || ''), () => base.definitionsFor(type, team)),
+      criteriaFor: (type, team) => cached('c|' + type + '|' + (team || ''), () => base.criteriaFor(type, team)),
+      configured: (type, team) => cached('g|' + type + '|' + (team || ''), () => base.configured(type, team)),
+      labelOf: (type, key, team) => cached('l|' + type + '|' + (team || '') + '|' + key, () => base.labelOf(type, key, team)),
+      elementValue: base.elementValue
+    };
+    return Object.assign(wrapped, supplied || {}, {
+      rowTeam: r => rowTeam(data, r),
+      elementValue: (r, k) => P.elementValue(Object.assign({}, r, { team: r.criteriaTeam || r.team || rowTeam(data, r) }), k, (data.settings || {}).callCriteria || null)
+    });
   }
   function criterionLabel(rows, type, key, crit) {
     const team = rows.length ? rows[0].criteriaTeam || rows[0].team || (crit.rowTeam ? crit.rowTeam(rows[0]) : '') : '';
@@ -398,10 +412,13 @@
     var voices = Array.isArray(vRaw) ? vRaw : (vRaw && typeof vRaw === 'object' && typeof vRaw.count === 'number' ? { count: vRaw.count } : []);
 
     /* نرخ موفقیت معیارهای تماس برای این کارشناس — طبق نمونه پنل (بازیگر معیارها از روی خود ردیف‌ها، چون دیکشنری نمی‌خواهیم سرور وابسته شود) */
+    var profileCriteria = configuredCriteria(data);
+    var callsByForm = { tele: [], account: [], mlm: [] };
+    Ph.forEach(function (r) { if (callsByForm[r.formType]) callsByForm[r.formType].push(r); });
     var byTypeRates = ['tele', 'account', 'mlm'].map(function (ft) {
-      var rs = Ph.filter(function (r) { return r.formType === ft; });
+      var rs = callsByForm[ft];
       if (!rs.length) return null;
-      var criteria = configuredCriteria(data);
+      var criteria = profileCriteria;
       var keys = criteriaKeys(rs, ft, criteria);
       var list = keys.map(function (k) {
         var stats = criterionStats(rs, k, criteria);
@@ -435,7 +452,7 @@
       calls: {
         rows: Ph, count: Ph.length,
         byType: ['tele', 'account', 'mlm'].map(function (t) {
-          var rs = Ph.filter(function (x) { return x.formType === t; });
+          var rs = callsByForm[t];
           return { type: t, count: rs.length, avg: avgScore(rs) };
         }).filter(function (x) { return x.count > 0; }),
         redlineCount: redlineCount(Ph, 'call'), scoredCount: scoredRows(Ph).length,
@@ -487,6 +504,16 @@
       return { form: ft, count: rs.length, avgScore: avgScore(rs), redlines: redlineCount(rs, 'call') };
     }).filter(Boolean);
 
+    /* گروه‌بندی کارشناسان یک‌بار انجام می‌شود؛ هیت‌مپ و رتبه‌بندی از همین
+     * گروه‌ها ساخته می‌شوند تا O(کارشناس × ردیف) به O(ردیف) برسد. */
+    var byExpert = Object.create(null);
+    Ph.forEach(function (r) {
+      var name = r.expertName;
+      if (!byExpert[name]) byExpert[name] = [];
+      byExpert[name].push(r);
+    });
+    var byExpertNames = Object.keys(byExpert);
+
     /* نرخ هر معیار — جدا برای هر نوع فرم به ترتیب پنل */
     function ratesOf(rows, type) {
       return criteriaKeys(rows, type, crit).map(function (key) {
@@ -494,7 +521,10 @@
         return Object.assign({}, stats, { label: criterionLabel(rows,type,key,crit), total: stats.applicable, observations: stats.total });
       });
     }
-    var elementRates = {
+    /* سنگین‌ترین بخش تحلیل فقط وقتی ساخته می‌شود که صریحاً خواسته شده باشد
+     * (خروجی اکسل)؛ نمای معمول صفحه به آن نیاز ندارد. */
+    var wantFull = q.full === true || q.full === '1' || q.full === 1;
+    var elementRates = !wantFull ? null : {
       tele: ratesOf(Ph.filter(function (r) { return r.formType === 'tele'; }), 'tele'),
       account: ratesOf(Ph.filter(function (r) { return r.formType === 'account'; }), 'account'),
       mlm: ratesOf(Ph.filter(function (r) { return r.formType === 'mlm'; }), 'mlm')
@@ -504,14 +534,22 @@
     function heatmapOf(type) {
       var rows = Ph.filter(function (r) { return r.formType === type; });
       var keys = criteriaKeys(rows, type, crit);
-      var names = Array.from(new Set(rows.map(function (r) { return r.expertName; })));
+      var present = Object.create(null);
+      rows.forEach(function (r) { present[r.expertName] = 1; });
+      var names = Object.keys(present);
       var out = names.map(function (name) {
-        var ers = rows.filter(function (r) { return r.expertName === name; });
-        var cells = keys.map(function (k) {
-          var ok = 0, bad = 0;
-          ers.forEach(function (r) { var v = crit.elementValue ? crit.elementValue(r,k) : C.normalizeTri((r.elements || {})[k]); if (v === 1) ok++; else if (v === 0) bad++; });
-          var tot = ok + bad;
-          return tot === 0 ? null : { ok: ok, bad: bad, total: tot, errorRate: C.round2(100 * bad / tot) };
+        var ers = byExpert[name] || [];
+        var counters = keys.map(function () { return { ok: 0, bad: 0 }; });
+        ers.forEach(function (r) {
+          if (r.formType !== type) return;
+          keys.forEach(function (k, i) {
+            var v = crit.elementValue ? crit.elementValue(r, k) : C.normalizeTri((r.elements || {})[k]);
+            if (v === 1) counters[i].ok++; else if (v === 0) counters[i].bad++;
+          });
+        });
+        var cells = counters.map(function (c) {
+          var tot = c.ok + c.bad;
+          return tot === 0 ? null : { ok: c.ok, bad: c.bad, total: tot, errorRate: C.round2(100 * c.bad / tot) };
         });
         return { name: name, team: teamOf(data.agents, name) || '', count: ers.length, avg: avgScore(ers), cells: cells };
       });
@@ -526,8 +564,8 @@
     var heatmaps = { tele: heatmapOf('tele'), account: heatmapOf('account'), mlm: heatmapOf('mlm') };
 
     /* رتبه‌بندی کارشناسان */
-    var leaderboard = Object.keys(expertSet).map(function (name) {
-      var rs = Ph.filter(function (r) { return r.expertName === name; });
+    var leaderboard = byExpertNames.map(function (name) {
+      var rs = byExpert[name];
       return {
         name: name, team: teamOf(data.agents, name) || rs[0].team || '',
         count: rs.length, avgScore: avgScore(rs),
@@ -548,8 +586,12 @@
         score: r.score, comment: r.qcComment, date: r.reviewDate };
     }).sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); }).slice(0, 60);
 
-    /* روند ماهانه */
+    /* روند ماهانه — فقط در درخواست کامل (خروجی اکسل) */
     var byMonth = {};
+    if (!wantFull) {
+      return { kpis: kpis, byForm: byForm, elementRates: null, heatmaps: heatmaps,
+        leaderboard: leaderboard, redlines: redlines, comments: comments, monthly: [] };
+    }
     Ph.forEach(function (r) {
       var j = C.parseDate(r.reviewDate); if (!j) return;
       var d = C.formatJalali(j).slice(0, 7);
