@@ -17,6 +17,9 @@ const Registry = require('./shared/registry.js');
 const ImportData = require('./shared/importData.js');
 const ExpertRef = require('./shared/expertRef.js');
 const Sheets = require('./googleSheets.js');
+const Access = require('./shared/access.js');
+const Fiscal = require('./shared/fiscal.js');
+const Elements = require('./shared/elements.js');
 const crypto = require('crypto');
 
 const ROOT = __dirname;
@@ -54,6 +57,12 @@ function loadStore() {
   if (!db.agentActions) db.agentActions = {};
   if (!db.settings.scoreBands) db.settings.scoreBands = [90, 75, 50];
   if (!db.settings.defaultPreset) db.settings.defaultPreset = 'cur';
+  /* ماه‌های مالی، کاربران QC و حالت احراز هویت (مشترک با نسخه‌ی Apps Script) */
+  if (!Array.isArray(db.fiscalMonths)) db.fiscalMonths = [];
+  db.fiscalMonths = Fiscal.normalizeMonths(db.fiscalMonths);
+  if (!Array.isArray(db.qcUsers)) db.qcUsers = [];
+  if (!db.settings.authMode) db.settings.authMode = 'auto';
+  if (!db.revision) db.revision = 1;
   if (!db.seq) db.seq = { ticket: 1, social: 1, agent: 1, action: 1 };
   if (!db.seq.action) db.seq.action = 1;
   if (!Array.isArray(db.callFeedbacks)) db.callFeedbacks = [];
@@ -62,7 +71,10 @@ function loadStore() {
   if (hadSheetIds) saveStore(true); // شناسه‌ی تماس‌ها برای همگام‌سازی پایدار بین سرور و شیت
 }
 
+let scopedRead = false;
 function saveStore(sync) {
+  if (scopedRead) { console.warn('[auth] تلاش برای ذخیره در حالت خواندن محدودشده — نادیده گرفته شد'); return; }
+  db.revision = Number(db.revision || 0) + 1; // برای اطلاع کاربران همزمان از تغییر داده
   const write = () => {
     const tmp = STORE_FILE + '.tmp';
     fs.writeFileSync(tmp, JSON.stringify(db, null, 1));
@@ -144,6 +156,14 @@ const str = (v) => (v == null ? '' : String(v)).trim();
 function jalaliStr(v) {
   const j = C.parseJalali(v);
   return j ? C.formatJalali(j) : null;
+}
+
+/* همزمانی چند کارشناس: اگر رکورد پس از بازکردن فرم عوض شده باشد ۴۰۹ می‌دهیم. */
+function conflictWith(row, body) {
+  const base = body && body.baseUpdatedAt;
+  if (!base || !row || !row.updatedAt) return null;
+  if (String(base) === String(row.updatedAt) || body.overwrite) return null;
+  return { error: 'این رکورد بعد از بازکردن فرم توسط شخص دیگری ویرایش شده است', conflict: { current: clone(row) } };
 }
 
 /* -------------------------------------------------- نرمال‌سازی رکورد تیکت */
@@ -275,13 +295,70 @@ function serveStatic(res, base, rel) {
   });
 }
 
+/* ------------------------------------------------ نشست‌ها (توکن در حافظه) */
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+const sessions = new Map();
+
+function issueToken(user) {
+  const token = crypto.randomBytes(24).toString('hex');
+  sessions.set(token, { user: user, exp: Date.now() + SESSION_TTL_MS });
+  return token;
+}
+function tokenOf(req) {
+  const header = req.headers['x-qc-token'] || req.headers.authorization || '';
+  return str(header).replace(/^Bearer\s+/i, '');
+}
+function resolveSession(req) {
+  const token = tokenOf(req);
+  if (!token) return null;
+  const hit = sessions.get(token);
+  if (!hit) return null;
+  if (hit.exp < Date.now()) { sessions.delete(token); return null; }
+  hit.exp = Date.now() + SESSION_TTL_MS; // انقضای لغزان
+  /* نقش/دسترسی از منبع حقیقت (db) تازه می‌شود تا تغییرات مدیر فوراً اعمال گردد. */
+  const fresh = Access.findUser(Access.normalizeUsers(db), hit.user.name);
+  return fresh ? fresh : hit.user;
+}
+function dropToken(token) { if (token) sessions.delete(token); }
+function dropSessionsOf(name) {
+  const key = Access.normalizeUser({ name: name }).key;
+  sessions.forEach((hit, token) => { if (Access.normalizeUser({ name: hit.user.name }).key === key) sessions.delete(token); });
+}
+
 /* -------------------------------------------------------------------- API */
 async function handleApi(req, res, pathname, query) {
-  const parts = pathname.split('/').filter(Boolean); // ['api', ...]
   const method = req.method;
   const body = method === 'POST' || method === 'PUT' || method === 'DELETE'
     ? await readBody(req, ['/api/calls/files', '/api/backup'].includes(pathname) ? 64e6 : 5e6)
     : {};
+  const authPath = pathname.indexOf('/api/auth/') === 0;
+  /* این مسیرها بدون نشست هم پاسخ می‌دهند: صفحه‌ی ورود، شماره‌ی نسخه و bootstrap
+   * (که پیش از ورود فقط پوسته‌ی خالی را برمی‌گرداند). */
+  const publicPath = authPath || pathname === '/api/revision' || pathname === '/api/bootstrap';
+  const session = resolveSession(req);
+  if (!publicPath && Access.authRequired(db)) {
+    const allowed = Access.canAccessApi(db, session, method, pathname);
+    if (!allowed.ok) return send(res, allowed.status || 403, { error: allowed.error });
+    if (method !== 'GET') {
+      const guard = Access.writeGuard(db, session, method, pathname, body);
+      if (!guard.ok) return send(res, guard.status || 403, { error: guard.error });
+    }
+  }
+  /* خواندن‌ها برای کارشناس QC روی کپی محدودشده‌ی داده اجرا می‌شوند (بند ۵). */
+  const scopeable = !authPath && pathname !== '/api/revision';
+  if (method === 'GET' && session && scopeable && Access.authRequired(db) && !Access.isAdmin(session)) {
+    const full = db;
+    db = Access.scopeDb(full, session);
+    scopedRead = true;
+    try { return await dispatchApi(req, res, pathname, query, body, session); }
+    finally { scopedRead = false; db = full; }
+  }
+  return await dispatchApi(req, res, pathname, query, body, session);
+}
+
+async function dispatchApi(req, res, pathname, query, body, session) {
+  const parts = pathname.split('/').filter(Boolean); // ['api', ...]
+  const method = req.method;
 
   // تاریخ اشتباه نباید به‌صورت بی‌صدا گزارش خالی یا پاک‌سازی/بک‌اپ کامل بسازد.
   const datedPath = ['/api/dashboard', '/api/reports', '/api/portfolio', '/api/portfolio/agents',
@@ -401,7 +478,21 @@ async function handleApi(req, res, pathname, query) {
 
   /* bootstrap: همه داده‌های مرجع */
   if (pathname === '/api/bootstrap' && method === 'GET') {
+    const auth = { required: Access.authRequired(db), mode: Access.authMode(db), accounts: Access.accounts(db),
+      user: session ? Access.publicUser(session) : null, admin: Access.isAdmin(session) };
+    if (auth.required && !session) {
+      /* پیش از ورود هیچ داده‌ای برنمی‌گردد؛ فقط آنچه صفحه‌ی ورود لازم دارد. */
+      return ok(res, { auth: auth, agents: [], teams: [], qcAgents: [], lists: db.lists,
+        fiscalMonths: [], revision: Number(db.revision || 0),
+        settings: { orgName: db.settings.orgName || 'سامانه کنترل کیفیت', scoreBands: db.settings.scoreBands,
+          defaultPreset: db.settings.defaultPreset, authMode: db.settings.authMode },
+        counts: { tickets: 0, socials: 0, calls: 0, callMeta: null } });
+    }
     return ok(res, {
+      auth: auth,
+      fiscalMonths: db.fiscalMonths || [],
+      revision: Number(db.revision || 0),
+      qcUsers: Access.isAdmin(session) ? Access.userMask(Access.normalizeUsers(db)) : undefined,
       agents: db.agents.filter((a) => a.active),
       teams: [...new Set(db.agents.filter((a) => a.active).map((a) => a.team))],
       qcAgents: db.qcAgents,
@@ -581,6 +672,8 @@ async function handleApi(req, res, pathname, query) {
     if (parts.length === 3 && method === 'PUT') {
       const row = db.tickets.find((r) => r.id === +parts[2]);
       if (!row) return notFound(res);
+      const clash = conflictWith(row, body);
+      if (clash) return send(res, 409, clash);
       const n = normalizeTicket(body, row);
       if (n.error) return bad(res, n.error);
       Object.assign(row, n.value);
@@ -625,6 +718,8 @@ async function handleApi(req, res, pathname, query) {
     if (parts.length === 3 && method === 'PUT') {
       const row = db.socials.find((r) => r.id === +parts[2]);
       if (!row) return notFound(res);
+      const clash = conflictWith(row, body);
+      if (clash) return send(res, 409, clash);
       const n = normalizeSocial(body, row);
       if (n.error) return bad(res, n.error);
       Object.assign(row, n.value);
@@ -890,11 +985,116 @@ async function handleApi(req, res, pathname, query) {
       if (Array.isArray(body.scoreBands) && body.scoreBands.length === 3) {
         s.scoreBands = body.scoreBands.map((x) => Math.min(100, Math.max(0, +x || 0))).sort((a, b) => b - a);
       }
-      if (['cur', 'prev', 'all'].indexOf(body.defaultPreset) !== -1) s.defaultPreset = body.defaultPreset;
+      if (['cur', 'prev', 'all', 'today'].indexOf(body.defaultPreset) !== -1 || Fiscal.isFiscalPreset(body.defaultPreset)) s.defaultPreset = body.defaultPreset;
+      if (['auto', 'on', 'off'].indexOf(str(body.authMode)) !== -1) s.authMode = str(body.authMode);
       saveStore();
       return ok(res, s);
     }
   }
+
+  /* ---- احراز هویت (بند ۵) ---- */
+  if (parts[1] === 'auth') {
+    if (parts[2] === 'accounts' && method === 'GET') {
+      return ok(res, { required: Access.authRequired(db), mode: Access.authMode(db),
+        accounts: Access.accounts(db), firstRun: !Access.normalizeUsers(db).length,
+        orgName: db.settings.orgName || '' });
+    }
+    if (parts[2] === 'login' && method === 'POST') {
+      const result = Access.login(db, body.name, body.password);
+      if (!result.ok) return send(res, 401, { error: result.error });
+      return ok(res, { ok: true, user: result.user, token: issueToken(result.user) });
+    }
+    if (parts[2] === 'logout' && method === 'POST') {
+      dropToken(str(body.token) || tokenOf(req));
+      return ok(res, { ok: true });
+    }
+    if (parts[2] === 'me' && method === 'GET') {
+      return ok(res, { required: Access.authRequired(db), user: session ? Access.publicUser(session) : null,
+        admin: Access.isAdmin(session), accounts: Access.accounts(db) });
+    }
+    if (parts[2] === 'setup' && method === 'POST') {
+      /* راه‌اندازی اولیه فقط وقتی هیچ کاربری وجود ندارد (جلوگیری از بن‌بست مدیر) */
+      if (Access.normalizeUsers(db).length) return bad(res, 'قبلاً کاربری تعریف شده است؛ از بخش مدیریت QC استفاده کنید');
+      if (!str(body.name) || !str(body.password)) return bad(res, 'نام و رمز مدیر الزامی است');
+      db.qcUsers = [];
+      const row = Access.saveUser(db, { name: body.name, password: body.password, role: 'admin', active: true, exts: '*' });
+      saveStore();
+      return ok(res, { ok: true, user: Access.publicUser(Access.normalizeUser(row, 0)) });
+    }
+    return notFound(res);
+  }
+
+  /* ---- کاربران QC و دسترسی‌ها (تب QC_Users) ---- */
+  if (parts[1] === 'qc-users') {
+    const users = Access.normalizeUsers(db);
+    if (parts.length === 2 && method === 'GET') {
+      return ok(res, { users: Access.userMask(users), required: Access.authRequired(db), mode: Access.authMode(db),
+        teams: [...new Set(db.agents.map((a) => a.team))].sort(),
+        agents: db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false })) });
+    }
+    /* شناسه‌ی کاربر هم در بدنه و هم در مسیر (/api/qc-users/u2) پذیرفته می‌شود —
+     * تا رفتار Node و Apps Script (که از همان LocalApi استفاده می‌کند) یکی بماند. */
+    const pathId = parts.length === 3 ? decodeURIComponent(parts[2]) : '';
+    if ((method === 'POST' && parts.length === 2) || (method === 'PUT' && (parts.length === 2 || parts.length === 3))) {
+      const wantedId = str(body.id) || pathId;
+      const existing = wantedId ? (db.qcUsers || []).find((u) => String(u.id) === wantedId) : null;
+      if (method === 'PUT' && !existing) return notFound(res);
+      const before = existing ? existing.name : '';
+      const row = Access.saveUser(db, body, existing);
+      saveStore();
+      if (before && before !== row.name) dropSessionsOf(before);
+      return ok(res, { ok: true, user: Access.userMask([Access.normalizeUser(row, 0)])[0],
+        users: Access.userMask(Access.normalizeUsers(db)) });
+    }
+    if (parts.length === 3 && method === 'DELETE') {
+      const target = users.find((u) => String(u.id) === String(parts[2]));
+      if (!target) return notFound(res);
+      if (session && target.key === session.key) return bad(res, 'نمی‌توانید حساب کاربری خودتان را حذف کنید');
+      if (target.role === 'admin' && users.filter((u) => u.role === 'admin' && u.active).length <= 1) {
+        return bad(res, 'حداقل یک مدیر فعال باید باقی بماند');
+      }
+      Access.deleteUser(db, target.name);
+      dropSessionsOf(target.name);
+      saveStore();
+      return ok(res, { ok: true, users: Access.userMask(Access.normalizeUsers(db)) });
+    }
+    return notFound(res);
+  }
+
+  /* ---- ماه‌های مالی (تب Fiscal_Months) ---- */
+  if (parts[1] === 'fiscal-months') {
+    const months = Fiscal.normalizeMonths(db.fiscalMonths);
+    if (method === 'GET') {
+      const today = C.formatJalali(C.todayJalali());
+      return ok(res, { months: months, options: Fiscal.presetOptions(months, today),
+        current: Fiscal.currentMonth(months, today), previous: Fiscal.previousMonth(months, today) });
+    }
+    if (method === 'PUT') {
+      const rows = Array.isArray(body.months) ? body.months : [];
+      const clean = rows.map((m) => ({ id: str(m.id), name: str(m.name), from: str(m.from), to: str(m.to), note: str(m.note) }))
+        .filter((m) => m.name || m.from || m.to);
+      for (const m of clean) {
+        if (!m.name) return bad(res, 'نام ماه مالی الزامی است');
+        if (!C.parseDate(m.from) || !C.parseDate(m.to)) return bad(res, 'تاریخ «' + m.name + '» نامعتبر است');
+      }
+      db.fiscalMonths = Fiscal.normalizeMonths(clean);
+      saveStore();
+      return ok(res, { ok: true, months: db.fiscalMonths });
+    }
+    if (method === 'DELETE' && parts.length === 3) {
+      db.fiscalMonths = Fiscal.normalizeMonths((db.fiscalMonths || []).filter((m) => m.id !== parts[2]));
+      saveStore();
+      return ok(res, { ok: true, months: db.fiscalMonths });
+    }
+    return notFound(res);
+  }
+
+  /* ---- المان‌ها به‌صورت تخت (تب Elements) و خلاصه‌ی ماهانه (تب Monthly_Summary) ---- */
+  if (parts[1] === 'elements' && method === 'GET') {
+    return ok(res, Elements.table(db.settings.callCriteria, [...new Set(db.agents.map((a) => a.team))]));
+  }
+  if (parts[1] === 'monthly-summary' && method === 'GET') return ok(res, Fiscal.monthlySummary(db, query));
+  if (parts[1] === 'revision' && method === 'GET') return ok(res, { revision: Number(db.revision || 0), at: Date.now() });
 
   notFound(res);
 }

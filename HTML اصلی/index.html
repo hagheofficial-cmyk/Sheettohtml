@@ -64,6 +64,7 @@
       <a href="#/criteria" class="nav-item" data-route="criteria"><i class="fa-solid fa-sliders"></i><span>تغییر المان‌ها</span></a>
       <a href="#/directory" class="nav-item" data-route="directory"><i class="fa-solid fa-users-gear"></i><span>مدیریت پایه</span></a>
       <a href="#/agents" class="nav-item" data-route="agents"><i class="fa-solid fa-user-group"></i><span>مدیریت کارشناسان</span></a>
+      <a href="#/qcadmin" class="nav-item" data-route="qcadmin"><i class="fa-solid fa-user-shield"></i><span>مدیریت QC</span></a>
       <a href="#/sheets" class="nav-item" data-route="sheets"><i class="fa-brands fa-google"></i><span>اتصال به گوگل شیت</span></a>
     </nav>
 
@@ -80,31 +81,50 @@
       <a class="topbar-logo" href="#/dashboard" aria-label="داشبورد سامانه"><img src="logo.png" alt="لوگوی سامانه" width="36" height="36"></a>
       <div class="topbar-title" id="pageTitle">داشبورد</div>
       <div class="topbar-left">
-        <div class="confirm-control"><button class="btn success-soft" id="confirmData" type="button" title="ذخیره کل اطلاعات ثبت‌شده در همین مرورگر برای بازکردن بعدی"><i class="fa-solid fa-circle-check"></i><span>تأیید اطلاعات</span></button><small id="confirmedInfo" role="status" aria-live="polite">هنوز تأیید نشده</small></div>
         <span class="data-source-badge" id="dataSourceBadge">سرور</span>
-        <button class="btn ghost sm" id="useServerData" type="button" hidden title="نمایش اطلاعات سرور به جای نسخه این مرورگر"><i class="fa-solid fa-cloud"></i><span>اطلاعات سرور</span></button>
+        <button class="btn ghost sm sync-chip" id="syncChip" type="button" hidden title="داده‌های شیت بعد از آخرین خواندن تغییر کرده است"><i class="fa-solid fa-arrows-rotate"></i><span>داده‌ها تازه شد — بروزرسانی</span></button>
         <button class="theme-toggle" id="themeToggle" type="button" aria-label="تغییر حالت روشن و تاریک" title="تغییر حالت روشن و تاریک"><i class="fa-solid fa-sun"></i><span>حالت روشن</span></button>
+        <div class="user-chip" id="userChip" hidden>
+          <span class="user-avatar" aria-hidden="true"><i class="fa-solid fa-user"></i></span>
+          <span class="user-meta"><strong id="userName">—</strong><small id="userRole">—</small></span>
+          <button class="btn ghost sm" id="logoutBtn" type="button" title="خروج از حساب کاربری"><i class="fa-solid fa-right-from-bracket"></i><span>خروج</span></button>
+        </div>
         <div class="today-chip" id="todayChip"><i class="fa-regular fa-calendar"></i><span></span></div>
       </div>
     </header>
 
     <form class="global-range no-print" id="globalRange" aria-label="فیلتر تاریخ کل سامانه">
-      <div class="range-title"><span class="range-icon"><i class="fa-solid fa-calendar-days"></i></span><div><strong>بازه بررسی عملکرد</strong><small>یک تاریخ؛ همه گزارش‌ها</small></div></div>
-      <div class="field grow-0"><label for="gFrom">از تاریخ بررسی</label>
-        <div class="date-f"><input class="input" id="gFrom" dir="ltr" inputmode="numeric" placeholder="۱۴۰۵/۰۶/۰۱" autocomplete="off">
-          <button type="button" class="cal-btn" id="gFromBtn" aria-label="تقویم تاریخ شروع"><i class="fa-regular fa-calendar"></i></button></div>
+      <div class="range-bar">
+        <div class="range-title">
+          <span class="range-icon"><i class="fa-solid fa-calendar-days"></i></span>
+          <div><strong>بازه بررسی عملکرد</strong><small>یک بازه؛ روی همه گزارش‌ها</small></div>
+        </div>
+        <div class="range-fields">
+          <div class="field"><label for="gFrom">از تاریخ</label>
+            <div class="date-f"><input class="input" id="gFrom" dir="ltr" inputmode="numeric" placeholder="۱۴۰۵/۰۶/۰۱" autocomplete="off">
+              <button type="button" class="cal-btn" id="gFromBtn" aria-label="تقویم تاریخ شروع"><i class="fa-regular fa-calendar"></i></button></div>
+          </div>
+          <div class="field"><label for="gTo">تا تاریخ</label>
+            <div class="date-f"><input class="input" id="gTo" dir="ltr" inputmode="numeric" placeholder="۱۴۰۵/۰۶/۳۱" autocomplete="off">
+              <button type="button" class="cal-btn" id="gToBtn" aria-label="تقویم تاریخ پایان"><i class="fa-regular fa-calendar"></i></button></div>
+          </div>
+          <div class="field field-preset"><label for="gPreset">بازه آماده</label>
+            <select class="input" id="gPreset">
+              <option value="all">همه تاریخ‌ها</option>
+              <option value="today">امروز</option>
+              <option value="cur">ماه جاری (شمسی)</option>
+              <option value="prev">ماه قبل (شمسی)</option>
+              <optgroup label="ماه مالی" id="gFiscalGroup" hidden></optgroup>
+              <optgroup label="همه ماه‌های مالی" id="gFiscalAll" hidden></optgroup>
+              <option value="custom">بازه دلخواه</option>
+            </select>
+          </div>
+        </div>
+        <div class="range-tools">
+          <button type="button" class="btn ghost sm" id="gReset" title="همه تاریخ‌ها"><i class="fa-solid fa-rotate-right"></i> حذف بازه</button>
+          <span class="range-state" id="gRangeState" role="status">اعمال‌شده</span>
+        </div>
       </div>
-      <div class="field grow-0"><label for="gTo">تا تاریخ بررسی</label>
-        <div class="date-f"><input class="input" id="gTo" dir="ltr" inputmode="numeric" placeholder="۱۴۰۵/۰۶/۳۱" autocomplete="off">
-          <button type="button" class="cal-btn" id="gToBtn" aria-label="تقویم تاریخ پایان"><i class="fa-regular fa-calendar"></i></button></div>
-      </div>
-      <div class="field grow-0"><label for="gPreset">بازه آماده</label>
-        <select class="input" id="gPreset"><option value="all">همه تاریخ‌ها</option><option value="today">امروز</option>
-          <option value="cur">ماه جاری</option><option value="prev">ماه قبل</option><option value="custom">بازه دلخواه</option></select>
-      </div>
-      <button type="submit" class="btn primary" id="gApply"><i class="fa-solid fa-check"></i> اعمال بازه</button>
-      <button type="button" class="btn ghost" id="gReset"><i class="fa-solid fa-rotate-right"></i> حذف بازه</button>
-      <span class="range-state" id="gRangeState" role="status">اعمال‌شده</span>
       <div class="range-note" id="gRangeNote" role="status" aria-live="polite"></div>
     </form>
 
@@ -124,12 +144,15 @@
 <script src="expertRef.js"></script>
 <script src="registry.js"></script>
 <script src="importData.js"></script>
+<script src="access.js"></script>
+<script src="fiscal.js"></script>
+<script src="elements.js"></script>
 <script src="storage.js"></script>
 <script src="jcal.js"></script>
 <script src="export.js"></script>
 <script src="vendor/html2canvas.min.js"></script>
 <script src="app.js"></script>
-<script src="session.js"></script>
+<script src="auth.js"></script>
 <script src="capture.js"></script>
 <script src="tableTools.js"></script>
 <script src="pages/dashboard.js"></script>
@@ -145,7 +168,10 @@
 <script src="pages/directory.js"></script>
 <script src="pages/agents.js"></script>
 <script src="pages/criteria.js"></script>
+<script src="pages/qcAdmin.js"></script>
 <script src="pages/sheets.js"></script>
 <script>App.init();</script>
+<div class="auth-gate" id="authGate" hidden aria-live="polite"></div>
+
 </body>
 </html>

@@ -32,8 +32,9 @@
 .theme-toggle { display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:99px;background:var(--panel);padding:7px 12px;cursor:pointer;font-size:11.5px;white-space:nowrap;color:var(--ink-2); }
 .theme-toggle i { color:var(--warn); } .theme-toggle:hover { border-color:var(--brand);background:var(--brand-soft); }
 :focus-visible { outline:2px solid var(--brand);outline-offset:3px; }
-.global-range { gap:12px;padding:16px 22px 12px;background:rgba(13,19,34,.97);box-shadow:0 8px 18px rgba(0,0,0,.04);align-items:center; }
-.range-title { min-width:178px;display:flex;gap:10px;align-items:center; }
+.global-range { padding:14px 22px 12px;background:rgba(13,19,34,.97);box-shadow:0 8px 18px rgba(0,0,0,.04); }
+.range-bar { gap:12px 18px; }
+.range-title { min-width:170px;flex:0 0 auto;display:flex;gap:10px;align-items:center; }
 .range-title strong { font-size:12.5px;display:block;color:var(--ink); }
 .range-title small { display:block;font-size:10px;color:var(--muted); }
 .range-icon { background:var(--brand-soft);color:var(--brand);width:37px;height:37px;border-radius:12px;display:grid;place-items:center; }
@@ -409,7 +410,7 @@
 [data-theme="light"] .filters { background: var(--filters-bg); }
 
 /* نوار بازه‌ی سراسری: همان ارتفاع و خط‌بندی */
-.global-range { align-items: flex-end; }
+.range-fields { align-items: flex-end; }
 .global-range .field > label { display: block; }
 .global-range .date-f .input { width: 156px; }
 .global-range .range-title, .global-range .range-state { align-self: center; }
@@ -424,12 +425,120 @@
 [data-theme="light"] .jcal-pop { background: var(--panel); box-shadow: 0 14px 38px rgba(28,52,88,.18); }
 
 /* =========================================================================
-   همبرگر و فهرست کناری: در دسکتاپ جمع/باز می‌شود (در موبایل همان دراور قبلی)
+   همبرگر و فهرست کناری: دراور همیشگی، پیش‌فرض بسته (بند ۳)
    ========================================================================= */
 .hamburger { display: grid; place-items: center; flex-shrink: 0; }
-@media (min-width: 1025px) {
-  .sidebar { transition: width .22s ease, border-color .22s ease; }
-  .sidebar > * { transition: opacity .15s ease; }
-  .app.sidebar-collapsed .sidebar { width: 0; border-left-color: transparent; overflow: hidden; }
-  .app.sidebar-collapsed .sidebar > * { opacity: 0; visibility: hidden; }
+.sidebar { transition: transform .25s ease; }
+.sidebar.open { box-shadow: -24px 0 70px rgba(2,8,23,.55); }
+.sidebar-backdrop { backdrop-filter: blur(2px); }
+.hamburger[aria-expanded="true"] { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+
+
+/* =========================================================================
+   احراز هویت: دروازه‌ی ورود، تراشه‌ی کاربر و اعلان تازه‌شدن داده (بند ۵)
+   ========================================================================= */
+.auth-gate { position: fixed; inset: 0; z-index: 9000; display: grid; place-items: center; padding: 20px; overflow-y: auto;
+  background: radial-gradient(1100px 560px at 82% -10%, rgba(56,189,248,.15), transparent 62%),
+              radial-gradient(900px 500px at 8% 112%, rgba(167,139,250,.13), transparent 60%), var(--bg-2); }
+.auth-gate[hidden] { display: none; }
+.auth-card { width: min(440px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 20px;
+  padding: 26px 24px 20px; box-shadow: 0 26px 64px rgba(2,8,23,.5); text-align: center; }
+.auth-logo { width: 64px; height: 64px; margin: 0 auto 12px; border-radius: 18px; overflow: hidden;
+  background: var(--brand-soft); display: grid; place-items: center; }
+.auth-logo img { width: 100%; height: 100%; object-fit: contain; }
+.auth-card h2 { font-size: 17px; font-weight: 900; margin-bottom: 6px; }
+.auth-sub { color: var(--muted); font-size: 12.2px; line-height: 2; margin-bottom: 16px; }
+.auth-form { display: flex; flex-direction: column; gap: 12px; text-align: right; }
+.auth-field > span { display: block; font-size: 11.5px; font-weight: 700; color: var(--muted); margin-bottom: 5px; }
+.auth-pass { display: flex; gap: 6px; align-items: center; }
+.auth-pass .input { flex: 1; min-width: 0; }
+.auth-error { background: var(--bad-soft); color: var(--bad); border: 1px solid rgba(248,113,113,.35);
+  border-radius: 10px; padding: 9px 12px; font-size: 12px; font-weight: 700; }
+.auth-error[hidden] { display: none; }
+.auth-submit { height: 42px; justify-content: center; font-weight: 800; }
+.auth-note { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); color: var(--muted);
+  font-size: 11px; line-height: 2; text-align: right; }
+.auth-note code, .sheet-note code, .note code { background: var(--soft); padding: 1px 5px; border-radius: 5px; font-size: 10.6px; }
+body.auth-locked #app { filter: blur(2px); pointer-events: none; }
+
+.user-chip { display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 99px; padding: 3px 5px 3px 11px; }
+.user-chip.admin { border-color: rgba(56,189,248,.45); background: var(--brand-soft); }
+.user-avatar { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--soft); color: var(--brand); font-size: 12px; flex-shrink: 0; }
+.user-meta { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
+.user-meta strong { font-size: 11.8px; font-weight: 800; max-width: 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-meta small { font-size: 9.6px; color: var(--muted); max-width: 152px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync-chip { border-color: rgba(52,211,153,.45); color: var(--good); }
+.sync-chip.pulse { animation: syncPulse 2.4s ease-in-out infinite; }
+@keyframes syncPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(52,211,153,.35); } 50% { box-shadow: 0 0 0 7px rgba(52,211,153,0); } }
+
+/* کمبو: هایلایت تطبیق فازی و گزینه‌ی فعال با کیبورد (بند ۷) */
+.combo .menu { max-height: 264px; overflow-y: auto; }
+.combo .menu-item mark { background: var(--brand-soft); color: var(--brand); border-radius: 4px; padding: 0 1px; font-weight: 800; }
+.combo .menu-item.hl { background: var(--soft); box-shadow: inset 3px 0 0 var(--brand); }
+.foot.warn { color: var(--warn); }
+
+/* گفت‌وگوی تعارض همزمانی (بند ۱۰) */
+.conflict-note { color: var(--ink-2); font-size: 12.6px; line-height: 2.1; margin-bottom: 12px; }
+
+/* =========================================================================
+   مدیریت QC، ماه‌های مالی و لانچر گزارش تماس
+   ========================================================================= */
+.qc-mode { display: flex; flex-direction: column; gap: 14px; }
+.qc-mode-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 10px; }
+.qc-mode-option { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--line);
+  border-radius: 14px; cursor: pointer; background: var(--bg-2); }
+.qc-mode-option.sel { border-color: rgba(56,189,248,.5); background: var(--brand-soft); }
+.qc-mode-option strong { font-size: 12.6px; }
+.qc-mode-option small { color: var(--muted); font-size: 11px; line-height: 1.9; }
+.qc-mode-option input { margin-inline-end: 5px; }
+.qc-users td { vertical-align: middle; }
+.qc-name strong { font-size: 12.8px; }
+.qc-ops { display: flex; gap: 6px; justify-content: flex-end; }
+.badge.brand { background: var(--brand-soft); color: var(--brand); }
+.badge.info { background: rgba(56,189,248,.13); color: var(--brand); }
+
+.qc-editor .qc-form-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.qc-access { margin-top: 6px; }
+.qc-access-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.qc-access-bar .input { flex: 1 1 200px; height: var(--ctl-h); }
+.qc-access-bar .spacer { flex: 1; }
+.qc-all { display: flex; align-items: center; gap: 6px; font-size: 11.6px; color: var(--ink-2); font-weight: 700; }
+.qc-teams { display: flex; flex-direction: column; gap: 10px; max-height: 330px; overflow-y: auto; padding-inline-end: 4px; }
+.qc-team { border: 1px solid var(--line); border-radius: 14px; background: var(--bg-2); overflow: hidden; }
+.qc-team.scoped { border-color: rgba(52,211,153,.5); }
+.qc-team-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px;
+  border-bottom: 1px solid var(--line-soft); background: var(--panel); }
+.qc-team-head strong { font-size: 12.4px; }
+.qc-team-head .spacer { flex: 1; }
+.qc-agents { display: grid; grid-template-columns: repeat(auto-fill, minmax(188px, 1fr)); gap: 6px; padding: 10px 12px; }
+.qc-agent { display: flex; align-items: center; gap: 7px; padding: 6px 9px; border: 1px solid var(--line);
+  border-radius: 10px; cursor: pointer; font-size: 12px; background: var(--panel); }
+.qc-agent:has(input:checked) { border-color: rgba(56,189,248,.5); background: var(--brand-soft); }
+.qc-agent span { font-weight: 700; }
+.qc-agent small { color: var(--muted); font-size: 10.4px; margin-inline-start: auto; }
+.qc-agent[hidden] { display: none; }
+
+.fm-tbl td { padding: 6px 8px; vertical-align: middle; }
+.fm-tbl .input { height: 34px; font-size: 12.2px; }
+.fm-tbl .date-f .input { padding-left: 30px; }
+.fm-tbl .date-f .cal-btn { top: 17px; }
+.fm-empty { text-align: center; color: var(--muted); padding: 16px; }
+.fm-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.fm-actions .spacer { flex: 1; }
+.fm-del { width: 46px; text-align: center; }
+
+.cr-launch { display: flex; flex-direction: column; gap: 14px; }
+.cr-launch-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.cr-launch-actions .btn.lg { padding: 12px 18px; font-size: 13px; }
+.cr-launch-info { display: flex; flex-direction: column; gap: 9px; }
+.note.warn { color: var(--warn); }
+
+@media (max-width: 1000px) {
+  .user-meta { display: none; }
+  .user-chip { padding: 3px 5px; }
+  .qc-agents { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 }
+[data-theme="light"] .auth-gate { background: radial-gradient(1100px 560px at 82% -10%, rgba(56,189,248,.14), transparent 62%), var(--bg-2); }
+[data-theme="light"] .auth-card { box-shadow: 0 22px 50px rgba(28,52,88,.2); }

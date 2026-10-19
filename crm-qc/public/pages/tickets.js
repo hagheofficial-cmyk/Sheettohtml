@@ -1,7 +1,7 @@
 /* tickets.js — بخش ارزیابی تیکت: فرم ثبت/ویرایش + سوابق */
 (function () {
 'use strict';
-const { C, $, $$, api, fa, esc, el, toast, modal, modalHead, confirmDlg, dateField, combo, triSwitch, redlineSwitch, selectField, scorePill, markBadge, pager, emptyState, debounce } = UI;
+const { C, $, $$, api, fa, esc, el, toast, modal, modalHead, confirmDlg, conflictDlg, applyQcIdentity, dateField, combo, triSwitch, redlineSwitch, selectField, scorePill, markBadge, pager, emptyState, debounce } = UI;
 
 const CRITERIA = [
   { key: 'q1', icon: 'fa-magnifying-glass-chart', title: 'پیگیری صحیح و رسیدگی تا مشخص‌شدن نتیجه' },
@@ -76,7 +76,7 @@ async function formPage(root, editId) {
   const fTeam = el(`<div class="field"><label>تیم کارشناس <span class="hint">(خودکار)</span></label><input class="input" readonly tabindex="-1" style="opacity:.75;cursor:not-allowed" placeholder="—"></div>`);
   const fCode = el(`<div class="field"><label>کد یکتای تیکت <span class="req">*</span></label><input class="input" dir="ltr" style="text-align:right" inputmode="numeric" placeholder="مثلاً 52418" value="${esc(rec ? rec.ticketCode : '')}"></div>`);
   [fQc, fReview, fTicketDate, fAgent, fTeam, fCode].forEach((f) => base.appendChild(f));
-  if (rec) fQc.setValue(rec.qcAgent);
+  applyQcIdentity(fQc, rec ? rec.qcAgent : '');
 
   const teamInp = $('input', fTeam);
   const syncTeam = () => { teamInp.value = App.teamOf(fAgent.getValue()) || (rec ? rec.team : ''); };
@@ -127,7 +127,9 @@ async function formPage(root, editId) {
 
   // --- ذخیره
   const saveBtn = $('#save');
-  saveBtn.addEventListener('click', async () => {
+  const idleLabel = '<i class="fa-solid fa-floppy-disk"></i> ' + (editId ? 'ذخیره تغییرات' : 'ثبت ارزیابی');
+  /* overwrite فقط وقتی true می‌شود که کاربر در گفت‌وگوی تعارض، بازنویسی را انتخاب کند */
+  const doSave = async (overwrite) => {
     const payload = {
       qcAgent: fQc.getValue(),
       reviewDate: fReview.getValue(),
@@ -138,6 +140,10 @@ async function formPage(root, editId) {
       redline: rl.getValue(),
       comment: $('#comment').value.trim()
     };
+    if (editId) {
+      payload.baseUpdatedAt = (rec && rec.updatedAt) || '';
+      if (overwrite) payload.overwrite = true;
+    }
     saveBtn.disabled = true;
     saveBtn.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> در حال ذخیره…';
     try {
@@ -146,11 +152,13 @@ async function formPage(root, editId) {
       await App.boot();
       location.hash = '#/tickets';
     } catch (e) {
-      toast(e.message, 'error', 5200);
       saveBtn.disabled = false;
-      saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> ' + (editId ? 'ذخیره تغییرات' : 'ثبت ارزیابی');
+      saveBtn.innerHTML = idleLabel;
+      if (e && e.status === 409 && e.conflict) { conflictDlg(e.conflict.current, () => doSave(true)); return; }
+      toast(e.message, 'error', 5200);
     }
-  });
+  };
+  saveBtn.addEventListener('click', () => doSave(false));
 }
 
 /* ----------------------------------------------------------------- لیست */

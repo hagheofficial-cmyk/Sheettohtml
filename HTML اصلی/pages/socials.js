@@ -1,7 +1,7 @@
 /* socials.js — بخش ارزیابی سوشال: فرم ثبت/ویرایش + سوابق */
 (function () {
 'use strict';
-const { C, $, $$, api, fa, esc, el, toast, modal, modalHead, confirmDlg, dateField, combo, triSwitch, selectField, scorePill, markBadge, slaBadge, durText, pager, emptyState, debounce } = UI;
+const { C, $, $$, api, fa, esc, el, toast, modal, modalHead, confirmDlg, conflictDlg, applyQcIdentity, dateField, combo, triSwitch, selectField, scorePill, markBadge, slaBadge, durText, pager, emptyState, debounce } = UI;
 
 const CRITERIA = [
   { key: 'qSla', icon: 'fa-stopwatch', title: 'رعایت زمان پاسخ‌گویی (SLA)' },
@@ -81,7 +81,8 @@ async function formPage(root, editId) {
   const fVerdict = selectField({ label: 'وضعیت تأیید دلیل', required: true, items: st.lists.reasonVerdicts });
   [fReview, fQc, fAgent, fTeam, fMsg, fRecv, fTRecv, fReply, fTReply, fStatus, fReason, fVerdict].forEach((f) => base.appendChild(f));
 
-  if (rec) { fQc.setValue(rec.qcAgent); fMsg.setValue(rec.messenger); fStatus.setValue(rec.responseStatus); fReason.setValue(rec.delayReason || ''); fVerdict.setValue(rec.reasonVerdict); }
+  applyQcIdentity(fQc, rec ? rec.qcAgent : '');
+  if (rec) { fMsg.setValue(rec.messenger); fStatus.setValue(rec.responseStatus); fReason.setValue(rec.delayReason || ''); fVerdict.setValue(rec.reasonVerdict); }
 
   const teamInp = $('input', fTeam);
   const syncTeam = () => { teamInp.value = App.teamOf(fAgent.getValue()) || (rec ? rec.team : ''); };
@@ -160,20 +161,28 @@ async function formPage(root, editId) {
 
   /* --- ذخیره */
   const saveBtn = $('#save');
-  saveBtn.addEventListener('click', async () => {
+  const idleLabel = '<i class="fa-solid fa-floppy-disk"></i> ' + (editId ? 'ذخیره تغییرات' : 'ثبت ارزیابی');
+  const doSave = async (overwrite) => {
+    const body = payload();
+    if (editId) {
+      body.baseUpdatedAt = (rec && rec.updatedAt) || '';
+      if (overwrite) body.overwrite = true;
+    }
     saveBtn.disabled = true;
     saveBtn.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> در حال ذخیره…';
     try {
-      const saved = editId ? await api.put('/api/socials/' + editId, payload()) : await api.post('/api/socials', payload());
+      const saved = editId ? await api.put('/api/socials/' + editId, body) : await api.post('/api/socials', body);
       toast((editId ? 'تغییرات ذخیره شد' : 'ارزیابی ثبت شد') + ' — نمره: ' + fa(saved.score == null ? '—' : saved.score), 'success');
       await App.boot();
       location.hash = '#/socials';
     } catch (e) {
-      toast(e.message, 'error', 5200);
       saveBtn.disabled = false;
-      saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> ' + (editId ? 'ذخیره تغییرات' : 'ثبت ارزیابی');
+      saveBtn.innerHTML = idleLabel;
+      if (e && e.status === 409 && e.conflict) { conflictDlg(e.conflict.current, () => doSave(true)); return; }
+      toast(e.message, 'error', 5200);
     }
-  });
+  };
+  saveBtn.addEventListener('click', () => doSave(false));
 }
 
 /* ----------------------------------------------------------------- لیست */

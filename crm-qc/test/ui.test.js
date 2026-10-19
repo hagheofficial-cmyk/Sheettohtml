@@ -29,10 +29,12 @@ for (const build of ['public', 'offline']) {
     });
 
     await t.test('invalid/reversed inputs do not change the applied range; calendar preserves its icon', async () => {
-      $('#gFrom').value = '1405/13/40'; $('#gApply').click(); await settle();
+      $('#gFrom').value = '1405/13/40';
+      $('#globalRange').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await settle();
       assert.ok($('#gFrom').classList.contains('invalid'));
       assert.equal(w.App.dateRange.from, '1405/06/20'); assert.equal(text('#cntC'), '۵');
-      $('#gFrom').value = '1405/06/21'; $('#gTo').value = '1405/06/20'; $('#gApply').click(); await settle();
+      $('#gFrom').value = '1405/06/21'; $('#gTo').value = '1405/06/20';
+      $('#globalRange').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await settle();
       assert.ok(text('#gRangeNote').includes('شروع')); assert.equal(text('#cntC'), '۵');
       w.App.syncDateRangeUI();
       $('#gFromBtn').click();

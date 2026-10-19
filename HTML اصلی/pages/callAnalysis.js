@@ -59,7 +59,7 @@ async function render(root) {
     </div>
 
     <div class="card" style="margin-bottom:16px">
-      <div class="filters" style="border-bottom:none">
+      <div class="filters plain">
         <div class="field grow-0"><label>تیم QC</label>
           <div class="tabs" id="formTabs">${tabs.map((t, i) => `<button data-t="${esc(t.key)}" class="${i === 0 ? 'active' : ''}"><i class="fa-solid ${t.icon}"></i> ${esc(t.label)}</button>`).join('')}</div>
         </div>

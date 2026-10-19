@@ -82,17 +82,25 @@ a { color: var(--brand); text-decoration: none; }
 i { font-style: normal; }
 
 /* --------------------------------------------------------------- چیدمان */
-.app { display: flex; min-height: 100vh; }
-.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.app { display: block; min-height: 100vh; }
+.main { min-width: 0; display: flex; flex-direction: column; }
 .content { padding: 20px 22px 46px; max-width: 1460px; width: 100%; margin: 0 auto; }
 
 /* --------------------------------------------------------------- سایدبار */
+/* فهرست کناری: دراور همیشگی — پیش‌فرض بسته، با دکمه‌ی همبرگر باز می‌شود (بند ۳) */
 .sidebar {
-  width: var(--sidebar-w); flex-shrink: 0; position: sticky; top: 0; height: 100vh;
+  width: var(--sidebar-w); position: fixed; inset-block: 0; inset-inline-start: 0;
+  transform: translateX(100%); transition: transform .25s ease;
   background: linear-gradient(180deg, #0d1528 0%, #0a1120 100%);
   border-left: 1px solid var(--line-soft);
-  display: flex; flex-direction: column; z-index: 60;
+  display: flex; flex-direction: column; z-index: 60; overflow: hidden;
 }
+.sidebar.open { transform: none; box-shadow: -20px 0 60px rgba(0,0,0,.5); }
+.sidebar-backdrop {
+  position: fixed; inset: 0; background: rgba(2,8,23,.55); z-index: 55;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.sidebar-backdrop.show { opacity: 1; pointer-events: auto; }
 .brand { display: flex; align-items: center; gap: 11px; padding: 18px 16px 14px; border-bottom: 1px solid var(--line-soft); }
 .brand-logo {
   width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; font-size: 19px;
@@ -104,7 +112,7 @@ i { font-style: normal; }
 .brand-text { display: flex; flex-direction: column; line-height: 1.35; }
 .brand-text strong { font-size: 14px; font-weight: 800; }
 .brand-text span { font-size: 10px; color: var(--muted); letter-spacing: .4px; }
-.sidebar-close { display: none; margin-inline-start: auto; background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; }
+.sidebar-close { display: grid; place-items: center; margin-inline-start: auto; background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; }
 
 .nav { padding: 12px 10px; overflow-y: auto; flex: 1; }
 .nav-item, .nav-group-title {
@@ -145,7 +153,7 @@ i { font-style: normal; }
 .topbar-left { margin-inline-start: auto; display: flex; align-items: center; gap: 10px; }
 .today-chip { display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); padding: 7px 14px; border-radius: 99px; font-size: 12.2px; color: var(--ink-2); }
 .today-chip i { color: var(--brand); }
-.hamburger { display: none; background: var(--panel); border: 1px solid var(--line); color: var(--ink); width: 38px; height: 38px; border-radius: 10px; cursor: pointer; font-size: 15px; }
+.hamburger { display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); color: var(--ink); width: 38px; height: 38px; border-radius: 10px; cursor: pointer; font-size: 15px; }
 
 /* ------------------------------------------------------------------- کارت‌ها */
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); }
@@ -450,12 +458,6 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
 
 /* -------------------------------------------------------------------------------- */
 @media (max-width: 1024px) {
-  .sidebar { position: fixed; inset-inline-start: 0; transform: translateX(100%); transition: transform .25s ease; }
-  .sidebar.open { transform: none; box-shadow: -20px 0 60px rgba(0,0,0,.5); }
-  .sidebar-close { display: grid; }
-  .sidebar-backdrop { position: fixed; inset: 0; background: rgba(2,8,23,.55); z-index: 55; opacity: 0; pointer-events: none; transition: opacity .2s; }
-  .sidebar-backdrop.show { opacity: 1; pointer-events: auto; }
-  .hamburger { display: grid; place-items: center; }
   .content { padding: 15px 13px 40px; }
   .iframe-shell { height: calc(100vh - var(--topbar-h) - 50px); }
 }
@@ -511,19 +513,32 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
 }
 .date-f .cal-btn:hover { color: var(--brand); }
 
+/* برگه‌ی گزارش تماس */
+.cr-frame-card { padding:0; overflow:hidden; }
+#crWrap { position:relative; background:var(--bg-2,#0f172a); height:calc(100vh - 178px); min-height:560px; }
+#crFrame { width:100%; height:100%; border:0; display:block; }
+
+/* فیلترهای بدون خط جداکننده (وقتی داخل کارت‌اند) */
+.filters.plain { border-bottom:none; }
+
 /* نشان حالت آفلاین */
 #offlineBadge { position: fixed; bottom: 14px; inset-inline-start: 14px; z-index: 1200; background: var(--warn-soft); border: 1px solid var(--warn); color: var(--warn); border-radius: 10px; padding: 7px 13px; font-size: 12.2px; font-weight: 800; box-shadow: var(--shadow); display: flex; align-items: center; gap: 7px; }
 #offlineBadge i { font-size: 13px; }
 
-/* فیلتر یگانه‌ی تاریخ — بیرون از محتوای روت، همیشه در همه‌ی سربرگ‌ها موجود است. */
-.global-range { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px 14px; padding:12px 22px;
-  background:var(--bg-2); border-bottom:1px solid var(--line); position:sticky; top:var(--topbar-h); z-index:45; }
-.global-range .field { margin:0; flex:0 0 auto; }
+/* فیلتر یگانه‌ی تاریخ — بیرون از محتوای روت، همیشه در همه‌ی سربرگ‌ها موجود است.
+ * چیدمان مرتب: عنوان | فیلدها | ابزارها، و یادداشت در خط جدا (بند ۲). */
+.global-range { display:block; padding:12px 22px; background:var(--bg-2);
+  border-bottom:1px solid var(--line); position:sticky; top:var(--topbar-h); z-index:45; }
+.range-bar { display:flex; flex-wrap:wrap; align-items:center; gap:12px 18px; }
+.range-fields { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px 14px; flex:1 1 460px; min-width:0; }
+.range-fields .field { margin:0; flex:0 0 auto; }
+.range-fields .field-preset { flex:1 1 220px; min-width:200px; }
+.range-tools { display:flex; align-items:center; gap:10px; margin-inline-start:auto; }
 .global-range .date-f .input { width:156px; text-align:right; padding-left:34px; }
 .global-range select { min-width:140px; }
-.range-title { display:flex; align-items:center; gap:8px; align-self:center; font-weight:700; font-size:12px; color:var(--ink-2); }
+.range-title { display:flex; align-items:center; gap:8px; font-weight:700; font-size:12px; color:var(--ink-2); }
 .range-title i { color:var(--brand); }
-.range-note { flex-basis:100%; color:var(--muted); font-size:11px; }
+.range-note { margin-top:9px; color:var(--muted); font-size:11px; }
 .range-note.bad { color:var(--bad); }
 .tri-value { display:inline-flex; justify-content:center; min-width:26px; padding:3px 7px; border-radius:6px; font-weight:800; }
 .tri-value.ok { background:var(--good-soft); color:var(--good); }
@@ -535,8 +550,11 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
 .call-detail-row > td { padding:12px; background:var(--bg-2); }
 .redline-link { cursor:pointer; border:1px solid rgba(248,113,113,.35); }
 @media (max-width:700px) {
-  .global-range { position:relative; top:0; padding:12px 14px; gap:10px; }
+  .global-range { position:relative; top:0; padding:12px 14px; }
+  .range-bar { gap:10px; }
   .range-title { flex-basis:100%; }
+  .range-fields { flex-basis:100%; }
+  .range-tools { margin-inline-start:0; width:100%; justify-content:space-between; }
   .global-range .date-f .input { width:142px; }
 }
 @media print { .global-range { display:none; } }
@@ -579,8 +597,9 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
 .theme-toggle { display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:99px;background:var(--panel);padding:7px 12px;cursor:pointer;font-size:11.5px;white-space:nowrap;color:var(--ink-2); }
 .theme-toggle i { color:var(--warn); } .theme-toggle:hover { border-color:var(--brand);background:var(--brand-soft); }
 :focus-visible { outline:2px solid var(--brand);outline-offset:3px; }
-.global-range { gap:12px;padding:16px 22px 12px;background:rgba(13,19,34,.97);box-shadow:0 8px 18px rgba(0,0,0,.04);align-items:center; }
-.range-title { min-width:178px;display:flex;gap:10px;align-items:center; }
+.global-range { padding:14px 22px 12px;background:rgba(13,19,34,.97);box-shadow:0 8px 18px rgba(0,0,0,.04); }
+.range-bar { gap:12px 18px; }
+.range-title { min-width:170px;flex:0 0 auto;display:flex;gap:10px;align-items:center; }
 .range-title strong { font-size:12.5px;display:block;color:var(--ink); }
 .range-title small { display:block;font-size:10px;color:var(--muted); }
 .range-icon { background:var(--brand-soft);color:var(--brand);width:37px;height:37px;border-radius:12px;display:grid;place-items:center; }
@@ -956,7 +975,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
 [data-theme="light"] .filters { background: var(--filters-bg); }
 
 /* نوار بازه‌ی سراسری: همان ارتفاع و خط‌بندی */
-.global-range { align-items: flex-end; }
+.range-fields { align-items: flex-end; }
 .global-range .field > label { display: block; }
 .global-range .date-f .input { width: 156px; }
 .global-range .range-title, .global-range .range-state { align-self: center; }
@@ -971,15 +990,123 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
 [data-theme="light"] .jcal-pop { background: var(--panel); box-shadow: 0 14px 38px rgba(28,52,88,.18); }
 
 /* =========================================================================
-   همبرگر و فهرست کناری: در دسکتاپ جمع/باز می‌شود (در موبایل همان دراور قبلی)
+   همبرگر و فهرست کناری: دراور همیشگی، پیش‌فرض بسته (بند ۳)
    ========================================================================= */
 .hamburger { display: grid; place-items: center; flex-shrink: 0; }
-@media (min-width: 1025px) {
-  .sidebar { transition: width .22s ease, border-color .22s ease; }
-  .sidebar > * { transition: opacity .15s ease; }
-  .app.sidebar-collapsed .sidebar { width: 0; border-left-color: transparent; overflow: hidden; }
-  .app.sidebar-collapsed .sidebar > * { opacity: 0; visibility: hidden; }
+.sidebar { transition: transform .25s ease; }
+.sidebar.open { box-shadow: -24px 0 70px rgba(2,8,23,.55); }
+.sidebar-backdrop { backdrop-filter: blur(2px); }
+.hamburger[aria-expanded="true"] { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+
+
+/* =========================================================================
+   احراز هویت: دروازه‌ی ورود، تراشه‌ی کاربر و اعلان تازه‌شدن داده (بند ۵)
+   ========================================================================= */
+.auth-gate { position: fixed; inset: 0; z-index: 9000; display: grid; place-items: center; padding: 20px; overflow-y: auto;
+  background: radial-gradient(1100px 560px at 82% -10%, rgba(56,189,248,.15), transparent 62%),
+              radial-gradient(900px 500px at 8% 112%, rgba(167,139,250,.13), transparent 60%), var(--bg-2); }
+.auth-gate[hidden] { display: none; }
+.auth-card { width: min(440px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 20px;
+  padding: 26px 24px 20px; box-shadow: 0 26px 64px rgba(2,8,23,.5); text-align: center; }
+.auth-logo { width: 64px; height: 64px; margin: 0 auto 12px; border-radius: 18px; overflow: hidden;
+  background: var(--brand-soft); display: grid; place-items: center; }
+.auth-logo img { width: 100%; height: 100%; object-fit: contain; }
+.auth-card h2 { font-size: 17px; font-weight: 900; margin-bottom: 6px; }
+.auth-sub { color: var(--muted); font-size: 12.2px; line-height: 2; margin-bottom: 16px; }
+.auth-form { display: flex; flex-direction: column; gap: 12px; text-align: right; }
+.auth-field > span { display: block; font-size: 11.5px; font-weight: 700; color: var(--muted); margin-bottom: 5px; }
+.auth-pass { display: flex; gap: 6px; align-items: center; }
+.auth-pass .input { flex: 1; min-width: 0; }
+.auth-error { background: var(--bad-soft); color: var(--bad); border: 1px solid rgba(248,113,113,.35);
+  border-radius: 10px; padding: 9px 12px; font-size: 12px; font-weight: 700; }
+.auth-error[hidden] { display: none; }
+.auth-submit { height: 42px; justify-content: center; font-weight: 800; }
+.auth-note { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); color: var(--muted);
+  font-size: 11px; line-height: 2; text-align: right; }
+.auth-note code, .sheet-note code, .note code { background: var(--soft); padding: 1px 5px; border-radius: 5px; font-size: 10.6px; }
+body.auth-locked #app { filter: blur(2px); pointer-events: none; }
+
+.user-chip { display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 99px; padding: 3px 5px 3px 11px; }
+.user-chip.admin { border-color: rgba(56,189,248,.45); background: var(--brand-soft); }
+.user-avatar { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--soft); color: var(--brand); font-size: 12px; flex-shrink: 0; }
+.user-meta { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
+.user-meta strong { font-size: 11.8px; font-weight: 800; max-width: 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-meta small { font-size: 9.6px; color: var(--muted); max-width: 152px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync-chip { border-color: rgba(52,211,153,.45); color: var(--good); }
+.sync-chip.pulse { animation: syncPulse 2.4s ease-in-out infinite; }
+@keyframes syncPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(52,211,153,.35); } 50% { box-shadow: 0 0 0 7px rgba(52,211,153,0); } }
+
+/* کمبو: هایلایت تطبیق فازی و گزینه‌ی فعال با کیبورد (بند ۷) */
+.combo .menu { max-height: 264px; overflow-y: auto; }
+.combo .menu-item mark { background: var(--brand-soft); color: var(--brand); border-radius: 4px; padding: 0 1px; font-weight: 800; }
+.combo .menu-item.hl { background: var(--soft); box-shadow: inset 3px 0 0 var(--brand); }
+.foot.warn { color: var(--warn); }
+
+/* گفت‌وگوی تعارض همزمانی (بند ۱۰) */
+.conflict-note { color: var(--ink-2); font-size: 12.6px; line-height: 2.1; margin-bottom: 12px; }
+
+/* =========================================================================
+   مدیریت QC، ماه‌های مالی و لانچر گزارش تماس
+   ========================================================================= */
+.qc-mode { display: flex; flex-direction: column; gap: 14px; }
+.qc-mode-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 10px; }
+.qc-mode-option { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--line);
+  border-radius: 14px; cursor: pointer; background: var(--bg-2); }
+.qc-mode-option.sel { border-color: rgba(56,189,248,.5); background: var(--brand-soft); }
+.qc-mode-option strong { font-size: 12.6px; }
+.qc-mode-option small { color: var(--muted); font-size: 11px; line-height: 1.9; }
+.qc-mode-option input { margin-inline-end: 5px; }
+.qc-users td { vertical-align: middle; }
+.qc-name strong { font-size: 12.8px; }
+.qc-ops { display: flex; gap: 6px; justify-content: flex-end; }
+.badge.brand { background: var(--brand-soft); color: var(--brand); }
+.badge.info { background: rgba(56,189,248,.13); color: var(--brand); }
+
+.qc-editor .qc-form-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.qc-access { margin-top: 6px; }
+.qc-access-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.qc-access-bar .input { flex: 1 1 200px; height: var(--ctl-h); }
+.qc-access-bar .spacer { flex: 1; }
+.qc-all { display: flex; align-items: center; gap: 6px; font-size: 11.6px; color: var(--ink-2); font-weight: 700; }
+.qc-teams { display: flex; flex-direction: column; gap: 10px; max-height: 330px; overflow-y: auto; padding-inline-end: 4px; }
+.qc-team { border: 1px solid var(--line); border-radius: 14px; background: var(--bg-2); overflow: hidden; }
+.qc-team.scoped { border-color: rgba(52,211,153,.5); }
+.qc-team-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px;
+  border-bottom: 1px solid var(--line-soft); background: var(--panel); }
+.qc-team-head strong { font-size: 12.4px; }
+.qc-team-head .spacer { flex: 1; }
+.qc-agents { display: grid; grid-template-columns: repeat(auto-fill, minmax(188px, 1fr)); gap: 6px; padding: 10px 12px; }
+.qc-agent { display: flex; align-items: center; gap: 7px; padding: 6px 9px; border: 1px solid var(--line);
+  border-radius: 10px; cursor: pointer; font-size: 12px; background: var(--panel); }
+.qc-agent:has(input:checked) { border-color: rgba(56,189,248,.5); background: var(--brand-soft); }
+.qc-agent span { font-weight: 700; }
+.qc-agent small { color: var(--muted); font-size: 10.4px; margin-inline-start: auto; }
+.qc-agent[hidden] { display: none; }
+
+.fm-tbl td { padding: 6px 8px; vertical-align: middle; }
+.fm-tbl .input { height: 34px; font-size: 12.2px; }
+.fm-tbl .date-f .input { padding-left: 30px; }
+.fm-tbl .date-f .cal-btn { top: 17px; }
+.fm-empty { text-align: center; color: var(--muted); padding: 16px; }
+.fm-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.fm-actions .spacer { flex: 1; }
+.fm-del { width: 46px; text-align: center; }
+
+.cr-launch { display: flex; flex-direction: column; gap: 14px; }
+.cr-launch-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.cr-launch-actions .btn.lg { padding: 12px 18px; font-size: 13px; }
+.cr-launch-info { display: flex; flex-direction: column; gap: 9px; }
+.note.warn { color: var(--warn); }
+
+@media (max-width: 1000px) {
+  .user-meta { display: none; }
+  .user-chip { padding: 3px 5px; }
+  .qc-agents { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 }
+[data-theme="light"] .auth-gate { background: radial-gradient(1100px 560px at 82% -10%, rgba(56,189,248,.14), transparent 62%), var(--bg-2); }
+[data-theme="light"] .auth-card { box-shadow: 0 22px 50px rgba(28,52,88,.2); }
 
 </style>
 
@@ -1239,6 +1366,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
       <a href="#/criteria" class="nav-item" data-route="criteria"><i class="fa-solid fa-sliders"></i><span>تغییر المان‌ها</span></a>
       <a href="#/directory" class="nav-item" data-route="directory"><i class="fa-solid fa-users-gear"></i><span>مدیریت پایه</span></a>
       <a href="#/agents" class="nav-item" data-route="agents"><i class="fa-solid fa-user-group"></i><span>مدیریت کارشناسان</span></a>
+      <a href="#/qcadmin" class="nav-item" data-route="qcadmin"><i class="fa-solid fa-user-shield"></i><span>مدیریت QC</span></a>
     </nav>
 
     <div class="sidebar-foot">
@@ -1254,31 +1382,50 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
       <a class="topbar-logo" href="#/dashboard" aria-label="داشبورد سامانه"><img data-app-logo src="" alt="لوگوی سامانه" width="36" height="36"></a>
       <div class="topbar-title" id="pageTitle">داشبورد</div>
       <div class="topbar-left">
-        <div class="confirm-control"><button class="btn success-soft" id="confirmData" type="button" title="ذخیره کل اطلاعات ثبت‌شده در همین مرورگر برای بازکردن بعدی"><i class="fa-solid fa-circle-check"></i><span>تأیید اطلاعات</span></button><small id="confirmedInfo" role="status" aria-live="polite">هنوز تأیید نشده</small></div>
         <span class="data-source-badge" id="dataSourceBadge">سرور</span>
-        <button class="btn ghost sm" id="useServerData" type="button" hidden title="نمایش اطلاعات سرور به جای نسخه این مرورگر"><i class="fa-solid fa-cloud"></i><span>اطلاعات سرور</span></button>
+        <button class="btn ghost sm sync-chip" id="syncChip" type="button" hidden title="داده‌های شیت بعد از آخرین خواندن تغییر کرده است"><i class="fa-solid fa-arrows-rotate"></i><span>داده‌ها تازه شد — بروزرسانی</span></button>
         <button class="theme-toggle" id="themeToggle" type="button" aria-label="تغییر حالت روشن و تاریک" title="تغییر حالت روشن و تاریک"><i class="fa-solid fa-sun"></i><span>حالت روشن</span></button>
+        <div class="user-chip" id="userChip" hidden>
+          <span class="user-avatar" aria-hidden="true"><i class="fa-solid fa-user"></i></span>
+          <span class="user-meta"><strong id="userName">—</strong><small id="userRole">—</small></span>
+          <button class="btn ghost sm" id="logoutBtn" type="button" title="خروج از حساب کاربری"><i class="fa-solid fa-right-from-bracket"></i><span>خروج</span></button>
+        </div>
         <div class="today-chip" id="todayChip"><i class="fa-regular fa-calendar"></i><span></span></div>
       </div>
     </header>
 
     <form class="global-range no-print" id="globalRange" aria-label="فیلتر تاریخ کل سامانه">
-      <div class="range-title"><span class="range-icon"><i class="fa-solid fa-calendar-days"></i></span><div><strong>بازه بررسی عملکرد</strong><small>یک تاریخ؛ همه گزارش‌ها</small></div></div>
-      <div class="field grow-0"><label for="gFrom">از تاریخ بررسی</label>
-        <div class="date-f"><input class="input" id="gFrom" dir="ltr" inputmode="numeric" placeholder="۱۴۰۵/۰۶/۰۱" autocomplete="off">
-          <button type="button" class="cal-btn" id="gFromBtn" aria-label="تقویم تاریخ شروع"><i class="fa-regular fa-calendar"></i></button></div>
+      <div class="range-bar">
+        <div class="range-title">
+          <span class="range-icon"><i class="fa-solid fa-calendar-days"></i></span>
+          <div><strong>بازه بررسی عملکرد</strong><small>یک بازه؛ روی همه گزارش‌ها</small></div>
+        </div>
+        <div class="range-fields">
+          <div class="field"><label for="gFrom">از تاریخ</label>
+            <div class="date-f"><input class="input" id="gFrom" dir="ltr" inputmode="numeric" placeholder="۱۴۰۵/۰۶/۰۱" autocomplete="off">
+              <button type="button" class="cal-btn" id="gFromBtn" aria-label="تقویم تاریخ شروع"><i class="fa-regular fa-calendar"></i></button></div>
+          </div>
+          <div class="field"><label for="gTo">تا تاریخ</label>
+            <div class="date-f"><input class="input" id="gTo" dir="ltr" inputmode="numeric" placeholder="۱۴۰۵/۰۶/۳۱" autocomplete="off">
+              <button type="button" class="cal-btn" id="gToBtn" aria-label="تقویم تاریخ پایان"><i class="fa-regular fa-calendar"></i></button></div>
+          </div>
+          <div class="field field-preset"><label for="gPreset">بازه آماده</label>
+            <select class="input" id="gPreset">
+              <option value="all">همه تاریخ‌ها</option>
+              <option value="today">امروز</option>
+              <option value="cur">ماه جاری (شمسی)</option>
+              <option value="prev">ماه قبل (شمسی)</option>
+              <optgroup label="ماه مالی" id="gFiscalGroup" hidden></optgroup>
+              <optgroup label="همه ماه‌های مالی" id="gFiscalAll" hidden></optgroup>
+              <option value="custom">بازه دلخواه</option>
+            </select>
+          </div>
+        </div>
+        <div class="range-tools">
+          <button type="button" class="btn ghost sm" id="gReset" title="همه تاریخ‌ها"><i class="fa-solid fa-rotate-right"></i> حذف بازه</button>
+          <span class="range-state" id="gRangeState" role="status">اعمال‌شده</span>
+        </div>
       </div>
-      <div class="field grow-0"><label for="gTo">تا تاریخ بررسی</label>
-        <div class="date-f"><input class="input" id="gTo" dir="ltr" inputmode="numeric" placeholder="۱۴۰۵/۰۶/۳۱" autocomplete="off">
-          <button type="button" class="cal-btn" id="gToBtn" aria-label="تقویم تاریخ پایان"><i class="fa-regular fa-calendar"></i></button></div>
-      </div>
-      <div class="field grow-0"><label for="gPreset">بازه آماده</label>
-        <select class="input" id="gPreset"><option value="all">همه تاریخ‌ها</option><option value="today">امروز</option>
-          <option value="cur">ماه جاری</option><option value="prev">ماه قبل</option><option value="custom">بازه دلخواه</option></select>
-      </div>
-      <button type="submit" class="btn primary" id="gApply"><i class="fa-solid fa-check"></i> اعمال بازه</button>
-      <button type="button" class="btn ghost" id="gReset"><i class="fa-solid fa-rotate-right"></i> حذف بازه</button>
-      <span class="range-state" id="gRangeState" role="status">اعمال‌شده</span>
       <div class="range-note" id="gRangeNote" role="status" aria-live="polite"></div>
     </form>
 
@@ -3435,6 +3582,763 @@ return { requireMode, restore, calls, mergeRows, validateBackup, semantic, stabl
 </script>
 
 
+<script>/* access.js */
+/* =========================================================================
+ * access.js — نقش‌ها، رمزها و محدوده‌ی داده‌ی هر کارشناس QC
+ * یک منبع حقیقت برای هر سه اجرا: سرور Node، مرورگر (آفلاین) و Apps Script.
+ *
+ * کاربران در تب `QC_Users` شیت (یا store نسخه Node) نگهداری می‌شوند:
+ *   name      نام کارشناس QC (همان چیزی که در فرم‌ها به‌عنوان qcAgent ثبت می‌شود)
+ *   password  رمز؛ به‌صورت `sha256$<salt>$<hex>` یا متن ساده (برای ویرایش مستقیم روی شیت)
+ *   role      admin | qc
+ *   active    1/0
+ *   exts      داخلی‌های مجاز، جداشده با ویرگول/فاصله؛ `*` یعنی همه
+ *   agents    نام کارشناسان مجاز (اختیاری، مکمل داخلی‌ها)
+ *   teams     نام تیم‌های مجاز (اختیاری)
+ * ========================================================================= */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./calc'), require('./parseQc'));
+  else root.QCAccess = factory(root.QCCalc, root.QCParse);
+})(typeof self !== 'undefined' ? self : this, function (C, P) {
+'use strict';
+
+const text = (v) => (v == null ? '' : String(v).trim());
+const clone = (o) => (o == null ? o : JSON.parse(JSON.stringify(o)));
+const nameKey = (s) => (P && P.nameKey ? P.nameKey(s) : text(s).toLowerCase().replace(/\s/g, ''));
+const teamKey = (s) => (P && P.teamKey ? P.teamKey(s) : text(s).toLowerCase().replace(/[\s_/-]/g, ''));
+const digits = (v) => (C && C.faToEn ? C.faToEn(text(v)) : text(v).replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+
+/* صفحه‌هایی که فقط مدیر می‌بیند (بند ۶) و صفحه‌های عملیاتی مشترک. */
+const ADMIN_ROUTES = ['criteria', 'directory', 'agents', 'data', 'qcadmin', 'sheets'];
+const SHARED_ROUTES = ['dashboard', 'tickets', 'tickets-new', 'socials', 'socials-new', 'reports',
+  'portfolio', 'expert-ref', 'expert-review', 'call-analysis', 'callreport', 'reminders'];
+
+/* اندپوینت‌هایی که همیشه مخصوص مدیرند (بدون توجه به نقش درخواست‌کننده). */
+const ADMIN_API = ['/api/criteria', '/api/settings', '/api/qc-users', '/api/fiscal-months', '/api/elements',
+  '/api/backup', '/api/demo', '/api/data', '/api/sheets', '/api/calls/import', '/api/calls/meta',
+  '/api/action-types', '/api/agents'];
+
+/* خواندن‌هایی که برای صفحه‌های عملیاتیِ کارشناس QC لازم‌اند (با داده‌ی محدودشده)؛
+ * وگرنه صفحه‌هایی مثل «پرونده کارشناس» و شمارنده‌های پایین صفحه با ۴۰۳ می‌افتند. */
+const OPEN_API = ['/api/data/status', '/api/agents', '/api/qc-agents', '/api/action-types'];
+
+/* ---------------------------------------------------------- SHA-256 خالص JS
+ * یک پیاده‌سازی کوچک و بدون وابستگی تا hash در Node، مرورگر و Apps Script
+ * دقیقاً یکسان باشد (رمزها روی شیت قابل حمل بمانند). */
+const K256 = [
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2];
+
+function rotr(x, n) { return (x >>> n) | (x << (32 - n)); }
+
+function utf8Bytes(str) {
+  const out = [], s = String(str);
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c < 0x80) out.push(c);
+    else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length && s.charCodeAt(i + 1) >= 0xdc00 && s.charCodeAt(i + 1) <= 0xdfff) {
+      const cp = 0x10000 + ((c - 0xd800) << 10) + (s.charCodeAt(i + 1) - 0xdc00);
+      out.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3f), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+      i++;
+    } else out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+  }
+  return out;
+}
+
+function sha256Hex(message) {
+  const bytes = utf8Bytes(message);
+  const bitLen = bytes.length * 8;
+  bytes.push(0x80);
+  while (bytes.length % 64 !== 56) bytes.push(0);
+  const hi = Math.floor(bitLen / 0x100000000), lo = bitLen >>> 0;
+  bytes.push((hi >>> 24) & 0xff, (hi >>> 16) & 0xff, (hi >>> 8) & 0xff, hi & 0xff,
+             (lo >>> 24) & 0xff, (lo >>> 16) & 0xff, (lo >>> 8) & 0xff, lo & 0xff);
+  let H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+  const w = new Array(64);
+  for (let off = 0; off < bytes.length; off += 64) {
+    for (let i = 0; i < 16; i++) {
+      w[i] = ((bytes[off + i * 4] << 24) | (bytes[off + i * 4 + 1] << 16) |
+              (bytes[off + i * 4 + 2] << 8) | bytes[off + i * 4 + 3]) >>> 0;
+    }
+    for (let i = 16; i < 64; i++) {
+      const x = w[i - 15], y = w[i - 2];
+      const s0 = (rotr(x, 7) ^ rotr(x, 18) ^ (x >>> 3)) >>> 0;
+      const s1 = (rotr(y, 17) ^ rotr(y, 19) ^ (y >>> 10)) >>> 0;
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+    }
+    let a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+    for (let i = 0; i < 64; i++) {
+      const S1 = (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) >>> 0;
+      const ch = ((e & f) ^ (~e & g)) >>> 0;
+      const t1 = (h + S1 + ch + K256[i] + w[i]) >>> 0;
+      const S0 = (rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) >>> 0;
+      const maj = ((a & b) ^ (a & c) ^ (b & c)) >>> 0;
+      const t2 = (S0 + maj) >>> 0;
+      h = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    H = [(H[0] + a) >>> 0, (H[1] + b) >>> 0, (H[2] + c) >>> 0, (H[3] + d) >>> 0,
+         (H[4] + e) >>> 0, (H[5] + f) >>> 0, (H[6] + g) >>> 0, (H[7] + h) >>> 0];
+  }
+  return H.map((x) => ('00000000' + x.toString(16)).slice(-8)).join('');
+}
+
+function randomToken(bytes) {
+  const n = bytes || 16;
+  const g = typeof globalThis !== 'undefined' ? globalThis : root;
+  if (g.crypto && typeof g.crypto.getRandomValues === 'function') {
+    const arr = new Uint8Array(n); g.crypto.getRandomValues(arr);
+    return Array.prototype.map.call(arr, (x) => ('0' + x.toString(16)).slice(-2)).join('');
+  }
+  if (g.Utilities && g.Utilities.getUuid) return String(g.Utilities.getUuid()).replace(/-/g, '').slice(0, n * 2);
+  let out = '';
+  while (out.length < n * 2) out += Math.random().toString(16).slice(2);
+  return out.slice(0, n * 2);
+}
+
+function hashPassword(plain, salt) {
+  const s = salt || randomToken(8);
+  return 'sha256$' + s + '$' + sha256Hex(s + '$' + text(plain));
+}
+
+function isHashed(value) { return /^sha256\$[^$]*\$[0-9a-f]{64}$/i.test(text(value)); }
+
+function verifyPassword(stored, plain) {
+  const s = text(stored), p = text(plain);
+  if (!s) return false;
+  if (isHashed(s)) {
+    const parts = s.split('$');
+    return sha256Hex(parts[1] + '$' + p) === parts[2].toLowerCase();
+  }
+  /* مقدار نوشته‌شده مستقیم روی شیت: مقایسه‌ی متن ساده (با یکدست‌سازی اعداد/فاصله). */
+  return nameKey(s) === nameKey(p) || s === p;
+}
+
+/* ------------------------------------------------------------- نرمال‌سازی */
+function splitList(value) {
+  return text(value).split(/[,،;؛|\n\r\t]+/).map((x) => text(x)).filter(Boolean);
+}
+
+function isWildcard(list) {
+  return (list || []).some((x) => ['*', 'all', 'همه', 'همه‌چیز', '-'].indexOf(digits(x).toLowerCase()) !== -1);
+}
+
+function normalizeUser(row, index) {
+  const r = row || {};
+  const name = P && P.normName ? P.normName(text(r.name)) : text(r.name);
+  const user = {
+    id: r.id == null || r.id === '' ? 'u' + (index + 1) : String(r.id),
+    name: name,
+    key: nameKey(name),
+    password: text(r.password),
+    role: /^ad/i.test(text(r.role)) || text(r.role) === 'مدیر' ? 'admin' : 'qc',
+    active: r.active === undefined || r.active === null || r.active === ''
+      ? true : /^(1|true|yes|y|بله|فعال|on)$/i.test(digits(r.active)),
+    exts: splitList(r.exts).map(digits),
+    agents: splitList(r.agents).map((x) => (P && P.normName ? P.normName(x) : x)),
+    teams: splitList(r.teams).map((x) => (P && P.normName ? P.normName(x) : x)),
+    note: text(r.note),
+    updatedAt: text(r.updatedAt)
+  };
+  user.unrestricted = user.role === 'admin' || isWildcard(user.exts) || isWildcard(user.agents) || isWildcard(user.teams);
+  user.hasScope = user.unrestricted || !!user.exts.length || !!user.agents.length || !!user.teams.length;
+  return user;
+}
+
+function normalizeUsers(db) {
+  const rows = (db && Array.isArray(db.qcUsers) ? db.qcUsers : []);
+  const seen = new Set(), out = [];
+  rows.forEach((row, i) => {
+    const u = normalizeUser(row, i);
+    if (!u.name || seen.has(u.key)) return;
+    seen.add(u.key); out.push(u);
+  });
+  return out;
+}
+
+function authMode(db) {
+  const mode = text(db && db.settings && db.settings.authMode).toLowerCase();
+  return mode === 'on' || mode === 'off' ? mode : 'auto';
+}
+
+function authRequired(db) {
+  const mode = authMode(db);
+  if (mode === 'off') return false;
+  if (mode === 'on') return true;
+  return normalizeUsers(db).some((u) => u.active && u.password);
+}
+
+function findUser(users, name) {
+  const key = nameKey(P && P.normName ? P.normName(text(name)) : text(name));
+  return (users || []).find((u) => u.key === key) || null;
+}
+
+function login(db, name, password) {
+  const users = normalizeUsers(db);
+  const user = findUser(users, name);
+  if (!user) return { ok: false, error: 'کاربری با این نام تعریف نشده است' };
+  if (!user.active) return { ok: false, error: 'دسترسی این کاربر غیرفعال شده است' };
+  if (!verifyPassword(user.password, password)) return { ok: false, error: 'رمز واردشده درست نیست' };
+  return { ok: true, user: publicUser(user) };
+}
+
+function publicUser(user) {
+  return { name: user.name, role: user.role, active: user.active,
+    exts: user.exts.slice(), agents: user.agents.slice(), teams: user.teams.slice(),
+    note: user.note, unrestricted: !!user.unrestricted, hasScope: !!user.hasScope };
+}
+
+/* فهرست حساب‌ها برای صفحه‌ی ورود (بدون رمز). */
+function accounts(db) {
+  return normalizeUsers(db).filter((u) => u.active).map((u) => ({ name: u.name, role: u.role }));
+}
+
+/* ------------------------------------------------------- محدوده‌ی داده */
+function allowedAgentNames(db, user) {
+  if (!user) return null;
+  if (user.role === 'admin' || user.unrestricted) return null; // null = بدون محدودیت
+  const agents = (db && db.agents) || [];
+  const exts = new Set((user.exts || []).map(digits));
+  const names = new Set((user.agents || []).map(nameKey));
+  const teams = new Set((user.teams || []).map(teamKey));
+  const out = new Set();
+  agents.forEach((a) => {
+    const hit = (a.ext != null && a.ext !== '' && exts.has(digits(a.ext))) ||
+      names.has(nameKey(a.name)) || (a.aliases || []).some((al) => names.has(nameKey(al))) ||
+      (a.team && teams.has(teamKey(a.team)));
+    if (hit) out.add(text(a.name));
+  });
+  return out;
+}
+
+function recordById(db, path, id) {
+  const key = String(id);
+  if (path.indexOf('/api/tickets') === 0) return (db.tickets || []).find((x) => String(x.id) === key) || null;
+  if (path.indexOf('/api/socials') === 0) return (db.socials || []).find((x) => String(x.id) === key) || null;
+  if (path.indexOf('/api/reminders') === 0) return (db.reminders || []).find((x) => String(x.id) === key) || null;
+  if (path.indexOf('/api/actions') === 0) {
+    const map = db.agentActions || {};
+    for (const name of Object.keys(map)) {
+      const hit = (map[name] || []).find((x) => String(x.id) === key);
+      if (hit) return Object.assign({ agent: name }, hit);
+    }
+  }
+  return null;
+}
+
+function agentOfRecord(row) {
+  if (!row) return '';
+  return text(row.agentName || row.sourceAgentName || row.expertName || row.sourceExpertName || row.agent || '');
+}
+
+function isAllowedName(allowed, name) {
+  if (!allowed) return true;
+  const n = text(name);
+  if (!n) return false;
+  return allowed.has(n);
+}
+
+/* کپی محدودشده‌ی db برای خواندن (هرگز خود db را تغییر نمی‌دهد). */
+function scopeDb(db, user) {
+  if (!db || !user || user.role === 'admin' || user.unrestricted) return db;
+  const allowed = allowedAgentNames(db, user);
+  const keepRow = (row) => isAllowedName(allowed, agentOfRecord(row));
+  const out = Object.assign({}, db);
+  out.agents = (db.agents || []).filter((a) => isAllowedName(allowed, a.name));
+  out.tickets = (db.tickets || []).filter(keepRow);
+  out.socials = (db.socials || []).filter(keepRow);
+  out.callFeedbacks = (db.callFeedbacks || []).filter(keepRow);
+  out.reminders = (db.reminders || []).filter(keepRow);
+  const actions = {};
+  Object.keys(db.agentActions || {}).forEach((name) => { if (isAllowedName(allowed, name)) actions[name] = db.agentActions[name]; });
+  out.agentActions = actions;
+  out.__scope = { user: user.name, agents: out.agents.length };
+  return out;
+}
+
+/* دسترسی نوشتن: مدیر آزاد؛ کارشناس QC فقط روی رکوردهای مجاز. */
+function writeGuard(db, user, method, pathname, body) {
+  if (!authRequired(db)) return { ok: true };
+  if (!user) return { ok: false, status: 401, error: 'برای این کار باید وارد سامانه شوید' };
+  if (user.role === 'admin' || user.unrestricted) return { ok: true };
+  const path = String(pathname || '');
+  if (method === 'GET') return { ok: true };
+  if (ADMIN_API.some((p) => path === p || path.indexOf(p + '/') === 0)) {
+    return { ok: false, status: 403, error: 'این بخش فقط برای مدیر سیستم باز است' };
+  }
+  const scopedWrite = ['/api/tickets', '/api/socials', '/api/actions', '/api/reminders'];
+  if (!scopedWrite.some((p) => path === p || path.indexOf(p + '/') === 0)) {
+    return { ok: false, status: 403, error: 'اجازه‌ی این تغییر را ندارید' };
+  }
+  const allowed = allowedAgentNames(db, user);
+  const candidates = [];
+  const b = body || {};
+  ['agentName', 'sourceAgentName', 'expertName', 'agent'].forEach((k) => { if (text(b[k])) candidates.push(text(b[k])); });
+  const id = path.split('/')[3];
+  if (id != null && id !== '') {
+    const row = recordById(db, path, id);
+    if (row) candidates.push(agentOfRecord(row));
+  }
+  if (!candidates.length) return { ok: false, status: 400, error: 'کارشناس این رکورد مشخص نیست' };
+  const denied = candidates.filter((name) => !isAllowedName(allowed, name));
+  if (denied.length) {
+    return { ok: false, status: 403, error: 'به داده‌ی کارشناس «' + denied[0] + '» دسترسی ندارید' };
+  }
+  return { ok: true };
+}
+
+/* ------------------------------------------------------------ دسترسی UI */
+function isAdmin(user) { return !!user && (user.role === 'admin' || !!user.unrestricted); }
+
+function canAccessRoute(user, route, authOn) {
+  if (!authOn) return true; // وقتی هیچ کاربری تعریف نشده، همه‌چیز باز است
+  if (!user) return false;
+  if (isAdmin(user)) return true;
+  const key = String(route || '');
+  return SHARED_ROUTES.includes(key) || SHARED_ROUTES.includes(key.replace(/-new$/, ''));
+}
+
+function visibleRoutes(user, authOn) {
+  return SHARED_ROUTES.concat(ADMIN_ROUTES).filter((r) => canAccessRoute(user, r, authOn));
+}
+
+function canAccessApi(db, user, method, pathname) {
+  if (!authRequired(db)) return { ok: true };
+  if (!user) return { ok: false, status: 401, error: 'نشست شما معتبر نیست؛ دوباره وارد شوید' };
+  if (isAdmin(user)) return { ok: true };
+  const path = String(pathname || '').split('?')[0];
+  if (method === 'GET' && OPEN_API.some((p) => path === p || path.indexOf(p + '/') === 0)) return { ok: true };
+  if (ADMIN_API.some((p) => path === p || path.indexOf(p + '/') === 0)) {
+    return { ok: false, status: 403, error: 'این بخش فقط برای مدیر سیستم باز است' };
+  }
+  return { ok: true };
+}
+
+/* ویرایش کاربر توسط مدیر (ساخت/به‌روزرسانی رکورد تب QC_Users). */
+function saveUser(db, body, existing) {
+  const users = Array.isArray(db.qcUsers) ? db.qcUsers : (db.qcUsers = []);
+  const fail = (message, status) => { const e = new Error(message); e.status = status || 400; throw e; };
+  const name = P && P.normName ? P.normName(text(body.name)) : text(body.name);
+  if (!name) fail('نام کارشناس QC الزامی است');
+  const key = nameKey(name);
+  const clash = users.find((u) => nameKey(u.name) === key && (!existing || String(u.id) !== String(existing.id)));
+  if (clash) fail('کاربری با این نام قبلاً تعریف شده است');
+  let row;
+  if (existing) row = Object.assign({}, existing);
+  else {
+    const maxId = users.reduce((m, u) => Math.max(m, Number(String(u.id || '').replace(/\D/g, '')) || 0), 0);
+    row = { id: 'u' + (maxId + 1) };
+  }
+  row.name = name;
+  row.role = /^ad/i.test(text(body.role)) ? 'admin' : 'qc';
+  row.active = body.active === undefined ? true : !!body.active;
+  row.exts = Array.isArray(body.exts) ? body.exts.map(digits).filter(Boolean).join(',') : text(body.exts);
+  row.agents = Array.isArray(body.agents) ? body.agents.map(text).filter(Boolean).join(',') : text(body.agents);
+  row.teams = Array.isArray(body.teams) ? body.teams.map(text).filter(Boolean).join(',') : text(body.teams);
+  row.note = text(body.note);
+  row.updatedAt = new Date().toISOString();
+  const plain = body.password == null ? '' : text(body.password);
+  if (plain) {
+    if (plain.length < 4) fail('رمز باید حداقل ۴ نویسه باشد');
+    row.password = hashPassword(plain);
+  } else if (!existing) fail('رمز اولیه الزامی است');
+  if (!existing) users.push(row);
+  /* نام کارشناس QC باید در فهرست qcAgents هم باشد تا در فرم‌ها قابل انتخاب باشد. */
+  if (!Array.isArray(db.qcAgents)) db.qcAgents = [];
+  if (!db.qcAgents.some((x) => nameKey(x) === key)) db.qcAgents.push(name);
+  return clone(row);
+}
+
+function deleteUser(db, name) {
+  const users = Array.isArray(db.qcUsers) ? db.qcUsers : [];
+  const key = nameKey(P && P.normName ? P.normName(text(name)) : text(name));
+  const found = users.find((u) => nameKey(u.name) === key);
+  if (!found) { const e = new Error('کاربر یافت نشد'); e.status = 404; throw e; }
+  db.qcUsers = users.filter((u) => u !== found);
+  return { ok: true };
+}
+
+/* ردیف‌های آماده‌ی نوشتن روی تب (بدون رمز hash‌شده؟ رمز hash می‌ماند). */
+function usersToRows(users) {
+  return (users || []).map((u) => ({ id: u.id, name: u.name, password: u.password, role: u.role,
+    active: u.active ? 1 : 0, exts: (u.exts || []).join(','), agents: (u.agents || []).join(','),
+    teams: (u.teams || []).join(','), note: u.note || '' }));
+}
+
+function userMask(users) {
+  return (users || []).map((u) => Object.assign({}, u, { password: u.password ? '••••••' : '' }));
+}
+
+return {
+  sha256Hex: sha256Hex, hashPassword: hashPassword, verifyPassword: verifyPassword, isHashed: isHashed,
+  randomToken: randomToken, splitList: splitList, normalizeUser: normalizeUser, normalizeUsers: normalizeUsers,
+  authMode: authMode, authRequired: authRequired, findUser: findUser, login: login, accounts: accounts,
+  publicUser: publicUser, allowedAgentNames: allowedAgentNames, scopeDb: scopeDb, writeGuard: writeGuard,
+  canAccessApi: canAccessApi, canAccessRoute: canAccessRoute, visibleRoutes: visibleRoutes, isAdmin: isAdmin,
+  saveUser: saveUser, deleteUser: deleteUser, usersToRows: usersToRows, userMask: userMask,
+  ADMIN_ROUTES: ADMIN_ROUTES, SHARED_ROUTES: SHARED_ROUTES, ADMIN_API: ADMIN_API, OPEN_API: OPEN_API
+};
+});
+
+</script>
+
+
+<script>/* fiscal.js */
+/* =========================================================================
+ * fiscal.js — ماه‌های مالی و خلاصه‌ی ماهانه‌ی آماده (بند ۲ و ۸)
+ *
+ * ماه‌های مالی در تب `Fiscal_Months` شیت نوشته می‌شوند:
+ *   name  نام ماه مالی (مثلاً «مهر ۱۴۰۵» یا «دوره ۰۷»)
+ *   from  تاریخ شروع (جلالی، مثل 1405/07/01)
+ *   to    تاریخ پایان (جلالی)
+ * چون منبع داده خودِ شیت است، تاریخ‌ها را می‌توان مستقیم روی شیت ویرایش کرد؛
+ * سامانه در هر بار خواندن آن‌ها را به «بازه آماده» تبدیل می‌کند.
+ *
+ * خلاصه‌ی ماهانه (تب `Monthly_Summary`) همان اعدادی است که گزارش‌ها می‌سازند،
+ * اما از قبل محاسبه و روی شیت نوشته شده‌اند تا بررسی/خروجی گرفتن سریع باشد.
+ * ========================================================================= */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./calc'));
+  else root.QCFiscal = factory(root.QCCalc);
+})(typeof self !== 'undefined' ? self : this, function (C) {
+'use strict';
+
+const text = (v) => (v == null ? '' : String(v).trim());
+const avg = (nums) => {
+  const list = (nums || []).map(Number).filter((n) => !isNaN(n));
+  return list.length ? Math.round((list.reduce((a, b) => a + b, 0) / list.length) * 100) / 100 : '';
+};
+
+function monthOf(value) {
+  const j = C.parseDate(value);
+  if (!j) return null;
+  return { jy: j.jy, jm: j.jm, key: j.jy + '/' + ('0' + j.jm).slice(-2), label: C.jalaliMonthLabel(j.jy, j.jm) };
+}
+
+/* ------------------------------------------------------------- ماه مالی */
+function normalizeMonths(rows) {
+  const out = [];
+  (rows || []).forEach((row, i) => {
+    const from = C.parseDate(row && row.from), to = C.parseDate(row && row.to);
+    if (!from || !to) return;
+    if (C.jalaliCmp(from, to) > 0) return; // بازه‌ی وارونه نادیده گرفته می‌شود
+    const name = text(row.name) || C.jalaliMonthLabel(from.jy, from.jm);
+    out.push({
+      id: text(row.id) || 'fm' + (i + 1),
+      name: name,
+      from: C.formatJalali(from),
+      to: C.formatJalali(to),
+      note: text(row.note)
+    });
+  });
+  out.sort((a, b) => C.jalaliCmp(C.parseDate(a.from), C.parseDate(b.from)) || C.jalaliCmp(C.parseDate(a.to), C.parseDate(b.to)));
+  return out;
+}
+
+function monthById(months, id) {
+  return (months || []).find((m) => m.id === text(id)) || null;
+}
+
+function monthOfDate(months, date) {
+  const j = C.parseDate(date || C.todayJalali());
+  if (!j) return null;
+  return (months || []).find((m) => C.jalaliInRange(j, C.parseDate(m.from), C.parseDate(m.to))) || null;
+}
+
+function currentIndex(months, today) {
+  const list = months || [];
+  const hit = monthOfDate(list, today);
+  if (hit) return list.indexOf(hit);
+  const t = C.parseDate(today || C.todayJalali());
+  let idx = -1;
+  list.forEach((m, i) => { if (t && C.jalaliCmp(C.parseDate(m.from), t) <= 0) idx = i; });
+  return idx >= 0 ? idx : (list.length ? 0 : -1);
+}
+
+function currentMonth(months, today) {
+  const i = currentIndex(months, today);
+  return i < 0 ? null : months[i];
+}
+
+function previousMonth(months, today) {
+  const i = currentIndex(months, today);
+  if (i < 0) return null;
+  return months[i - 1] || null;
+}
+
+/* مقدار «بازه آماده» → بازه‌ی واقعی. کلیدها: fm:cur | fm:prev | fm:<id> */
+function presetRange(months, preset, today) {
+  const list = months || [];
+  if (!list.length || !/^fm:/.test(text(preset))) return null;
+  const id = text(preset).slice(3);
+  const month = id === 'cur' ? currentMonth(list, today) : id === 'prev' ? previousMonth(list, today) : monthById(list, id);
+  return month ? { from: month.from, to: month.to, preset: preset } : null;
+}
+
+function isFiscalPreset(preset) { return /^fm:/.test(text(preset)); }
+
+/* گزینه‌های dropdown (با برچسب فارسی و بازه‌ی readable). */
+function presetOptions(months, today) {
+  const list = normalizeMonths(months);
+  if (!list.length) return [];
+  const cur = currentMonth(list, today), prev = previousMonth(list, today);
+  const span = (m) => m ? m.from + ' تا ' + m.to : '';
+  const options = [];
+  if (cur) options.push({ value: 'fm:cur', label: 'ماه مالی جاری — ' + cur.name, group: 'ماه مالی', hint: span(cur) });
+  if (prev) options.push({ value: 'fm:prev', label: 'ماه مالی قبل — ' + prev.name, group: 'ماه مالی', hint: span(prev) });
+  list.slice().reverse().forEach((m) => {
+    options.push({ value: 'fm:' + m.id, label: m.name, group: 'همه ماه‌های مالی', hint: span(m) });
+  });
+  return options;
+}
+
+function labelFor(months, date) {
+  const m = monthOfDate(months, date);
+  return m ? m.name : '';
+}
+
+/* ------------------------------------------------------- خلاصه‌ی ماهانه */
+function redlineOf(row, kind) {
+  if (kind === 'call') return !!(row && row.redline);
+  if (kind === 'social') return false;
+  return !!(row && row.redline);
+}
+
+function monthlySummary(db, opts) {
+  const o = opts || {};
+  const from = o.from ? C.parseDate(o.from) : null;
+  const to = o.to ? C.parseDate(o.to) : null;
+  const months = normalizeMonths(db && db.fiscalMonths);
+  const agents = (db && db.agents) || [];
+  const groups = new Map();
+
+  function ensure(month, name, team) {
+    const key = month.key + '|' + name;
+    if (!groups.has(key)) {
+      const agent = agents.find((a) => a.name === name) || null;
+      groups.set(key, {
+        month: month.key, monthLabel: month.label, fiscal: labelFor(months, month.key + '/01'),
+        agent: name, ext: agent ? text(agent.ext) : '', team: text(team || (agent && agent.team) || ''),
+        ticketScores: [], socialScores: [], callScores: [],
+        ticketRedline: 0, socialRedline: 0, callRedline: 0,
+        qc: new Set(), actions: 0
+      });
+    }
+    return groups.get(key);
+  }
+
+  function inRange(row) {
+    const j = C.parseDate(row && row.reviewDate);
+    if (!j) return null;
+    if (from && C.jalaliCmp(j, from) < 0) return null;
+    if (to && C.jalaliCmp(j, to) > 0) return null;
+    return monthOf(row.reviewDate);
+  }
+
+  ((db && db.tickets) || []).forEach((r) => {
+    const m = inRange(r); const name = text(r.agentName);
+    if (!m || !name) return;
+    const g = ensure(m, name, r.team);
+    if (r.score !== '' && r.score != null) g.ticketScores.push(Number(r.score));
+    if (redlineOf(r, 'ticket')) g.ticketRedline++;
+    if (text(r.qcAgent)) g.qc.add(text(r.qcAgent));
+  });
+  ((db && db.socials) || []).forEach((r) => {
+    const m = inRange(r); const name = text(r.agentName);
+    if (!m || !name) return;
+    const g = ensure(m, name, r.team);
+    if (r.score !== '' && r.score != null) g.socialScores.push(Number(r.score));
+    if (text(r.qcAgent)) g.qc.add(text(r.qcAgent));
+  });
+  ((db && db.callFeedbacks) || []).forEach((r) => {
+    const m = inRange(r); const name = text(r.expertName);
+    if (!m || !name) return;
+    const g = ensure(m, name, r.team);
+    if (r.score !== '' && r.score != null) g.callScores.push(Number(r.score));
+    if (redlineOf(r, 'call')) g.callRedline++;
+    if (text(r.qcAgent)) g.qc.add(text(r.qcAgent));
+  });
+  Object.keys((db && db.agentActions) || {}).forEach((name) => {
+    (((db && db.agentActions) || {})[name] || []).forEach((a) => {
+      const m = monthOf(a && a.date);
+      if (!m) return;
+      if (from && C.jalaliCmp(C.parseDate(a.date), from) < 0) return;
+      if (to && C.jalaliCmp(C.parseDate(a.date), to) > 0) return;
+      ensure(m, text(name), '').actions++;
+    });
+  });
+
+  const rows = Array.from(groups.values()).map((g) => {
+    const all = g.ticketScores.concat(g.socialScores, g.callScores);
+    return {
+      month: g.month, monthLabel: g.monthLabel, fiscal: g.fiscal,
+      agent: g.agent, ext: g.ext, team: g.team,
+      qcAgents: Array.from(g.qc).join('، '),
+      tickets: g.ticketScores.length, ticketAvg: avg(g.ticketScores), ticketRedline: g.ticketRedline,
+      socials: g.socialScores.length, socialAvg: avg(g.socialScores), socialRedline: g.socialRedline,
+      calls: g.callScores.length, callAvg: avg(g.callScores), callRedline: g.callRedline,
+      totalCount: all.length, combinedAvg: avg(all),
+      redlines: g.ticketRedline + g.callRedline, actions: g.actions
+    };
+  }).sort((a, b) => (a.month < b.month ? 1 : a.month > b.month ? -1 : a.agent.localeCompare(b.agent, 'fa')));
+
+  return {
+    generatedAt: new Date().toISOString(),
+    range: { from: from ? C.formatJalali(from) : '', to: to ? C.formatJalali(to) : '' },
+    months: Array.from(new Set(rows.map((r) => r.month))).sort().reverse(),
+    count: rows.length,
+    rows: rows
+  };
+}
+
+return {
+  monthOf: monthOf, normalizeMonths: normalizeMonths, monthById: monthById, monthOfDate: monthOfDate,
+  currentMonth: currentMonth, previousMonth: previousMonth, currentIndex: currentIndex,
+  presetRange: presetRange, presetOptions: presetOptions, isFiscalPreset: isFiscalPreset,
+  labelFor: labelFor, monthlySummary: monthlySummary
+};
+});
+
+</script>
+
+
+<script>/* elements.js */
+/* =========================================================================
+ * elements.js — نگاشت المان‌ها بین پیکربندی JSON و تب تخت `Elements` (بند ۹)
+ *
+ * تب Elements روی شیت یک ردیف برای هر المان دارد تا مستقیم قابل ویرایش باشد:
+ *   scope   form | team     (form = تعریف پیش‌فرض کل فرم، team = فقط همان تیم)
+ *   team    نام تیم (برای scope=team)
+ *   form    نوع فرم: tele | account | mlm
+ *   key     شناسه‌ی پایدار المان (هرگز تغییر نکند؛ تاریخچه به آن وابسته است)
+ *   label   نام فارسی المان (در سامانه دیده می‌شود)
+ *   excelKey نام ستون در فایل اکسل دریافتی (برای نگاشت خودکار هنگام import)
+ *   active  1/0
+ *   aliases ستون‌های قدیمی/جایگزین، جداشده با «|»
+ *   order   ترتیب نمایش
+ *
+ * قاعده‌ی ادغام: هر scope که در تب ردیف دارد، کاملاً با ردیف‌های همان scope
+ * تعریف می‌شود؛ scope‌های بدون ردیف از پیکربندی قبلی دست‌نخورده می‌مانند.
+ * اگر excelKey روی شیت عوض شود، مقدار قبلی خودکار به aliases اضافه می‌شود تا
+ * نمره‌های تاریخی از دست نروند.
+ * ========================================================================= */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./parseQc'));
+  else root.QCElements = factory(root.QCParse);
+})(typeof self !== 'undefined' ? self : this, function (P) {
+'use strict';
+
+const text = (v) => (v == null ? '' : String(v).trim());
+const clone = (o) => (o == null ? o : JSON.parse(JSON.stringify(o)));
+const truthy = (v) => v === undefined || v === null || v === '' ? true : /^(1|true|yes|y|on|فعال|بله)$/i.test(text(v));
+
+function aliasesOf(value) {
+  return text(value).split(/[|،,;؛\n\r\t]+/).map(text).filter(Boolean);
+}
+
+function emptyConfig() { return { version: 0, forms: {}, teams: {} }; }
+
+/* پیکربندی → ردیف‌های تخت (برای نوشتن روی تب). */
+function criteriaToRows(cfg) {
+  const config = cfg || emptyConfig();
+  const rows = [];
+  let order = 0;
+  Object.keys(config.forms || {}).forEach((form) => {
+    (config.forms[form] || []).forEach((d) => {
+      rows.push({ scope: 'form', team: '', form: form, key: text(d.key), label: text(d.label),
+        excelKey: text(d.excelKey), active: d.active !== false ? 1 : 0,
+        aliases: (d.aliases || []).join('|'), order: ++order });
+    });
+  });
+  Object.keys(config.teams || {}).forEach((id) => {
+    const entry = config.teams[id] || {};
+    (entry.elements || []).forEach((d) => {
+      rows.push({ scope: 'team', team: text(entry.team), form: text(entry.form), key: text(d.key),
+        label: text(d.label), excelKey: text(d.excelKey), active: d.active !== false ? 1 : 0,
+        aliases: (d.aliases || []).join('|'), order: ++order });
+    });
+  });
+  return rows;
+}
+
+function teamId(team) { return P && P.teamKey ? P.teamKey(team) : text(team).toLowerCase().replace(/[\s_/-]/g, ''); }
+
+function definitionsFrom(rows) {
+  return rows.map((r) => ({
+    key: text(r.key),
+    label: text(r.label),
+    excelKey: text(r.excelKey),
+    active: truthy(r.active),
+    aliases: aliasesOf(r.aliases)
+  })).filter((d) => d.key);
+}
+
+/* ردیف‌های تخت → پیکربندی (برای خواندن از تب؛ base پیکربندی قبلی است). */
+function rowsToCriteria(rows, base) {
+  const cfg = clone(base) || emptyConfig();
+  cfg.forms = cfg.forms || {}; cfg.teams = cfg.teams || {};
+  const list = (rows || []).filter((r) => text(r.key));
+  if (!list.length) return cfg;
+
+  const previousElement = (scopeTeam, form, key) => {
+    const source = scopeTeam ? (cfg.teams[teamId(scopeTeam)] || {}).elements : cfg.forms[form];
+    return (source || []).find((d) => d.key === key) || null;
+  };
+
+  const merged = (r) => {
+    const before = previousElement(text(r.team), text(r.form), text(r.key));
+    const aliases = new Set(aliasesOf(r.aliases).concat((before && before.aliases) || []));
+    const excelKey = text(r.excelKey);
+    if (before && text(before.excelKey) && text(before.excelKey) !== excelKey) aliases.add(text(before.excelKey));
+    aliases.delete(excelKey);
+    return { key: text(r.key), label: text(r.label) || (before && before.label) || text(r.key),
+      excelKey: excelKey || (before && before.excelKey) || '', active: truthy(r.active), aliases: Array.from(aliases) };
+  };
+
+  const formRows = new Map(), teamRows = new Map();
+  list.slice().sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)).forEach((r) => {
+    const scope = /^team/i.test(text(r.scope)) ? 'team' : 'form';
+    if (scope === 'team') {
+      const id = teamId(r.team);
+      if (!id) return;
+      if (!teamRows.has(id)) teamRows.set(id, { team: text(r.team), form: text(r.form), elements: [] });
+      const entry = teamRows.get(id);
+      if (!entry.form) entry.form = text(r.form);
+      entry.elements.push(merged(r));
+    } else {
+      const form = text(r.form);
+      if (!form) return;
+      if (!formRows.has(form)) formRows.set(form, []);
+      formRows.get(form).push(merged(r));
+    }
+  });
+
+  formRows.forEach((elements, form) => { if (elements.length) cfg.forms[form] = elements; });
+  teamRows.forEach((entry, id) => { if (entry.elements.length) cfg.teams[id] = entry; });
+  return cfg;
+}
+
+/* جدول تخت برای نمایش در سامانه (هر ردیف = یک المان). */
+function table(cfg, teams) {
+  const rows = criteriaToRows(cfg);
+  return { rows: rows, teams: (teams || []).slice(), version: Number((cfg || {}).version || 0) };
+}
+
+return {
+  criteriaToRows: criteriaToRows, rowsToCriteria: rowsToCriteria, table: table,
+  aliasesOf: aliasesOf, emptyConfig: emptyConfig, teamId: teamId
+};
+});
+
+</script>
+
+
 <script>/* storage.js */
 /* storage.js — لایه داده مرورگر (localStorage) با همان رابط API نسخه سروری.
  * بدون سرور؛ فقط این فایل را با fetch به API واقعی CRM عوض کنید — بقیه UI دست نمی‌خورد. */
@@ -3442,7 +4346,10 @@ return { requireMode, restore, calls, mergeRows, validateBackup, semantic, stabl
 'use strict';
 const C = window.QCCalc, R = window.QCReports, KEY = 'crmqc.db.v1';
 const Registry = window.QCRegistry, ImportData = window.QCImport, X = window.QCExpertRef;
+const A = window.QCAccess, F = window.QCFiscal, E = window.QCElements;
 let db = null, saveTimer = null;
+/* نشست فعلی (کاربر واردشده). در Apps Script سمت سرور با هر درخواست ست می‌شود. */
+let session = null;
 
 function loadDb() {
   let raw = null;
@@ -3469,6 +4376,11 @@ function loadDb() {
   X.ensure(db);
   if (!db.settings.scoreBands) db.settings.scoreBands = [90, 75, 50];
   if (!db.settings.defaultPreset) db.settings.defaultPreset = 'cur';
+  /* ماه‌های مالی و کاربران QC: هر دو مستقیم روی شیت هم قابل ویرایش‌اند. */
+  if (!Array.isArray(db.fiscalMonths)) db.fiscalMonths = [];
+  db.fiscalMonths = F.normalizeMonths(db.fiscalMonths);
+  if (!Array.isArray(db.qcUsers)) db.qcUsers = [];
+  if (!db.settings.authMode) db.settings.authMode = 'auto';
 }
 function saveDb(sync) {
   const w = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {} };
@@ -3483,6 +4395,7 @@ function saveDb(sync) {
 if (typeof window.addEventListener === 'function') window.addEventListener('pagehide', () => saveDb(true));
 
 const str = (v) => (v == null ? '' : String(v)).trim();
+const text = str; /* نام دیگر str؛ در لایه‌ی دسترسی/ماه مالی استفاده می‌شود */
 const clone = (o) => (o == null ? o : JSON.parse(JSON.stringify(o)));
 function jstr(v) { const j = C.parseJalali(v); return j ? C.formatJalali(j) : null; }
 function teamOf(name) { const a = db.agents.find((x) => x.name === name); return a ? a.team : ''; }
@@ -3566,7 +4479,33 @@ function list(kind, q) {
   return { rows: clone(rows.slice((page-1)*per, page*per)), total, page, per };
 }
 
+/* لایه‌ی احراز هویت + محدوده‌ی داده؛ منطق اصلی در dispatch() است. */
 function route(method, url, body) {
+  const pathPart = '/' + String(url || '/').replace(/^\/+/, '').split('?')[0];
+  if (pathPart.indexOf('/api/auth') === 0) return dispatch(method, url, body);
+  /* bootstrap و revision بدون نشست هم پاسخ می‌دهند (دقیقاً مثل server.js):
+   * اولی پوسته‌ی خالی + فهرست حساب‌ها را برای صفحه‌ی ورود می‌فرستد و دومی برای
+   * همگام‌سازی خودکار مرورگرهاست. */
+  const publicPath = pathPart === '/api/bootstrap' || pathPart === '/api/revision';
+  const required = A.authRequired(db);
+  if (required && !publicPath) {
+    const allowed = A.canAccessApi(db, session, method, pathPart);
+    if (!allowed.ok) bad(allowed.error, allowed.status || 403);
+    if (method !== 'GET') {
+      const guard = A.writeGuard(db, session, method, pathPart, body);
+      if (!guard.ok) bad(guard.error, guard.status || 403);
+    }
+  }
+  if (method === 'GET' && required && session && !A.isAdmin(session)) {
+    /* خواندن‌ها روی کپی محدودشده اجرا می‌شوند؛ نوشتن در این مسیر ممنوع است. */
+    const full = db;
+    db = A.scopeDb(full, session);
+    try { return dispatch(method, url, body); } finally { db = full; }
+  }
+  return dispatch(method, url, body);
+}
+
+function dispatch(method, url, body) {
   // کوئری را اول جدا کن — تاریخ‌ها شامل «/» هستند و نباید در مسیر شکسته شوند
   const [pathPart, qsAll] = url.slice(1).split('?');
   const parts = pathPart.split('/');
@@ -3588,8 +4527,24 @@ function route(method, url, body) {
 
   if(name === 'session-snapshot' && method === 'GET')return clone(db);
 
+  if (name === 'auth') return authRoute(method, id, body);
+
   if (name === 'bootstrap' && method === 'GET') {
+    const auth = { required: A.authRequired(db), mode: A.authMode(db), accounts: A.accounts(db),
+      user: session ? A.publicUser(session) : null, admin: A.isAdmin(session) };
+    if (auth.required && !session) {
+      /* پیش از ورود هیچ داده‌ای لو نمی‌رود؛ فقط آنچه صفحه‌ی ورود لازم دارد. */
+      return { auth: auth, agents: [], teams: [], qcAgents: [], lists: clone(db.lists),
+        fiscalMonths: [], revision: db.revision || 0,
+        settings: { orgName: db.settings.orgName || 'سامانه کنترل کیفیت', scoreBands: db.settings.scoreBands,
+          defaultPreset: db.settings.defaultPreset, authMode: db.settings.authMode },
+        counts: { tickets: 0, socials: 0, calls: 0, callMeta: null } };
+    }
     return {
+      auth: auth,
+      fiscalMonths: clone(db.fiscalMonths || []),
+      revision: db.revision || 0,
+      qcUsers: A.isAdmin(session) ? clone(A.userMask(A.normalizeUsers(db))) : undefined,
       agents: clone(db.agents.filter((a) => a.active)),
       teams: [...new Set(db.agents.filter((a) => a.active).map((a) => a.team))],
       qcAgents: clone(db.qcAgents),
@@ -3605,7 +4560,7 @@ function route(method, url, body) {
     db.tickets.push(n); saveDb(); return clone(n);
   }
   if (name === 'tickets' && method === 'GET') { const r = db.tickets.find((x) => x.id === +id); return r ? clone(r) : bad('یافت نشد', 404); }
-  if (name === 'tickets' && method === 'PUT') { const r = db.tickets.find((x) => x.id === +id); if (!r) bad('یافت نشد', 404); const n = normalizeTicket(body, r); if (typeof n === 'string') bad(n); db.tickets = db.tickets.map((x) => x.id === r.id ? n : x); saveDb(); return clone(n); }
+  if (name === 'tickets' && method === 'PUT') { const r = db.tickets.find((x) => x.id === +id); if (!r) bad('یافت نشد', 404); conflict(r, body); const n = normalizeTicket(body, r); if (typeof n === 'string') bad(n); db.tickets = db.tickets.map((x) => x.id === r.id ? n : x); saveDb(); return clone(n); }
   if (name === 'tickets' && method === 'DELETE') { db.tickets = db.tickets.filter((x) => x.id !== +id); saveDb(); return { ok: true }; }
 
   if (name === 'socials' && method === 'GET' && id == null) return list('socials', q);
@@ -3614,7 +4569,7 @@ function route(method, url, body) {
     db.socials.push(n); saveDb(); return clone(n);
   }
   if (name === 'socials' && method === 'GET') { const r = db.socials.find((x) => x.id === +id); return r ? clone(r) : bad('یافت نشد', 404); }
-  if (name === 'socials' && method === 'PUT') { const r = db.socials.find((x) => x.id === +id); if (!r) bad('یافت نشد', 404); const n = normalizeSocial(body, r); if (typeof n === 'string') bad(n); db.socials = db.socials.map((x) => x.id === r.id ? n : x); saveDb(); return clone(n); }
+  if (name === 'socials' && method === 'PUT') { const r = db.socials.find((x) => x.id === +id); if (!r) bad('یافت نشد', 404); conflict(r, body); const n = normalizeSocial(body, r); if (typeof n === 'string') bad(n); db.socials = db.socials.map((x) => x.id === r.id ? n : x); saveDb(); return clone(n); }
   if (name === 'socials' && method === 'DELETE') { db.socials = db.socials.filter((x) => x.id !== +id); saveDb(); return { ok: true }; }
 
   if (name === 'reports' && method === 'GET') {
@@ -3948,15 +4903,145 @@ function route(method, url, body) {
     if (Array.isArray(b.scoreBands) && b.scoreBands.length === 3) {
       db.settings.scoreBands = b.scoreBands.map((x) => Math.min(100, Math.max(0, +x || 0))).sort((a, b) => b - a);
     }
-    if (['cur', 'prev', 'all'].indexOf(b.defaultPreset) !== -1) db.settings.defaultPreset = b.defaultPreset;
+    if (['cur', 'prev', 'all', 'today'].indexOf(b.defaultPreset) !== -1 || F.isFiscalPreset(b.defaultPreset)) db.settings.defaultPreset = b.defaultPreset;
+    if (['auto', 'on', 'off'].indexOf(text(b.authMode)) !== -1) db.settings.authMode = text(b.authMode);
     saveDb(); return clone(db.settings);
   }
+
+  const extended = extendedRoute(method, url, body, name, id, q);
+  if (extended !== null) return extended;
   bad('not found', 404);
+}
+
+/* ------------------------------------------------------- احراز هویت و دسترسی */
+function conflict(row, body) {
+  /* همزمانی چند کارشناس: اگر رکورد بعد از بازکردن فرم تغییر کرده باشد،
+   * به‌جای بازنویسی بی‌صدا خطای ۴۰۹ می‌دهیم تا کاربر انتخاب کند. */
+  const base = body && body.baseUpdatedAt;
+  if (base && row && row.updatedAt && String(base) !== String(row.updatedAt) && !body.overwrite) {
+    const e = new Error('این رکورد بعد از بازکردن فرم توسط شخص دیگری ویرایش شده است');
+    e.status = 409; e.conflict = { current: clone(row) };
+    throw e;
+  }
+}
+
+function authRoute(method, id, body) {
+  if (id === 'accounts' && method === 'GET') {
+    return { required: A.authRequired(db), mode: A.authMode(db), accounts: A.accounts(db),
+      firstRun: !A.normalizeUsers(db).length, orgName: db.settings.orgName || '' };
+  }
+  if (id === 'login' && method === 'POST') {
+    const result = A.login(db, (body || {}).name, (body || {}).password);
+    if (!result.ok) bad(result.error, 401);
+    return { ok: true, user: result.user };
+  }
+  if (id === 'logout' && method === 'POST') {
+    /* خروج: نشست همین لایه پاک می‌شود؛ باطل‌کردن خودِ توکن در لایه‌ی میزبان است
+     * (server.js نشست in-memory و Server.gs کلید qctok@… را حذف می‌کند). */
+    session = null;
+    return { ok: true };
+  }
+  if (id === 'me' && method === 'GET') {
+    return { required: A.authRequired(db), user: session ? A.publicUser(session) : null,
+      admin: A.isAdmin(session), accounts: A.accounts(db) };
+  }
+  if (id === 'setup' && method === 'POST') {
+    /* راه‌اندازی اولیه: فقط وقتی هیچ کاربری تعریف نشده مجاز است (بن‌بست مدیر). */
+    if (A.normalizeUsers(db).length) bad('قبلاً کاربری تعریف شده است؛ از بخش مدیریت QC استفاده کنید');
+    const b = body || {};
+    if (!text(b.name)) bad('نام مدیر الزامی است');
+    if (!text(b.password)) bad('رمز مدیر الزامی است');
+    db.qcUsers = [];
+    const row = A.saveUser(db, { name: b.name, password: b.password, role: 'admin', active: true, exts: '*', agents: '', teams: '' });
+    saveDb();
+    return { ok: true, user: A.publicUser(A.normalizeUser(row, 0)) };
+  }
+  bad('not found', 404);
+}
+
+/* کاربران QC (تب QC_Users) — فقط مدیر */
+function qcUsersRoute(method, id, body) {
+  const users = A.normalizeUsers(db);
+  if (method === 'GET' && id == null) {
+    return { users: clone(A.userMask(users)), required: A.authRequired(db), mode: A.authMode(db),
+      teams: [...new Set(db.agents.map((a) => a.team))].sort(),
+      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false }))) };
+  }
+  if (method === 'GET' && id != null) {
+    const u = users.find((x) => String(x.id) === String(id) || x.key === A.normalizeUser({ name: id }).key);
+    if (!u) bad('کاربر یافت نشد', 404);
+    return clone(A.userMask([u])[0]);
+  }
+  if (method === 'POST' || method === 'PUT') {
+    const existing = body && body.id != null && body.id !== ''
+      ? (db.qcUsers || []).find((u) => String(u.id) === String(body.id)) : null;
+    if (method === 'PUT' && !existing) bad('کاربر یافت نشد', 404);
+    const row = A.saveUser(db, body || {}, existing);
+    if (session && A.normalizeUser({ name: session.name }).key === row.name.toLowerCase().replace(/\s/g, '')) {
+      session = A.normalizeUser(row, 0); // تغییر نقش/دسترسی مدیر بلافاصله اعمال شود
+    }
+    saveDb();
+    return { ok: true, user: clone(A.userMask([A.normalizeUser(row, 0)])[0]), users: clone(A.userMask(A.normalizeUsers(db))) };
+  }
+  if (method === 'DELETE' && id != null) {
+    const target = users.find((x) => String(x.id) === String(id));
+    if (!target) bad('کاربر یافت نشد', 404);
+    if (session && target.key === session.key) bad('نمی‌توانید حساب کاربری خودتان را حذف کنید');
+    if (target.role === 'admin' && users.filter((u) => u.role === 'admin' && u.active).length <= 1) {
+      bad('حداقل یک مدیر فعال باید باقی بماند');
+    }
+    A.deleteUser(db, target.name); saveDb();
+    return { ok: true, users: clone(A.userMask(A.normalizeUsers(db))) };
+  }
+  bad('not found', 404);
+}
+
+/* ماه‌های مالی (تب Fiscal_Months) */
+function fiscalRoute(method, id, body) {
+  if (method === 'GET') {
+    const months = F.normalizeMonths(db.fiscalMonths);
+    const today = C.todayJalali();
+    return { months: clone(months), options: F.presetOptions(months, C.formatJalali(today)),
+      current: F.currentMonth(months, C.formatJalali(today)), previous: F.previousMonth(months, C.formatJalali(today)) };
+  }
+  if (method === 'PUT') {
+    const rows = Array.isArray(body && body.months) ? body.months : [];
+    const clean = rows.map((m) => ({ id: text(m.id), name: text(m.name), from: text(m.from), to: text(m.to), note: text(m.note) }))
+      .filter((m) => m.name || m.from || m.to);
+    clean.forEach((m) => {
+      if (!m.name) bad('نام ماه مالی الزامی است');
+      if (!C.parseDate(m.from) || !C.parseDate(m.to)) bad('تاریخ «' + m.name + '» نامعتبر است');
+    });
+    db.fiscalMonths = F.normalizeMonths(clean); saveDb();
+    return { ok: true, months: clone(db.fiscalMonths) };
+  }
+  if (method === 'DELETE' && id != null) {
+    db.fiscalMonths = F.normalizeMonths((db.fiscalMonths || []).filter((m) => m.id !== id));
+    saveDb(); return { ok: true, months: clone(db.fiscalMonths) };
+  }
+  bad('not found', 404);
+}
+
+/* --------------------------------------------------------------- مسیرهای جدید */
+function extendedRoute(method, url, body, name, id, q) {
+  if (name === 'qc-users') return qcUsersRoute(method, id, body);
+  if (name === 'fiscal-months') return fiscalRoute(method, id, body);
+  if (name === 'elements' && method === 'GET') {
+    return E.table(db.settings.callCriteria, [...new Set(db.agents.map((a) => a.team))]);
+  }
+  if (name === 'monthly-summary' && method === 'GET') return F.monthlySummary(db, q);
+  if (name === 'revision' && method === 'GET') return { revision: db.revision || 0, at: Date.now() };
+  return null;
 }
 
 window.LocalApi = {
   // Apps Script uses the same tested route logic on its server-side bundle.
   run(method, url, body) { return route(method, url, body); },
+  /* کاربر واردشده؛ null یعنی بدون احراز هویت (همه‌چیز باز). */
+  setSession(user) { session = user && user.name ? A.normalizeUser(user, 0) : null; return session; },
+  getSession() { return session ? A.publicUser(session) : null; },
+  authRequired() { return A.authRequired(db); },
+  setRevision(value) { db.revision = Number(value) || 0; },
   get(url) { return Promise.resolve().then(() => route('GET', url)); },
   post(url, b) { return Promise.resolve().then(() => route('POST', url, b)); },
   put(url, b) { return Promise.resolve().then(() => route('PUT', url, b)); },
@@ -4338,27 +5423,46 @@ const api = {
    * به‌صورت خودکار آنلاین برمی‌گردیم. */
   offline: false,
   _lastProbe: 0,
-  browserPinned: false,
   _writes: new Set(),
+  _unauthorized: false,
   async waitForWrites(){ await Promise.all([...this._writes]); },
+  /* توکن نشست با هر درخواست فرستاده می‌شود (هدر در Node، آرگومان در Apps Script). */
+  headers(body) {
+    const h = {};
+    if (body) h['Content-Type'] = 'application/json';
+    const token = window.QCAuth && window.QCAuth.token;
+    if (token) h['x-qc-token'] = token;
+    return Object.keys(h).length ? h : undefined;
+  },
   async req(method,url,body){
-    if(method!=='GET'&&window.BrowserSession&&BrowserSession.saving){const error=new Error('تأیید اطلاعات در حال انجام است؛ پس از آن ذخیره کنید');error.status=409;throw error;}
     const work=this._request(method,url,body);if(method!=='GET')this._writes.add(work);
-    try{const result=await work;if(method!=='GET'&&window.BrowserSession)BrowserSession.markChanged();return result;}finally{this._writes.delete(work);}
+    try{const result=await work;if(method!=='GET'&&window.App)window.App.syncAfterWrite();return result;}
+    finally{this._writes.delete(work);}
+  },
+  unauthorized(message) {
+    if (api._unauthorized || !window.QCAuth || !window.QCAuth.required) return;
+    api._unauthorized = true;
+    window.QCAuth.clear();
+    window.QCAuth.showGate(message || 'نشست شما پایان یافته است؛ دوباره وارد شوید.');
   },
   async _request(method, url, body) {
     url = App.withDateRange(url, method);
-    if(api.browserPinned){ const methodName=method==='GET'?'get':method==='POST'?'post':method==='PUT'?'put':'del';return window.LocalApi[methodName](url,body); }
     if (!api.offline) {
       try {
         const res = await fetch(url, {
           method,
-          headers: body ? { 'Content-Type': 'application/json' } : undefined,
+          headers: api.headers(body),
           body: body ? JSON.stringify(body) : undefined
         });
         let data = null;
         try { data = await res.json(); } catch (e) { /* پاسخ خالی */ }
-        if (!res.ok) { const err = new Error((data && data.error) || 'خطای ارتباط با سرور (' + res.status + ')'); err.status = res.status; throw err; }
+        if (!res.ok) {
+          const err = new Error((data && data.error) || 'خطای ارتباط با سرور (' + res.status + ')');
+          err.status = res.status;
+          if (data && data.conflict) err.conflict = data.conflict;
+          if (res.status === 401) api.unauthorized((data && data.error) || '');
+          throw err;
+        }
         return data;
       } catch (e) {
         /* خطاهای واقعی (۴xx/۵xx) سرور جزو فallback نیستند؛ فقط شبکه‌ی قطع */
@@ -4478,30 +5582,75 @@ function confirmDlg(title, text, onYes, yesLabel) {
 }
 
 /* ------------------------------------------------------------ کامپوننت‌ها */
-/** ورودی تاریخ جلالی با نمایش خودکار روز هفته */
+/* تطبیق فازی فارسی: یکدست‌سازی نویسه‌ها (ی/ک/نیم‌فاصله/ارقام فارسی) + امتیازدهی
+ * تا «علی رضا» با «علیرضا» و «101» با «۱۰۱» هم پیدا شود. */
+function normChar(v) {
+  return C.faToEn(String(v == null ? '' : v))
+    .replace(/[يى]/g, 'ی').replace(/ك/g, 'ک').replace(/[\u200c\u200d]/g, ' ').toLowerCase();
+}
+function normKey(v) { return normChar(v).replace(/\s+/g, ' ').trim(); }
+function fuzzyScore(haystack, needle) {
+  const h = normKey(haystack), n = normKey(needle);
+  if (!n) return 1000;
+  if (!h) return -1;
+  if (h === n) return 1000;
+  if (h.indexOf(n) === 0) return 900 - h.length;
+  const words = h.split(' ');
+  if (words.some((w) => w.indexOf(n) === 0)) return 800 - h.length;
+  const at = h.indexOf(n);
+  if (at > 0) return 700 - at - h.length;
+  if (words.some((w) => w.indexOf(n) > 0)) return 620 - h.length;
+  /* زیردنباله‌ی فازی: نویسه‌ها به ترتیب، ولی نه لزوماً چسبیده */
+  let i = 0, gaps = 0, first = -1;
+  for (let k = 0; k < h.length && i < n.length; k++) {
+    if (h[k] === n[i]) { if (first < 0) first = k; i++; }
+    else if (i > 0) gaps++;
+  }
+  return i === n.length ? 480 - gaps * 6 - first : -1;
+}
+function markMatch(label, needle) {
+  const text = String(label == null ? '' : label);
+  const n = normKey(needle);
+  if (!n) return esc(text);
+  const at = normChar(text).indexOf(n);
+  if (at >= 0) return esc(text.slice(0, at)) + '<mark>' + esc(text.slice(at, at + n.length)) + '</mark>' + esc(text.slice(at + n.length));
+  let out = '', i = 0;
+  for (let k = 0; k < text.length; k++) {
+    const ch = normChar(text[k]);
+    if (i < n.length && ch === n[i] && ch !== ' ') { out += '<mark>' + esc(text[k]) + '</mark>'; i++; }
+    else out += esc(text[k]);
+  }
+  return out;
+}
+
+/** ورودی تاریخ جلالی با روز هفته و تقویم پاپ‌آپ (بند ۷) */
 function dateField(opts) {
-  // opts: {label, name, value, required, showWeekday, placeholder}
+  // opts: {label, name, value, required, showWeekday, placeholder, onPick}
   const wrap = el(`<div class="field">
     <label>${esc(opts.label)}${opts.required ? ' <span class="req">*</span>' : ''}</label>
-    <input class="input" dir="ltr" style="text-align:right" inputmode="numeric" name="${opts.name}"
-      placeholder="${esc(opts.placeholder || '1405/06/20')}" value="${esc(opts.value || '')}" autocomplete="off">
+    <div class="date-f">
+      <input class="input" dir="ltr" style="text-align:right" inputmode="numeric" name="${opts.name}"
+        placeholder="${esc(opts.placeholder || '1405-06-20')}" value="${esc(opts.value || '')}" autocomplete="off">
+      <button type="button" class="cal-btn" aria-label="تقویم ${esc(opts.label)}" title="انتخاب از تقویم"><i class="fa-regular fa-calendar"></i></button>
+    </div>
     <div class="foot" data-foot></div>
   </div>`);
-  const inp = $('input', wrap), foot = $('[data-foot]', wrap);
+  const inp = $('input', wrap), foot = $('[data-foot]', wrap), btn = $('.cal-btn', wrap);
   const validate = () => {
     const v = inp.value.trim();
-    if (!v) { foot.innerHTML = ''; inp.classList.remove('invalid'); wrap._j = null; return; }
+    if (!v) { foot.className = 'foot'; foot.innerHTML = ''; inp.classList.remove('invalid'); wrap._j = null; return; }
     const j = C.parseJalali(v);
     if (!j) { inp.classList.add('invalid'); foot.className = 'foot bad'; foot.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> تاریخ نامعتبر است'; wrap._j = null; }
     else {
       inp.classList.remove('invalid');
       const norm = C.formatJalali(j);
       if (inp.value.trim() !== norm) inp.value = norm;
+      inp.dataset.value = norm;
       wrap._j = j;
       if (opts.showWeekday !== false) { foot.className = 'foot good'; foot.innerHTML = `<i class="fa-regular fa-calendar-check"></i> ${C.weekdayFa(j)} — معتبر`; }
     }
   };
-  // ماسک خودکار: فقط اعداد و اسلش؛ تبدیل 14050620 → 1405/06/20
+  // ماسک خودکار: فقط اعداد و اسلش؛ تبدیل 14050620 → 1405-06-20
   inp.addEventListener('input', () => {
     let v = C.faToEn(inp.value).replace(/[^\d/]/g, '');
     if (/^\d{9,}$/.test(v.replace(/\//g, ''))) v = v.slice(0, 8);
@@ -4512,59 +5661,137 @@ function dateField(opts) {
     if (/^\d{8}$/.test(raw) && inp.value.indexOf('/') === -1) inp.value = raw.slice(0, 4) + '/' + raw.slice(4, 6) + '/' + raw.slice(6, 8);
     validate();
   });
+  /* تقویم پاپ‌آپ کنار فیلد */
+  JCal.attach(btn, { input: inp, onPick: () => {
+    validate();
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.dispatchEvent(new Event('change', { bubbles: true }));
+    if (opts.onPick) opts.onPick(wrap.getValue());
+  } });
   if (opts.value) validate();
   wrap.getValue = () => (C.parseJalali(inp.value) ? C.formatJalali(C.parseJalali(inp.value)) : '');
+  wrap.setToday = () => { inp.value = C.formatJalali(C.todayJalali()); validate(); };
   return wrap;
 }
 
-/** کمبوباکس جستجوپذیر */
+/** کمبوباکس جستجوپذیر با تطبیق فازی و ناوبری با کلیدهای بالا/پایین (بند ۷) */
+let comboSeq = 0;
 function combo(opts) {
-  // opts: {label, name, items: [{value,label,sub}], value, required, placeholder, onPick}
+  // opts: {label, name, items: [{value,label,sub,keys[]}], value, required, placeholder, onPick}
+  const uid = 'cmb' + (++comboSeq);
   const wrap = el(`<div class="field">
-    <label>${esc(opts.label)}${opts.required ? ' <span class="req">*</span>' : ''}</label>
+    <label id="${uid}-label">${esc(opts.label)}${opts.required ? ' <span class="req">*</span>' : ''}</label>
     <div class="combo">
-      <input class="input" placeholder="${esc(opts.placeholder || 'جستجو…')}" value="" autocomplete="off">
-      <div class="menu"></div>
+      <input class="input" placeholder="${esc(opts.placeholder || 'جستجو…')}" value="" autocomplete="off"
+        role="combobox" aria-expanded="false" aria-controls="${uid}-list" aria-autocomplete="list" aria-labelledby="${uid}-label">
+      <div class="menu" id="${uid}-list" role="listbox" aria-label="${esc(opts.label)}"></div>
     </div>
     <div class="foot" data-foot></div>
   </div>`);
-  const box = $('.combo', wrap), inp = $('input', wrap), menu = $('.menu', wrap);
-  let items = opts.items || [];
+  const box = $('.combo', wrap), inp = $('input', wrap), menu = $('.menu', wrap), foot = $('[data-foot]', wrap);
+  let items = opts.items || [], shown = [], active = -1;
   wrap._value = '';
 
+  function scoreOf(it, filter) {
+    let best = -1;
+    [it.label, it.value, it.sub].concat(it.keys || []).forEach((cand, i) => {
+      if (cand == null || cand === '') return;
+      const sc = fuzzyScore(cand, filter) - i * 90;
+      if (sc > best) best = sc;
+    });
+    return best;
+  }
   function renderMenu(filter) {
     const f = (filter || '').trim();
-    const shown = items.filter((it) => !f || it.label.includes(f) || (it.sub || '').includes(f)).slice(0, 60);
-    if (!shown.length) { menu.innerHTML = '<div class="menu-empty">موردی یافت نشد</div>'; return; }
-    menu.innerHTML = shown.map((it) =>
-      `<div class="menu-item" data-v="${esc(it.value)}"><span>${esc(it.label)}</span>${it.sub ? `<span class="tm">${esc(it.sub)}</span>` : ''}</div>`).join('');
-    $$('.menu-item', menu).forEach((mi) => mi.addEventListener('mousedown', (e) => {
-      e.preventDefault(); pick(mi.dataset.v);
-    }));
+    shown = items.map((it) => ({ it: it, score: scoreOf(it, f) }))
+      .filter((x) => x.score >= 0)
+      .sort((a, b) => b.score - a.score || String(a.it.label).localeCompare(String(b.it.label), 'fa'))
+      .slice(0, 60).map((x) => x.it);
+    if (!shown.length) { menu.innerHTML = '<div class="menu-empty">موردی یافت نشد</div>'; active = -1; updateActive(); return; }
+    menu.innerHTML = shown.map((it, i) =>
+      `<div class="menu-item" role="option" id="${uid}-opt-${i}" data-v="${esc(it.value)}" data-i="${i}">` +
+      `<span>${markMatch(it.label, f)}</span>${it.sub ? `<span class="tm">${markMatch(it.sub, f)}</span>` : ''}</div>`).join('');
+    $$('.menu-item', menu).forEach((mi) => {
+      mi.addEventListener('mousedown', (e) => { e.preventDefault(); pick(mi.dataset.v); });
+      mi.addEventListener('mouseenter', () => { active = Number(mi.dataset.i); updateActive(); });
+    });
+    active = 0;
+    updateActive();
   }
+  function updateActive() {
+    const nodes = $$('.menu-item', menu);
+    nodes.forEach((mi, i) => {
+      mi.classList.toggle('hl', i === active);
+      if (i === active) mi.setAttribute('aria-selected', 'true'); else mi.removeAttribute('aria-selected');
+    });
+    const cur = nodes[active];
+    if (cur) { if (cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest' }); inp.setAttribute('aria-activedescendant', cur.id); }
+    else inp.removeAttribute('aria-activedescendant');
+    inp.setAttribute('aria-expanded', String(box.classList.contains('open')));
+  }
+  function openMenu(filter) { box.classList.add('open'); renderMenu(filter || ''); }
+  function closeMenu() { box.classList.remove('open'); active = -1; updateActive(); }
   function pick(v) {
     const it = items.find((x) => x.value === v);
     wrap._value = it ? it.value : '';
     inp.value = it ? it.label : v;
-    box.classList.remove('open');
+    closeMenu();
+    foot.className = 'foot'; foot.innerHTML = '';
     if (opts.onPick) opts.onPick(it || null);
-    const foot = $('[data-foot]', wrap);
     if (it && it.foot) { foot.className = 'foot good'; foot.innerHTML = `<i class="fa-solid fa-check"></i> ${esc(it.foot)}`; }
   }
-  inp.addEventListener('focus', () => { inp.select(); box.classList.add('open'); renderMenu(''); });
-  inp.addEventListener('input', () => { box.classList.add('open'); renderMenu(inp.value); wrap._value = ''; });
-  inp.addEventListener('blur', () => {
-    setTimeout(() => box.classList.remove('open'), 160);
-    const jt = items.find((x) => x.label === inp.value);
-    if (jt) wrap._value = jt.value;
+  function resolveTyped() {
+    const typed = normKey(inp.value);
+    if (!typed) return null;
+    const exact = items.find((x) => normKey(x.label) === typed) || items.find((x) => normKey(x.value) === typed);
+    if (exact) return exact;
+    const near = items.map((it) => ({ it: it, score: scoreOf(it, typed) })).filter((x) => x.score >= 700)
+      .sort((a, b) => b.score - a.score);
+    return near.length === 1 ? near[0].it : null;
+  }
+
+  inp.addEventListener('focus', () => { inp.select(); openMenu(''); });
+  inp.addEventListener('input', () => {
+    wrap._value = '';
+    const resolved = resolveTyped();
+    if (resolved) { wrap._value = resolved.value; foot.className = 'foot'; foot.innerHTML = ''; }
+    else if (inp.value.trim()) { foot.className = 'foot warn'; foot.innerHTML = '<i class="fa-solid fa-hand-pointer"></i> نام را از فهرست انتخاب کنید (بالا/پایین و Enter)'; }
+    else { foot.className = 'foot'; foot.innerHTML = ''; }
+    openMenu(inp.value);
   });
-  wrap.setItems = (list) => { items = list; };
+  inp.addEventListener('blur', () => {
+    setTimeout(() => closeMenu(), 160);
+    const resolved = resolveTyped();
+    if (resolved) { wrap._value = resolved.value; if (normKey(resolved.label) !== normKey(inp.value)) inp.value = resolved.label; }
+  });
+  inp.addEventListener('keydown', (e) => {
+    const isOpen = box.classList.contains('open');
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!isOpen) { openMenu(inp.value); return; }
+      if (!shown.length) return;
+      active = e.key === 'ArrowDown' ? (active + 1) % shown.length : (active <= 0 ? shown.length - 1 : active - 1);
+      updateActive();
+      return;
+    }
+    if (e.key === 'Home' && isOpen && shown.length) { e.preventDefault(); active = 0; updateActive(); return; }
+    if (e.key === 'End' && isOpen && shown.length) { e.preventDefault(); active = shown.length - 1; updateActive(); return; }
+    if (e.key === 'Enter') {
+      if (isOpen && active >= 0 && shown[active]) { e.preventDefault(); e.stopPropagation(); pick(shown[active].value); return; }
+      const resolved = resolveTyped();
+      if (resolved) { e.preventDefault(); pick(resolved.value); }
+      return;
+    }
+    if (e.key === 'Escape' || e.key === 'Tab') closeMenu();
+  });
+  wrap.setItems = (list) => { items = list || []; };
   wrap.setValue = (v) => { if (v) pick(v); };
   wrap.getValue = () => {
-    const exact = items.find((x) => x.label === inp.value.trim());
-    return wrap._value || (exact ? exact.value : '');
+    if (wrap._value) return wrap._value;
+    const resolved = resolveTyped();
+    return resolved ? resolved.value : '';
   };
-  if (opts.value) wrap.setValue(opts.value);
+  wrap.focus = () => inp.focus();
   return wrap;
 }
 
@@ -4727,6 +5954,44 @@ function redlineSwitch(opts) {
   return wrap;
 }
 
+/* نام کارشناس QC واردشده پیش‌فرض می‌شود؛ برای نقش QC قفل است تا ارزیابی
+ * به نام شخص دیگری ثبت نشود (بند ۵). */
+function applyQcIdentity(field, current) {
+  const me = window.QCAuth ? window.QCAuth.user : null;
+  const sel = $('select', field);
+  if (!me || !me.name || !sel) return;
+  const value = current || me.name;
+  if (!Array.prototype.some.call(sel.options, (o) => o.value === value)) sel.add(new Option(value, value));
+  sel.value = value;
+  if (current || (window.QCAuth && window.QCAuth.isAdmin)) return;
+  sel.disabled = true;
+  field.appendChild(el(`<div class="foot good"><i class="fa-solid fa-user-check"></i> به‌عنوان «${esc(me.name)}» ثبت می‌شود</div>`));
+}
+
+/* همزمانی چند کارشناس (بند ۱۰): رکورد پس از بازکردن فرم عوض شده است */
+function conflictDlg(current, onOverwrite) {
+  const when = current && current.updatedAt ? new Date(current.updatedAt) : null;
+  const m = modal(`${modalHead('تغییر همزمان توسط کاربر دیگر', 'fa-people-arrows')}
+    <div class="modal-body">
+      <p class="conflict-note">این رکورد بعد از بازکردن فرمِ شما ویرایش شده است — احتمالاً توسط یک کارشناس QC دیگر.
+        برای اینکه زحمت کسی پاک نشود، انتخاب کنید کدام نسخه بماند.</p>
+      <div class="detail-rows">
+        <div class="detail-row"><div class="k">آخرین ویرایش</div><div class="v">${when && !isNaN(when) ? esc(when.toLocaleString('fa-IR')) : '—'}</div></div>
+        <div class="detail-row"><div class="k">کارشناس QC</div><div class="v">${esc((current && current.qcAgent) || '—')}</div></div>
+        <div class="detail-row"><div class="k">کارشناس ارزیابی‌شده</div><div class="v">${esc((current && (current.agentName || current.expertName)) || '—')}</div></div>
+        <div class="detail-row"><div class="k">نمره‌ی ذخیره‌شده</div><div class="v">${fa(current && current.score)}</div></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close>انصراف</button>
+      <button class="btn soft" id="cfOverwrite"><i class="fa-solid fa-pen-nib"></i> تغییرات من جایگزین شود</button>
+      <button class="btn primary" id="cfReload"><i class="fa-solid fa-arrows-rotate"></i> بارگذاری نسخه‌ی تازه</button>
+    </div>`);
+  $('#cfReload', m).addEventListener('click', () => { m.close(); App.route(); });
+  $('#cfOverwrite', m).addEventListener('click', () => { m.close(); onOverwrite(); });
+  return m;
+}
+
 function selectField(opts) {
   const wrap = el(`<div class="field">
     <label>${esc(opts.label)}${opts.required ? ' <span class="req">*</span>' : ''}</label>
@@ -4861,6 +6126,10 @@ const App = {
   state: null, // bootstrap
   routes: {},
   charts: [],
+  fiscalMonths: [],   // از تب Fiscal_Months شیت
+  auth: { required: false, user: null },
+  revision: 0,
+  _syncTimer: null,
   dateRange: { from: '', to: '', preset: 'all' },
   _rangeReady: false,
   _dateRefresh: null,
@@ -4889,16 +6158,39 @@ const App = {
   },
   presetRange(preset) {
     if (preset === 'all') return { from: '', to: '', preset };
-    const t = C.todayJalali();
-    if (preset === 'today') return { from: C.formatJalali(t), to: C.formatJalali(t), preset };
+    const t = C.todayJalali(), today = C.formatJalali(t);
+    if (preset === 'today') return { from: today, to: today, preset };
+    /* بازه‌های ماه مالی از تب Fiscal_Months شیت خوانده می‌شوند (بند ۲) */
+    const fiscal = window.QCFiscal ? window.QCFiscal.presetRange(this.fiscalMonths, preset, today) : null;
+    if (fiscal) return fiscal;
     const month = preset === 'prev' ? C.jalaliMonthAdd(t.jy, t.jm, -1) : t;
     const r = C.jalaliMonthRange(month.jy, month.jm);
     return { from: C.formatJalali(r.from), to: C.formatJalali(r.to), preset };
   },
+  /* گزینه‌های ماه مالی داخل dropdown بازه آماده */
+  buildFiscalOptions() {
+    const months = this.fiscalMonths || [];
+    const group = $('#gFiscalGroup'), all = $('#gFiscalAll');
+    if (!group || !all) return;
+    const options = window.QCFiscal ? window.QCFiscal.presetOptions(months, C.formatJalali(C.todayJalali())) : [];
+    const cur = options.filter((o) => o.group === 'ماه مالی');
+    const rest = options.filter((o) => o.group !== 'ماه مالی');
+    group.innerHTML = cur.map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('');
+    all.innerHTML = rest.map((o) => `<option value="${esc(o.value)}" title="${esc(o.hint || '')}">${esc(o.label)}</option>`).join('');
+    group.hidden = !cur.length; all.hidden = !rest.length;
+  },
+  rangeStorageKey() {
+    /* تنظیمات هر کارشناس QC جدا نگه داشته می‌شود تا محیط کارها قاطی نشود (بند ۱۰) */
+    const base = 'crmqc.dateRange.v1';
+    return window.QCAuth && window.QCAuth.user ? window.QCAuth.scopeKey(base) : base;
+  },
   initDateRange() {
     if (this._rangeReady) return;
     let saved = null;
-    try { saved = JSON.parse(localStorage.getItem('crmqc.dateRange.v1')); } catch (e) {}
+    try { saved = JSON.parse(localStorage.getItem(this.rangeStorageKey())); } catch (e) {}
+    const presetKnown = (p) => !window.QCFiscal || !window.QCFiscal.isFiscalPreset(p) ||
+      !!(window.QCFiscal.presetRange(this.fiscalMonths, p, C.formatJalali(C.todayJalali())));
+    if (saved && !presetKnown(saved.preset)) saved = null;
     if (saved && !window.QCReports.validateRange(saved)) {
       this.dateRange = { from: saved.from ? C.formatJalali(C.parseDate(saved.from)) : '',
         to: saved.to ? C.formatJalali(C.parseDate(saved.to)) : '', preset: saved.preset || 'custom' };
@@ -4911,11 +6203,18 @@ const App = {
     $('#gFrom').value = r.from; $('#gTo').value = r.to;
     $('#gFrom').dataset.value = r.from; $('#gTo').dataset.value = r.to;
     $('#gFrom').classList.remove('invalid'); $('#gTo').classList.remove('invalid');
-    $('#gPreset').value = r.preset || 'custom';
+    const wanted = r.preset || 'custom';
+    const select = $('#gPreset');
+    select.value = wanted;
+    if (select.value !== wanted) select.value = 'custom'; // بازه‌ی ماه مالی حذف‌شده
     $('#gRangeNote').className = 'range-note';
     $('#globalRange').classList.remove('draft');
     $('#gRangeState').textContent = 'اعمال‌شده';
-    $('#gRangeNote').textContent = this.dateRangeLabel() + ' · مبنا: تاریخ بررسی فرم؛ اطلاعات کارشناسان و عملیات بک‌اپ/پاک‌سازی مستقل‌اند.';
+    /* نام ماه مالی در یادداشت بازه تا معلوم باشد کدام «بازه‌ی آماده» فعال است (بند ۲) */
+    const fiscalName = window.QCFiscal && r.from && window.QCFiscal.isFiscalPreset(r.preset)
+      ? window.QCFiscal.labelFor(this.fiscalMonths, r.from) : '';
+    $('#gRangeNote').textContent = (fiscalName ? 'ماه مالی «' + fiscalName + '» · ' : '') +
+      this.dateRangeLabel() + ' · مبنا: تاریخ بررسی فرم؛ اطلاعات کارشناسان و عملیات بک‌اپ/پاک‌سازی مستقل‌اند.';
   },
   async setDateRange(range) {
     const error = window.QCReports.validateRange(range);
@@ -4924,7 +6223,7 @@ const App = {
     const request = ++this._rangeRequest;
     this.dateRange = { from: range.from ? C.formatJalali(C.parseDate(range.from)) : '',
       to: range.to ? C.formatJalali(C.parseDate(range.to)) : '', preset: range.preset || 'custom' };
-    try { localStorage.setItem('crmqc.dateRange.v1', JSON.stringify(this.dateRange)); } catch(e) {}
+    try { localStorage.setItem(this.rangeStorageKey(), JSON.stringify(this.dateRange)); } catch(e) {}
     this.syncDateRangeUI();
     $('#globalRange').classList.add('updating'); $('#gRangeState').textContent = 'در حال بروزرسانی گزارش‌ها…';
     const refresh = this._dateRefresh;
@@ -4932,7 +6231,6 @@ const App = {
     finally { if (request === this._rangeRequest) {
       $('#globalRange').classList.remove('updating');
       if (!$('#globalRange').classList.contains('draft')) $('#gRangeState').textContent = 'روی همه گزارش‌ها اعمال شد';
-      if(window.BrowserSession)BrowserSession.markChanged();
     } }
     return true;
   },
@@ -5000,20 +6298,88 @@ const App = {
   async boot() {
     this.state = await api.get('/api/bootstrap');
     const st = this.state;
+    this.fiscalMonths = Array.isArray(st.fiscalMonths) ? st.fiscalMonths : [];
+    this.auth = st.auth || { required: false, user: null };
+    this.revision = Number(st.revision || 0);
+    this._syncRevision = this.revision;
+    if (window.QCAuth && this.auth.user) window.QCAuth.user = this.auth.user;
     $('#orgName').textContent = st.settings.orgName || 'سامانه کنترل کیفیت';
     const t = C.todayJalali();
     $('#todayChip span').textContent = `${C.weekdayFa(t)} ${C.toFaDigits(t.jd)} ${['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'][t.jm - 1]} ${C.toFaDigits(t.jy)}`;
     if (window.QCParse) window.QCParse.setConfig(st.settings.callCriteria);
     this.applyTheme(document.documentElement.dataset.theme || 'dark');
+    this.buildFiscalOptions();
     this.initDateRange();
+    this.renderUserChip();
+    if (window.QCAuth) window.QCAuth.applyNav();
     await this.refreshCounts();
-    $('#dataSourceBadge').textContent=window.APP_SCRIPT_MODE?'Google Sheets':api.browserPinned?'نسخه مرورگر':api.offline?'آفلاین':'سرور';
-    if(api.browserPinned){const badge=$('#dataSourceBadge');badge.title='نسخه ذخیره‌شده در این مرورگر؛ تغییرات محلی خودکار به سرور ارسال نمی‌شوند.';}
-    if(window.BrowserSession)BrowserSession.status();
+    $('#dataSourceBadge').textContent = window.APP_SCRIPT_MODE ? 'Google Sheets' : api.offline ? 'آفلاین' : 'سرور';
+    this.startSyncWatch();
+  },
+
+  /* نام/نقش کاربر واردشده در نوار بالا + دکمه خروج (بند ۵) */
+  renderUserChip() {
+    const chip = $('#userChip');
+    if (!chip) return;
+    const user = window.QCAuth ? window.QCAuth.user : null;
+    if (!user || !this.auth.required) { chip.hidden = true; return; }
+    chip.hidden = false;
+    chip.classList.toggle('admin', user.role === 'admin');
+    $('#userName').textContent = user.name;
+    $('#userRole').textContent = user.role === 'admin' ? 'مدیر سیستم — دسترسی کامل' :
+      (user.unrestricted ? 'کارشناس QC — همه کارشناسان' : 'کارشناس QC — داده‌ی محدود');
+    const avatar = $('.user-avatar', chip);
+    if (avatar) avatar.innerHTML = `<i class="fa-solid ${user.role === 'admin' ? 'fa-user-shield' : 'fa-user-check'}"></i>`;
+  },
+
+  /* چند کاربر همزمان: هر ~۴۵ ثانیه نسخه‌ی داده‌ی شیت را می‌پرسیم (بند ۱۰).
+   * اگر شخص دیگری چیزی نوشته باشد، فقط یک دکمه‌ی کوچک ظاهر می‌شود تا خودِ
+   * کاربر تصمیم بگیرد کی صفحه را تازه کند — کار کسی قطع نمی‌شود. */
+  startSyncWatch() {
+    clearInterval(this._syncTimer);
+    this._syncTimer = setInterval(async () => {
+      if (document.hidden) return;
+      try {
+        const res = await api.get('/api/revision');
+        const rev = Number((res && res.revision) || 0);
+        if (!rev) return;
+        if (this._syncRevision && rev !== this._syncRevision) this.markStale(rev);
+        else this._syncRevision = rev;
+      } catch (e) { /* سرور قدیمی یا آفلاین: بی‌صدا رد می‌شویم */ }
+    }, 45000);
+  },
+  markStale(rev) {
+    this._pendingRevision = rev;
+    const chip = $('#syncChip');
+    if (chip) { chip.hidden = false; chip.classList.add('pulse'); }
+  },
+  async syncAfterWrite() {
+    if (!this._syncTimer) return;
+    try {
+      const res = await api.get('/api/revision');
+      const rev = Number((res && res.revision) || 0);
+      if (rev) { this._syncRevision = rev; this.revision = rev; }
+    } catch (e) { /* بی‌اثر */ }
+  },
+  async applyServerData() {
+    const chip = $('#syncChip');
+    if (chip) { chip.disabled = true; }
+    try {
+      this._rangeReady = false;
+      await this.boot();
+      await this.route();
+      this._pendingRevision = 0;
+      if (chip) chip.hidden = true;
+      toast.success('داده‌ها از شیت تازه شد');
+    } catch (e) { toast.error(e.message || 'تازه‌سازی ناموفق بود'); }
+    finally { if (chip) chip.disabled = false; }
   },
 
   agentComboItems() {
-    return this.state.agents.map((a) => ({ value: a.name, label: a.name, sub: a.team, foot: 'تیم: ' + a.team }));
+    /* داخلی و زیرگروه هم قابل جستجو باشند تا با تایپ «101» کارشناس پیدا شود */
+    return this.state.agents.map((a) => ({ value: a.name, label: a.name, sub: a.team,
+      keys: [a.ext, a.subgroup].filter((x) => x != null && x !== ''),
+      foot: 'تیم: ' + a.team + (a.ext ? ' · داخلی ' + C.toFaDigits(a.ext) : '') }));
   },
   teamOf(name) { const a = this.state.agents.find((x) => x.name === name); return a ? a.team : ''; },
 
@@ -5026,10 +6392,12 @@ const App = {
   },
 
   async route() {
+    if (!this.state) return; // پیش از ورود/بارگذاری داده‌ها رندر نکن
     const routeRequest = ++this._routeRequest;
     $$('#modalRoot .modal-back').forEach(m => m.close ? m.close() : m.remove());
     clearTimeout(this._dateTimer);
     const { name, arg, arg2 } = this.parseHash();
+    if (window.QCAuth && window.QCAuth.required && !window.QCAuth.can(name)) return this.renderForbidden(name);
     // ناوبری فعال
     $$('.nav-item, .nav-subitem').forEach((a) => {
       const r = a.dataset.route;
@@ -5063,6 +6431,16 @@ const App = {
     if (routeRequest === this._routeRequest) this.closeSidebar();
   },
 
+  renderForbidden(name) {
+    this.setTitle('دسترسی محدود');
+    const view = document.createElement('section'); view.className = 'route-view';
+    $('#content').replaceChildren(view);
+    view.innerHTML = `<div class="card">${emptyState('fa-lock', 'به این بخش دسترسی ندارید',
+      'این صفحه فقط برای مدیر سیستم باز است. اگر فکر می‌کنید اشتباه شده، از مدیر بخواهید نقش یا دسترسی حساب شما را در صفحه‌ی «مدیریت QC» تغییر دهد.',
+      `<a class="btn primary" href="#/dashboard"><i class="fa-solid fa-gauge-high"></i> بازگشت به داشبورد</a>`)}</div>`;
+    this.closeSidebar();
+  },
+
   chart(canvas, cfg) {
     if (!canvas) { console.warn('[chart] canvas موجود نیست — رندر این نمودار رد شد', cfg && cfg.type); return null; }
     Chart.defaults.font.family = 'Vazirmatn';
@@ -5075,210 +6453,288 @@ const App = {
 
   clearCharts() { this.charts.forEach((ch) => { try { ch.destroy(); } catch (e) {} }); this.charts = []; },
 
-  closeSidebar() { $('#sidebar').classList.remove('open'); $('#sidebarBackdrop').classList.remove('show'); },
+  closeSidebar() {
+    $('#sidebar').classList.remove('open');
+    $('#sidebarBackdrop').classList.remove('show');
+    $('#hamburger').setAttribute('aria-expanded', 'false');
+  },
+  openSidebar() {
+    $('#sidebar').classList.add('open');
+    $('#sidebarBackdrop').classList.add('show');
+    $('#hamburger').setAttribute('aria-expanded', 'true');
+  },
+  toggleSidebar() {
+    if ($('#sidebar').classList.contains('open')) this.closeSidebar(); else this.openSidebar();
+  },
 
   async init() {
-    try { if(window.BrowserSession)await BrowserSession.initialize();await this.boot(); }
-    catch (e) { $('#content').innerHTML = `<div class="card">${emptyState('fa-plug-circle-xmark', 'عدم اتصال به سرور', e.message)}</div>`; return; }
+    this.bindChrome();
+    /* احراز هویت: اگر کاربری تعریف نشده باشد، مثل قبل بدون ورود باز می‌شود. */
+    let ready = true;
+    if (window.QCAuth) {
+      try { ready = await window.QCAuth.ensure(); }
+      catch (e) { ready = true; }
+    }
+    if (!ready) return; // دروازه‌ی ورود نمایش داده شده؛ بعد از ورود onAuthReady اجرا می‌شود
+    await this.start();
+  },
 
-    this.bindDateRangeUI();
-    $('#themeToggle').addEventListener('click', () => {this.applyTheme(this.theme === 'dark' ? 'light' : 'dark');if(window.BrowserSession)BrowserSession.markChanged();});
-    if(window.BrowserSession)BrowserSession.bind();
-    // همبرگر: در موبایل دراور را باز می‌کند؛ در دسکتاپ فهرست کناری را جمع/باز می‌کند (انتخاب کاربر ذخیره می‌شود)
-    const narrowMQ = window.matchMedia ? window.matchMedia('(max-width: 1024px)') : { get matches() { return window.innerWidth <= 1024; } };
-    try { if (localStorage.getItem('crmqc.sidebar.v1') === 'collapsed') $('#app').classList.add('sidebar-collapsed'); } catch (e) { /* بی‌اثر */ }
-    $('#hamburger').addEventListener('click', () => {
-      if (narrowMQ.matches) { $('#sidebar').classList.add('open'); $('#sidebarBackdrop').classList.add('show'); return; }
-      const collapsed = $('#app').classList.toggle('sidebar-collapsed');
-      $('#hamburger').setAttribute('aria-expanded', String(!collapsed));
-      try { localStorage.setItem('crmqc.sidebar.v1', collapsed ? 'collapsed' : 'open'); } catch (e) { /* بی‌اثر */ }
-    });
-    $('#hamburger').setAttribute('aria-expanded', String(!$('#app').classList.contains('sidebar-collapsed')));
+  async onAuthReady() {
+    api._unauthorized = false;
+    this._rangeReady = false;
+    this._started = false;
+    if (window.QCAuth) window.QCAuth.hideGate();
+    await this.start();
+  },
+
+  async start() {
+    try { await this.boot(); }
+    catch (e) {
+      $('#content').innerHTML = `<div class="card">${emptyState('fa-plug-circle-xmark', 'عدم اتصال به سرور', e.message,
+        `<button class="btn ghost" onclick="location.reload()"><i class="fa-solid fa-rotate-right"></i> تلاش دوباره</button>`)}</div>`;
+      return;
+    }
+    if (!this._started) { this.bindDateRangeUI(); this._started = true; }
+    const target = this.parseHash().name;
+    if (window.QCAuth && window.QCAuth.required && !window.QCAuth.can(target)) location.hash = '#/dashboard';
+    if (location.hash && location.hash.length > 1) await this.route();
+    else location.hash = '#/dashboard'; // رویداد hashchange خودش route را اجرا می‌کند
+  },
+
+  /* رویدادهای ثابت پوسته (پیش از ورود هم فعال‌اند) */
+  bindChrome() {
+    $('#themeToggle').addEventListener('click', () => this.applyTheme(this.theme === 'dark' ? 'light' : 'dark'));
+    const logout = $('#logoutBtn');
+    if (logout) logout.addEventListener('click', () => { if (window.QCAuth) window.QCAuth.logout(); });
+    const syncChip = $('#syncChip');
+    if (syncChip) syncChip.addEventListener('click', () => this.applyServerData());
+
+    /* منوی همبرگری: در همه‌ی اندازه‌ها یک دراور است که پیش‌فرض بسته است (بند ۳) */
+    $('#app').classList.remove('sidebar-collapsed');
+    this.closeSidebar();
+    $('#hamburger').addEventListener('click', () => this.toggleSidebar());
     $('#sidebarClose').addEventListener('click', () => this.closeSidebar());
     $('#sidebarBackdrop').addEventListener('click', () => this.closeSidebar());
     $$('.nav-group-title').forEach((g) => g.addEventListener('click', () => g.parentElement.classList.toggle('open')));
-
-    window.addEventListener('hashchange', () => {this.route();if(window.BrowserSession)BrowserSession.markChanged();});
-    /* fix: قبلاً hash هم از اینجا ست می‌شد (رویداد) و هم await route() — دو رندر هم‌زمان
-     * می‌ساخت که چارت‌ها را خراب می‌کرد؛ حالا فقط یک مسیر واحد اجرا می‌شود. */
-    if (location.hash && location.hash.length > 1) {
-      await this.route();
-      if(window.BrowserSession)await BrowserSession.restorePage();
-    } else {
-      location.hash = '#/dashboard'; // رویداد hashchange خودش route را اجرا می‌کند
-    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && $('#sidebar').classList.contains('open')) this.closeSidebar();
+    });
+    window.addEventListener('hashchange', () => this.route());
   }
 };
 
 // اکسپورت سراسری
 window.App = App;
-window.UI = { C, $, $$, esc, fa, el, api, toast, modal, modalHead, confirmDlg, confirmImport, dateField, combo, multiSelect, triSwitch, redlineSwitch, selectField, scorePill, markBadge, triValue, callRedlineBadge, bindCallRedlines, callTimeCell, slaBadge, durText, rateCell, errorRateCell, pager, emptyState, debounce, scoreBands, scoreColorHex, scoreColorRgba };
+window.UI = { C, $, $$, esc, fa, el, api, toast, modal, modalHead, confirmDlg, confirmImport, conflictDlg, applyQcIdentity, dateField, combo, multiSelect, triSwitch, redlineSwitch, selectField, scorePill, markBadge, triValue, callRedlineBadge, bindCallRedlines, callTimeCell, slaBadge, durText, rateCell, errorRateCell, pager, emptyState, debounce, scoreBands, scoreColorHex, scoreColorRgba };
 })();
 
 </script>
 
 
-<script>/* session.js */
-/* تأیید اطلاعات: نسخه کامل مرورگر، ذخیره اتمیک IndexedDB و بازیابی بدون نمره‌دهی مجدد. */
-(function(){
+<script>/* auth.js */
+/* =========================================================================
+ * auth.js — دروازه‌ی ورود، نگهداری نشست و فیلتر دسترسی صفحه‌ها
+ *
+ * جریان کار:
+ *   ۱) App.init() → QCAuth.ensure()
+ *   ۲) اگر هیچ کاربر فعالی تعریف نشده باشد (firstRun) یا احراز هویت خاموش باشد،
+ *      سامانه مثل قبل بدون ورود باز می‌شود.
+ *   ۳) در غیر این صورت دروازه‌ی ورود نمایش داده می‌شود؛ بعد از ورود موفق
+ *      QCAuth.start() اپ را بالا می‌آورد.
+ * نشست فقط در حافظه + localStorage همان مرورگر نگه داشته می‌شود (توکن سمت
+ * سرور در CacheService/حافظه‌ی سرور اعتبارسنجی می‌شود).
+ * ========================================================================= */
+(function () {
 'use strict';
-if(window.APP_SCRIPT_MODE){
-  window.BrowserSession={initialize:async()=>false,bind(){const el=document.querySelector('.confirm-control');if(el)el.hidden=true;const button=document.getElementById('useServerData');if(button)button.hidden=true;},markChanged(){},status(){},restorePage:async()=>{},async waitForWrites(){},get saving(){return false;}};
-  return;
-}
-const NAME='crmqc.confirmed-session.v1', KEY='current', FALLBACK='crmqc.confirmed-session.v1';
-let database=null, record=null, saving=false, restoring=false, timer=null;
-const copy=x=>JSON.parse(JSON.stringify(x));
-function validate(value){
-  if(!value||value.version!==1||!value.data||!value.preferences)throw new Error('نسخه ذخیره‌شده مرورگر نامعتبر است');
-  const data=value.data;
-  for(const key of ['agents','qcAgents','tickets','socials','callFeedbacks'])if(!Array.isArray(data[key]))throw new Error('نسخه مرورگر ناقص است: '+key);
-  if(!data.settings||!data.seq||!data.lists)throw new Error('تنظیمات نسخه مرورگر ناقص است');
-  if(QCReports.validateRange(value.preferences.dateRange||{}))throw new Error('بازه ذخیره‌شده نامعتبر است');
-  return value;
-}
-async function open(){
-  if(database)return database;
-  if(!window.indexedDB)return null;
-  database=await new Promise((resolve,reject)=>{
-    const req=indexedDB.open(NAME,1);
-    const timeout=setTimeout(()=>reject(new Error('حافظه مرورگر پاسخ نداد؛ قبل از بستن بک‌اپ بگیرید')),5000);
-    req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('sessions'))req.result.createObjectStore('sessions');};
-    req.onsuccess=()=>{clearTimeout(timeout);resolve(req.result);};
-    req.onerror=()=>{clearTimeout(timeout);reject(req.error||new Error('دسترسی به حافظه مرورگر ممکن نیست'));};
-    req.onblocked=()=>{clearTimeout(timeout);reject(new Error('یک تب دیگر حافظه مرورگر را قفل کرده است'));};
-  });
-  return database;
-}
-async function read(){
-  const db=await open();
-  if(!db){const raw=localStorage.getItem(FALLBACK);return raw?JSON.parse(raw):null;}
-  return new Promise((resolve,reject)=>{
-    const transaction=db.transaction('sessions','readonly'),request=transaction.objectStore('sessions').get(KEY);
-    request.onsuccess=()=>resolve(request.result||null);request.onerror=()=>reject(request.error);
-  });
-}
-async function write(value){
-  validate(value);const db=await open();
-  if(!db){localStorage.setItem(FALLBACK,JSON.stringify(value));return;}
-  await new Promise((resolve,reject)=>{
-    const transaction=db.transaction('sessions','readwrite');
-    transaction.objectStore('sessions').put(copy(value),KEY);
-    transaction.oncomplete=resolve;transaction.onerror=()=>reject(transaction.error||new Error('ذخیره اطلاعات ناموفق بود'));
-    transaction.onabort=()=>reject(transaction.error||new Error('ذخیره اطلاعات لغو شد'));
-  });
-}
-function preferences(){
-  const fields=[],tabs=[],multiselects=[];
-  if(!/\/(?:new|edit)(?:\/|$)/.test(location.hash)&&!['#/criteria','#/agents','#/directory'].includes(location.hash)){
-    document.querySelectorAll('#content input[id]:not([type="file"]),#content select[id]').forEach(input=>{
-      if(input.closest('.mselect'))return;
-      fields.push({id:input.id,value:input.value,checked:input.checked});
-    });
-    document.querySelectorAll('#content .tabs[id]').forEach(group=>{
-      const button=group.querySelector('button.active');if(!button)return;
-      const attr=['data-t','data-l','data-v'].find(key=>button.hasAttribute(key));if(attr)tabs.push({id:group.id,attr,value:button.getAttribute(attr)});
-    });
-    document.querySelectorAll('#content .field').forEach(field=>{if(field.getValues)multiselects.push({label:field.querySelector('label').textContent,values:field.getValues()});});
-  }
-  return {dateRange:copy(App.dateRange),theme:App.theme,hash:location.hash||'#/dashboard',fields,tabs,multiselects};
-}
-function status(){
-  const button=document.getElementById('confirmData'),label=document.getElementById('confirmedInfo'),server=document.getElementById('useServerData');
-  if(!button)return;
-  button.disabled=saving;
-  button.classList.toggle('saved',!!record&&!record.dirty);
-  button.innerHTML=saving?'<i class="fa-solid fa-spinner fa-spin"></i><span>در حال تأیید…</span>':'<i class="fa-solid fa-circle-check"></i><span>تأیید اطلاعات</span>';
-  if(label){label.textContent=record?(record.dirty?'تغییرات جدید؛ دوباره تأیید کنید':'آخرین تأیید: '+new Date(record.confirmedAt).toLocaleString('fa-IR')):'هنوز تأیید نشده';label.title=record?'ذخیره روی همین مرورگر و همین آدرس. پاک‌کردن داده مرورگر این نسخه را حذف می‌کند.':'پیش از بستن، اطلاعات ثبت‌شده را تأیید کنید';}
-  if(server)server.hidden=!UI.api.browserPinned;
-}
-function markChanged(){
-  if(!record||restoring||saving)return;
-  record.dirty=true;status();
-  // تغییرات ثبت‌شده آفلاین حتی بدون تأیید مجدد از دست نمی‌روند؛ وضعیتشان مشخص است.
-  if(UI.api.browserPinned){
-    clearTimeout(timer);timer=setTimeout(()=>persistWorking().catch(error=>UI.toast.error('ذخیره خودکار مرورگر ناموفق بود؛ تأیید اطلاعات یا بک‌اپ لازم است: '+error.message)),350);
-  }
-}
-async function persistWorking(){
-  if(!record||!record.dirty||!UI.api.browserPinned||saving||restoring)return;
-  const next={...record,data:LocalApi.backup(),preferences:preferences(),dirty:true,updatedAt:new Date().toISOString()};
-  await write(next);record=next;status();
-}
-async function initialize(){
-  restoring=true;
-  try{
-    const saved=await read();if(!saved)return false;
-    validate(saved);record=copy(saved);
-    LocalApi.replaceSnapshot(record.data);
-    UI.api.browserPinned=record.useBrowser!==false;
-    const prefs=record.preferences;
-    App.dateRange=copy(prefs.dateRange||{from:'',to:'',preset:'all'});App._rangeReady=true;
-    document.documentElement.dataset.theme=prefs.theme==='light'?'light':'dark';
-    if(!location.hash||location.hash==='#/'||location.hash==='#/dashboard'){
-      const hash=prefs.hash;
-      if(/^#\/[A-Za-z-]+(?:\/[^<>]*)?$/.test(hash||'')&&App.routes[hash.slice(2).split('/')[0]])history.replaceState(null,'',hash);
-    }
-    App.syncDateRangeUI();status();return true;
-  }finally{restoring=false;}
-}
-async function confirm(){
-  if(saving)return;
-  clearTimeout(timer);saving=true;status();
-  try{
-    if(document.querySelector('#globalRange.draft')){
-      const range={from:document.getElementById('gFrom').value.trim(),to:document.getElementById('gTo').value.trim(),preset:'custom'};
-      const error=QCReports.validateRange(range);if(error)throw new Error('ابتدا بازه تاریخ را اصلاح کنید: '+error);
-      await App.setDateRange(range);
-    }
-    await UI.api.waitForWrites();
-    let data;
-    if(UI.api.browserPinned||UI.api.offline)data=LocalApi.backup();
-    else {
-      const response=await fetch('/api/session-snapshot');
-      if(!response.ok)throw new Error('دریافت نسخه کامل سرور ناموفق بود؛ نسخه قدیمی مرورگر به جای آن تأیید نشد');
-      data=await response.json();
-    }
-    const now=new Date().toISOString();
-    const next={version:1,confirmedAt:now,updatedAt:now,dirty:false,useBrowser:true,data,preferences:preferences()};
-    await write(next);const verified=await read();validate(verified);
-    if(verified.confirmedAt!==now)throw new Error('تأیید هم‌زمان در تب دیگر انجام شد؛ دوباره تلاش کنید');
-    record=copy(verified);
-    LocalApi.replaceSnapshot(record.data);
-    if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
-    UI.toast.success('کل اطلاعات ثبت‌شده، تاریخ و حالت نمایش تأیید شد؛ دفعه بعد همین نسخه مرورگر باز می‌شود.',6500);
+
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+
+const TOKEN_KEY = 'crmqc.auth.v1';
+
+function safeGet(key) { try { return window.localStorage.getItem(key); } catch (e) { return null; } }
+function safeSet(key, value) { try { window.localStorage.setItem(key, value); } catch (e) { /* سندباکس بدون storage */ } }
+function safeRemove(key) { try { window.localStorage.removeItem(key); } catch (e) {} }
+
+const QCAuth = {
+  user: null,
+  token: '',
+  required: false,
+  firstRun: false,
+  accounts: [],
+  orgName: '',
+  mode: 'auto',
+  _started: false,
+
+  get isAdmin() { return !this.required || !!(this.user && this.user.role === 'admin'); },
+  get name() { return this.user ? this.user.name : ''; },
+
+  /* کلید اختصاصی هر کاربر برای تنظیمات محلی (بند ۱۰: جداسازی محیط کار) */
+  scopeKey(key) { return this.user && this.user.name ? key + '@' + this.user.name : key; },
+
+  persist() {
+    if (!this.user) { safeRemove(TOKEN_KEY); return; }
+    safeSet(TOKEN_KEY, JSON.stringify({ token: this.token, user: this.user, at: Date.now() }));
+  },
+  restore() {
+    const raw = safeGet(TOKEN_KEY);
+    if (!raw) return null;
+    try {
+      const saved = JSON.parse(raw);
+      if (!saved || !saved.user || !saved.user.name) return null;
+      this.token = saved.token || ''; this.user = saved.user;
+      return saved.user;
+    } catch (e) { return null; }
+  },
+  clear() { this.user = null; this.token = ''; safeRemove(TOKEN_KEY); },
+
+  /* صفحه‌هایی که این کاربر اجازه‌ی دیدنشان را دارد */
+  can(route) {
+    if (!this.required) return true;
+    if (!this.user) return false;
+    if (window.QCAccess) return window.QCAccess.canAccessRoute(this.user, String(route || ''), true);
     return true;
-  }catch(error){
-    UI.toast.error('اطلاعات تأیید نشد؛ قبل از بستن بک‌اپ بگیرید. '+error.message,7500);
+  },
+  applyNav() {
+    $$('.nav-item, .nav-subitem').forEach((a) => {
+      const allowed = this.can(a.dataset.route);
+      a.hidden = !allowed;
+      a.setAttribute('aria-hidden', String(!allowed));
+    });
+    /* گروه‌هایی که هیچ زیرصفحه‌ی مجازی ندارند پنهان شوند */
+    $$('.nav-group').forEach((g) => {
+      const visible = $$('.nav-subitem', g).some((a) => !a.hidden);
+      g.hidden = !visible;
+    });
+  },
+
+  async ensure() {
+    const api = window.UI ? window.UI.api : null;
+    let info = null;
+    try { info = await api.get('/api/auth/accounts'); }
+    catch (e) { info = { required: false, accounts: [], firstRun: false, orgName: '' }; }
+    this.required = !!info.required;
+    this.firstRun = !!info.firstRun;
+    this.accounts = info.accounts || [];
+    this.mode = info.mode || 'auto';
+    this.orgName = info.orgName || '';
+    if (!this.required) { this.user = null; return true; }
+
+    const saved = this.restore();
+    if (saved) {
+      try {
+        const me = await api.get('/api/auth/me');
+        if (me && me.user) { this.user = me.user; this.syncLocalSession(); return true; }
+      } catch (e) { /* نشست منقضی شده */ }
+      this.clear();
+    }
+    this.showGate();
     return false;
-  }finally{saving=false;status();}
-}
-async function restorePage(){
-  if(!record||!UI.api.browserPinned)return;
-  const prefs=record.preferences;
-  if(location.hash!==prefs.hash)return;
-  restoring=true;
-  try{
-    for(const tab of prefs.tabs||[]){const group=document.getElementById(tab.id);if(!group)continue;const button=[...group.querySelectorAll('button')].find(b=>b.getAttribute(tab.attr)===tab.value);if(button&&!button.classList.contains('active'))button.click();}
-    for(const item of prefs.fields||[]){const input=document.querySelector('#content #'+CSS.escape(item.id));if(input){input.value=item.value;if(input.type==='checkbox')input.checked=item.checked;input.dispatchEvent(new Event(input.tagName==='SELECT'||input.type==='checkbox'?'change':'input',{bubbles:true}));}}
-    for(const item of prefs.multiselects||[]){const field=[...document.querySelectorAll('#content .field')].find(f=>f.getValues&&f.querySelector('label').textContent===item.label);if(field){field.setValues(item.values);field.notifyChange();}}
-  }finally{restoring=false;}
-}
-function bind(){
-  document.getElementById('confirmData').addEventListener('click',confirm);
-  document.getElementById('useServerData').addEventListener('click',()=>UI.confirmDlg('استفاده از اطلاعات سرور','نسخه مرورگر محفوظ می‌ماند. اطلاعات سرور ممکن است متفاوت باشد؛ تغییرات محلی خودکار به سرور ارسال نمی‌شوند. ادامه می‌دهید؟',async()=>{
-    try{
-      const response=await fetch('/api/bootstrap');if(!response.ok)throw new Error('سرور در دسترس نیست');
-      if(record){const next={...record,useBrowser:false};await write(next);record=next;}
-      UI.api.browserPinned=false;UI.api.offline=false;UI.api._hideOfflineTag();await App.boot();await App.route();status();
-    }catch(error){UI.toast.error(error.message);}
-  },'نمایش اطلاعات سرور'));
-  ['input','change','click'].forEach(type=>document.addEventListener(type,event=>{if(event.target.closest('#content .filters,#content .tabs'))markChanged();}));
-  window.addEventListener('beforeunload',event=>{if(record&&record.dirty){event.preventDefault();event.returnValue='';}});
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&UI.api.browserPinned)persistWorking().catch(()=>{});});
-  status();
-}
-window.BrowserSession={initialize,confirm,bind,markChanged,restorePage,status,get saving(){return saving;},get saved(){return record?copy(record):null;},get restored(){return !!record;}};
+  },
+
+  syncLocalSession() {
+    if (window.LocalApi && window.LocalApi.setSession) window.LocalApi.setSession(this.user);
+  },
+
+  async login(name, password) {
+    const api = window.UI.api;
+    const res = await api.post('/api/auth/login', { name: name, password: password });
+    this.user = res.user; this.token = res.token || '';
+    this.persist(); this.syncLocalSession();
+    return res.user;
+  },
+
+  async setupAdmin(name, password) {
+    const api = window.UI.api;
+    const res = await api.post('/api/auth/setup', { name: name, password: password });
+    this.firstRun = false; this.required = true;
+    return this.login(name, password).catch(() => res.user);
+  },
+
+  async logout() {
+    const api = window.UI.api;
+    try { await api.post('/api/auth/logout', { token: this.token }); } catch (e) { /* بی‌اثر */ }
+    this.clear();
+    if (window.LocalApi && window.LocalApi.setSession) window.LocalApi.setSession(null);
+    this.showGate();
+  },
+
+  /* ------------------------------------------------------------- دروازه ورود */
+  showGate(message) {
+    const gate = $('#authGate');
+    if (!gate) return;
+    gate.hidden = false;
+    document.body.classList.add('auth-locked');
+    const accounts = this.accounts || [];
+    const options = accounts.map((a) => `<option value="${esc(a.name)}">${esc(a.name)}${a.role === 'admin' ? ' (مدیر)' : ''}</option>`).join('');
+    gate.innerHTML = `
+      <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+        <div class="auth-logo"><img src="logo.png" alt="" width="56" height="56" data-app-logo></div>
+        <h2 id="authTitle">${this.firstRun ? 'راه‌اندازی دسترسی مدیر' : 'ورود به سامانه کنترل کیفیت'}</h2>
+        <p class="auth-sub">${esc(this.orgName || 'سامانه کنترل کیفیت')} — ${this.firstRun
+          ? 'هیچ کاربری تعریف نشده است. یک حساب مدیر بسازید؛ بعد از آن ورود با رمز اجباری می‌شود.'
+          : 'نام کارشناس QC و رمز اختصاصی خود را وارد کنید. داده‌هایی که می‌بینید به دسترسی‌های شما محدود است.'}</p>
+        <form id="authForm" class="auth-form" autocomplete="off">
+          ${this.firstRun ? '' : `<label class="auth-field"><span>کاربر</span>
+            <input class="input" id="authName" list="authAccounts" placeholder="نام کارشناس QC" autocomplete="username" required>
+            <datalist id="authAccounts">${options}</datalist></label>`}
+          ${this.firstRun ? `<label class="auth-field"><span>نام مدیر</span>
+            <input class="input" id="authName" placeholder="مثلاً: مدیر سیستم" autocomplete="username" required></label>` : ''}
+          <label class="auth-field"><span>رمز عبور</span>
+            <div class="auth-pass">
+              <input class="input" id="authPass" type="password" placeholder="••••••" autocomplete="current-password" required>
+              <button type="button" class="btn ghost sm" id="authShow" aria-label="نمایش رمز"><i class="fa-regular fa-eye"></i></button>
+            </div></label>
+          ${this.firstRun ? `<label class="auth-field"><span>تکرار رمز</span>
+            <input class="input" id="authPass2" type="password" placeholder="••••••" autocomplete="new-password" required></label>` : ''}
+          <div class="auth-error" id="authError" role="alert" ${message ? '' : 'hidden'}>${esc(message || '')}</div>
+          <button class="btn primary auth-submit" type="submit" id="authSubmit">
+            <i class="fa-solid ${this.firstRun ? 'fa-user-shield' : 'fa-right-to-bracket'}"></i>
+            ${this.firstRun ? 'ساخت حساب مدیر و ورود' : 'ورود'}</button>
+        </form>
+        <div class="auth-note"><i class="fa-solid fa-circle-info"></i>
+          رمزها و دسترسی‌ها در تب <code>QC_Users</code> گوگل‌شیت نگهداری می‌شوند و مدیر می‌تواند آن‌ها را از صفحه‌ی «مدیریت QC» یا مستقیم روی شیت تغییر دهد.</div>
+      </div>`;
+    const nameEl = $('#authName', gate), passEl = $('#authPass', gate);
+    $('#authShow', gate).addEventListener('click', () => {
+      const showing = passEl.type === 'text';
+      passEl.type = showing ? 'password' : 'text';
+      $('#authShow', gate).innerHTML = `<i class="fa-regular ${showing ? 'fa-eye' : 'fa-eye-slash'}"></i>`;
+    });
+    $('#authForm', gate).addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorEl = $('#authError', gate), submit = $('#authSubmit', gate);
+      const name = nameEl.value.trim(), pass = passEl.value;
+      if (this.firstRun && pass !== $('#authPass2', gate).value) {
+        errorEl.hidden = false; errorEl.textContent = 'رمز و تکرار آن یکسان نیستند'; return;
+      }
+      submit.disabled = true;
+      errorEl.hidden = true;
+      try {
+        if (this.firstRun) await this.setupAdmin(name, pass);
+        else await this.login(name, pass);
+        gate.hidden = true;
+        document.body.classList.remove('auth-locked');
+        if (window.App && window.App.onAuthReady) await window.App.onAuthReady();
+      } catch (err) {
+        errorEl.hidden = false;
+        errorEl.textContent = err && err.message ? err.message : 'ورود ناموفق بود';
+        passEl.value = ''; passEl.focus();
+      } finally { submit.disabled = false; }
+    });
+    if (window.APP_SCRIPT_LOGO_DATA) $$('.auth-logo img', gate).forEach((img) => { img.src = window.APP_SCRIPT_LOGO_DATA; });
+    setTimeout(() => { if (nameEl) nameEl.focus(); }, 60);
+  },
+
+  hideGate() {
+    const gate = $('#authGate');
+    if (gate) { gate.hidden = true; gate.innerHTML = ''; }
+    document.body.classList.remove('auth-locked');
+  }
+};
+
+window.QCAuth = QCAuth;
 })();
 
 </script>
@@ -5579,7 +7035,7 @@ App.register('dashboard', {
       </div>
 
       <div class="card" style="margin-bottom:16px">
-        <div class="filters" style="border-bottom:none"><div id="dTeamSlot"></div></div>
+        <div class="filters plain"><div id="dTeamSlot"></div></div>
       </div>
       <div id="dContent"><div class="loading-page"><div class="spinner"></div><p>در حال دریافت آمار…</p></div></div>`;
 
@@ -5739,7 +7195,7 @@ App.register('dashboard', {
 /* tickets.js — بخش ارزیابی تیکت: فرم ثبت/ویرایش + سوابق */
 (function () {
 'use strict';
-const { C, $, $$, api, fa, esc, el, toast, modal, modalHead, confirmDlg, dateField, combo, triSwitch, redlineSwitch, selectField, scorePill, markBadge, pager, emptyState, debounce } = UI;
+const { C, $, $$, api, fa, esc, el, toast, modal, modalHead, confirmDlg, conflictDlg, applyQcIdentity, dateField, combo, triSwitch, redlineSwitch, selectField, scorePill, markBadge, pager, emptyState, debounce } = UI;
 
 const CRITERIA = [
   { key: 'q1', icon: 'fa-magnifying-glass-chart', title: 'پیگیری صحیح و رسیدگی تا مشخص‌شدن نتیجه' },
@@ -5814,7 +7270,7 @@ async function formPage(root, editId) {
   const fTeam = el(`<div class="field"><label>تیم کارشناس <span class="hint">(خودکار)</span></label><input class="input" readonly tabindex="-1" style="opacity:.75;cursor:not-allowed" placeholder="—"></div>`);
   const fCode = el(`<div class="field"><label>کد یکتای تیکت <span class="req">*</span></label><input class="input" dir="ltr" style="text-align:right" inputmode="numeric" placeholder="مثلاً 52418" value="${esc(rec ? rec.ticketCode : '')}"></div>`);
   [fQc, fReview, fTicketDate, fAgent, fTeam, fCode].forEach((f) => base.appendChild(f));
-  if (rec) fQc.setValue(rec.qcAgent);
+  applyQcIdentity(fQc, rec ? rec.qcAgent : '');
 
   const teamInp = $('input', fTeam);
   const syncTeam = () => { teamInp.value = App.teamOf(fAgent.getValue()) || (rec ? rec.team : ''); };
@@ -5865,7 +7321,9 @@ async function formPage(root, editId) {
 
   // --- ذخیره
   const saveBtn = $('#save');
-  saveBtn.addEventListener('click', async () => {
+  const idleLabel = '<i class="fa-solid fa-floppy-disk"></i> ' + (editId ? 'ذخیره تغییرات' : 'ثبت ارزیابی');
+  /* overwrite فقط وقتی true می‌شود که کاربر در گفت‌وگوی تعارض، بازنویسی را انتخاب کند */
+  const doSave = async (overwrite) => {
     const payload = {
       qcAgent: fQc.getValue(),
       reviewDate: fReview.getValue(),
@@ -5876,6 +7334,10 @@ async function formPage(root, editId) {
       redline: rl.getValue(),
       comment: $('#comment').value.trim()
     };
+    if (editId) {
+      payload.baseUpdatedAt = (rec && rec.updatedAt) || '';
+      if (overwrite) payload.overwrite = true;
+    }
     saveBtn.disabled = true;
     saveBtn.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> در حال ذخیره…';
     try {
@@ -5884,11 +7346,13 @@ async function formPage(root, editId) {
       await App.boot();
       location.hash = '#/tickets';
     } catch (e) {
-      toast(e.message, 'error', 5200);
       saveBtn.disabled = false;
-      saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> ' + (editId ? 'ذخیره تغییرات' : 'ثبت ارزیابی');
+      saveBtn.innerHTML = idleLabel;
+      if (e && e.status === 409 && e.conflict) { conflictDlg(e.conflict.current, () => doSave(true)); return; }
+      toast(e.message, 'error', 5200);
     }
-  });
+  };
+  saveBtn.addEventListener('click', () => doSave(false));
 }
 
 /* ----------------------------------------------------------------- لیست */
@@ -6085,7 +7549,7 @@ App.register('tickets', {
 /* socials.js — بخش ارزیابی سوشال: فرم ثبت/ویرایش + سوابق */
 (function () {
 'use strict';
-const { C, $, $$, api, fa, esc, el, toast, modal, modalHead, confirmDlg, dateField, combo, triSwitch, selectField, scorePill, markBadge, slaBadge, durText, pager, emptyState, debounce } = UI;
+const { C, $, $$, api, fa, esc, el, toast, modal, modalHead, confirmDlg, conflictDlg, applyQcIdentity, dateField, combo, triSwitch, selectField, scorePill, markBadge, slaBadge, durText, pager, emptyState, debounce } = UI;
 
 const CRITERIA = [
   { key: 'qSla', icon: 'fa-stopwatch', title: 'رعایت زمان پاسخ‌گویی (SLA)' },
@@ -6165,7 +7629,8 @@ async function formPage(root, editId) {
   const fVerdict = selectField({ label: 'وضعیت تأیید دلیل', required: true, items: st.lists.reasonVerdicts });
   [fReview, fQc, fAgent, fTeam, fMsg, fRecv, fTRecv, fReply, fTReply, fStatus, fReason, fVerdict].forEach((f) => base.appendChild(f));
 
-  if (rec) { fQc.setValue(rec.qcAgent); fMsg.setValue(rec.messenger); fStatus.setValue(rec.responseStatus); fReason.setValue(rec.delayReason || ''); fVerdict.setValue(rec.reasonVerdict); }
+  applyQcIdentity(fQc, rec ? rec.qcAgent : '');
+  if (rec) { fMsg.setValue(rec.messenger); fStatus.setValue(rec.responseStatus); fReason.setValue(rec.delayReason || ''); fVerdict.setValue(rec.reasonVerdict); }
 
   const teamInp = $('input', fTeam);
   const syncTeam = () => { teamInp.value = App.teamOf(fAgent.getValue()) || (rec ? rec.team : ''); };
@@ -6244,20 +7709,28 @@ async function formPage(root, editId) {
 
   /* --- ذخیره */
   const saveBtn = $('#save');
-  saveBtn.addEventListener('click', async () => {
+  const idleLabel = '<i class="fa-solid fa-floppy-disk"></i> ' + (editId ? 'ذخیره تغییرات' : 'ثبت ارزیابی');
+  const doSave = async (overwrite) => {
+    const body = payload();
+    if (editId) {
+      body.baseUpdatedAt = (rec && rec.updatedAt) || '';
+      if (overwrite) body.overwrite = true;
+    }
     saveBtn.disabled = true;
     saveBtn.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> در حال ذخیره…';
     try {
-      const saved = editId ? await api.put('/api/socials/' + editId, payload()) : await api.post('/api/socials', payload());
+      const saved = editId ? await api.put('/api/socials/' + editId, body) : await api.post('/api/socials', body);
       toast((editId ? 'تغییرات ذخیره شد' : 'ارزیابی ثبت شد') + ' — نمره: ' + fa(saved.score == null ? '—' : saved.score), 'success');
       await App.boot();
       location.hash = '#/socials';
     } catch (e) {
-      toast(e.message, 'error', 5200);
       saveBtn.disabled = false;
-      saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> ' + (editId ? 'ذخیره تغییرات' : 'ثبت ارزیابی');
+      saveBtn.innerHTML = idleLabel;
+      if (e && e.status === 409 && e.conflict) { conflictDlg(e.conflict.current, () => doSave(true)); return; }
+      toast(e.message, 'error', 5200);
     }
-  });
+  };
+  saveBtn.addEventListener('click', () => doSave(false));
 }
 
 /* ----------------------------------------------------------------- لیست */
@@ -6552,7 +8025,7 @@ async function render(root) {
     </div>
 
     <div class="card" style="margin-bottom:16px">
-      <div class="filters" style="border-bottom:none">
+      <div class="filters plain">
         <div class="field grow-0"><label>نوع ارزیابی</label>
           <div class="tabs" id="typeTabs">
             <button data-t="social" class="active"><i class="fa-solid fa-comments"></i> سوشال</button>
@@ -6884,7 +8357,7 @@ function render(root) {
       </div>
     </div>
     <div class="card" style="margin-bottom:16px">
-      <div class="filters" style="border-bottom:none">
+      <div class="filters plain">
         <div id="rvTeamSlot"></div><div id="rvAgentSlot"></div><div id="rvTypeSlot"></div><div id="rvResultSlot"></div>
         <div class="field"><label>وضعیت انجام</label>
           <select class="input" id="rvStatus"><option value="">همه</option><option value="${DONE}">انجام شده</option><option value="${NOT_DONE}">انجام نشده</option></select></div>
@@ -7240,7 +8713,7 @@ async function render(root, arg) {
       </div>
     </div>
     <div class="card" style="margin-bottom:16px">
-      <div class="filters" style="border-bottom:none;align-items:flex-end">
+      <div class="filters plain">
         <div class="field" style="flex:1.4;min-width:220px"><label>جستجو (نام یا داخلی)</label>
           <input class="input" id="erSearch" placeholder="مثلاً: مبینا یا ۳۰۷۳" autocomplete="off"></div>
         <div id="erTeamSlot"></div>
@@ -8002,7 +9475,7 @@ async function render(root, arg) {
     </div>
 
     <div class="card" style="margin-bottom:16px">
-      <div class="filters" style="border-bottom:none;align-items:flex-end">
+      <div class="filters plain">
         <div class="field" style="flex:1.4;min-width:220px"><label>جستجوی کارشناس (نام یا داخلی)</label>
           <div style="position:relative">
             <input class="input" id="pSearch" placeholder="مثلاً: الهه عسگری یا ۳۰۱۲ یا 3012" dir="auto" autocomplete="off">
@@ -8993,7 +10466,7 @@ async function render(root) {
     </div>
 
     <div class="card" style="margin-bottom:16px">
-      <div class="filters" style="border-bottom:none">
+      <div class="filters plain">
         <div class="field grow-0"><label>تیم QC</label>
           <div class="tabs" id="formTabs">${tabs.map((t, i) => `<button data-t="${esc(t.key)}" class="${i === 0 ? 'active' : ''}"><i class="fa-solid ${t.icon}"></i> ${esc(t.label)}</button>`).join('')}</div>
         </div>
@@ -9314,27 +10787,32 @@ App.register('call-analysis', { title: 'تحلیل ریت تماس', render });
 
 <script>/* pages/callReport.js */
 /* callReport.js — برگه‌ی «گزارش تماس»: ابزار مستقل گزارش تماس روزانه‌ی تیم‌ها
- * (فایل call-admin-report.html — همان «گزارش تماس ادمین نهایی.html») داخل همین سامانه
- * به‌صورت فریم تمام‌صفحه سِرو می‌شود؛ دیتای خودش را جدا مدیریت می‌کند (لوکال‌استوریج خود ابزار).
+ *
+ * نسخه‌ی Node/مرورگر: همان فایل داخل یک فریم تمام‌صفحه (هم‌ریشه، بدون مشکل).
+ * نسخه‌ی Apps Script: گوگل صفحه‌ی وب‌اپ را داخل یک فریم شنی (sandbox) سرو می‌کند و
+ * فریم تو‌در‌تو به /exec با «refused to connect» رد می‌شود؛ پس اینجا فرمی ساخته
+ * نمی‌شود و ابزار در یک صفحه‌ی مستقل (تب جدید یا همین صفحه) باز می‌شود (بند ۱۱).
  */
 (function () {
 'use strict';
 const { $, esc } = UI;
 
-const SRC = window.APP_SCRIPT_MODE && window.APP_SCRIPT_URL
-  ? window.APP_SCRIPT_URL + '?page=call-report'
-  : 'call-admin-report.html';
+const STANDALONE = !!(window.APP_SCRIPT_MODE && window.APP_SCRIPT_URL);
+const SRC = STANDALONE ? window.APP_SCRIPT_URL + '?page=call-report' : 'call-admin-report.html';
 
 function rangeSource() {
   const params = new URLSearchParams();
   if (App.dateRange.from) params.set('qcFrom', App.dateRange.from);
   if (App.dateRange.to) params.set('qcTo', App.dateRange.to);
-  params.set('qcTheme',App.theme);
+  params.set('qcTheme', App.theme);
   const qs = params.toString();
   return SRC + (qs ? (SRC.includes('?') ? '&' : '?') + qs : '');
 }
+
 function render(root) {
   const src = rangeSource();
+  if (STANDALONE) return renderLauncher(root, src);
+
   root.innerHTML = `
     <div class="page-head">
       <div class="ph-ic"><i class="fa-solid fa-phone"></i></div>
@@ -9346,9 +10824,9 @@ function render(root) {
       <button class="btn ghost" id="crReload"><i class="fa-solid fa-rotate"></i> تازه‌سازی</button>
       <a id="crNewTab" class="btn soft" href="${esc(src)}" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> باز کردن در تب جدید</a>
     </div>
-    <div class="card" style="padding:0;overflow:hidden">
-      <div id="crWrap" style="position:relative;background:var(--bg-2,#0f172a);height:calc(100vh - 178px);min-height:560px">
-        <iframe id="crFrame" src="${esc(src)}" title="گزارش تماس روزانه تیم‌ها" style="width:100%;height:100%;border:0;display:block"></iframe>
+    <div class="card cr-frame-card">
+      <div id="crWrap">
+        <iframe id="crFrame" src="${esc(src)}" title="گزارش تماس روزانه تیم‌ها"></iframe>
       </div>
     </div>`;
 
@@ -9356,13 +10834,61 @@ function render(root) {
   const syncRange = () => {
     if (!frame.isConnected || !frame.contentWindow) return;
     $('#crNewTab', root).href = rangeSource();
-    frame.contentWindow.postMessage({ type:'crmqc:theme', theme:App.theme }, location.origin === 'null' ? '*' : location.origin);
+    frame.contentWindow.postMessage({ type: 'crmqc:theme', theme: App.theme }, location.origin === 'null' ? '*' : location.origin);
     frame.contentWindow.postMessage({ type: 'crmqc:date-range', range: App.dateRange }, location.origin === 'null' ? '*' : location.origin);
   };
   frame.addEventListener('load', syncRange);
   App.onDateRangeChange(syncRange);
   $('#crReload').addEventListener('click', () => { frame.src = rangeSource(); });
+}
 
+/* حالت Apps Script: لانچر به‌جای فریم تو‌در‌تو */
+function renderLauncher(root, src) {
+  root.innerHTML = `
+    <div class="page-head">
+      <div class="ph-ic"><i class="fa-solid fa-phone"></i></div>
+      <div>
+        <h2>گزارش تماس</h2>
+        <p>ابزار مستقل گزارش روزانه‌ی تماس تیم‌ها / شرکای بیمه بازار</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head brand">
+        <div class="head-icon"><i class="fa-solid fa-up-right-from-square"></i></div>
+        <div><h3>باز کردن ابزار گزارش تماس</h3>
+          <div class="sub">در نسخه‌ی گوگل‌شیت این ابزار در صفحه‌ی خودش باز می‌شود — بازه‌ی تاریخ و حالت رنگ همراهش منتقل می‌شود</div></div>
+      </div>
+      <div class="card-pad cr-launch">
+        <div class="cr-launch-actions">
+          <a class="btn primary lg" id="crOpenTab" href="${esc(src)}" target="_blank" rel="noopener">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> باز کردن گزارش تماس (تب جدید)</a>
+          <a class="btn soft lg" id="crOpenTop" href="${esc(src)}" target="_top" rel="noopener">
+            <i class="fa-solid fa-window-restore"></i> باز کردن در همین صفحه</a>
+        </div>
+        <div class="cr-launch-info">
+          <div class="note"><i class="fa-solid fa-circle-info"></i>
+            بازه‌ی فعلی سامانه (<b id="crRange">${esc(App.dateRangeLabel())}</b>) و حالت
+            <b>${esc(App.theme === 'dark' ? 'تاریک' : 'روشن')}</b> به‌صورت خودکار به ابزار گزارش تماس منتقل می‌شود.</div>
+          <div class="note warn"><i class="fa-solid fa-shield-halved"></i>
+            گوگل اجازه نمی‌دهد یک وب‌اپ داخل فریمِ همان وب‌اپ باز شود (خطای <code>refused to connect</code>)؛
+            به همین دلیل این ابزار در صفحه‌ی مستقل باز می‌شود و داخل خودش دکمه‌ی «بازگشت به سامانه» دارد.</div>
+          <div class="note"><i class="fa-solid fa-database"></i>
+            داده‌ی این ابزار در تب‌های <code>Call_Report_Experts</code> و <code>Call_Report_Access</code> شیت ذخیره می‌شود،
+            پس روی هر دستگاهی که وارد شوید همان فهرست کارشناسان و دسترسی‌ها را می‌بینید.</div>
+        </div>
+      </div>
+    </div>`;
+
+  const refresh = () => {
+    const next = rangeSource();
+    $('#crOpenTab', root).href = next;
+    const top = $('#crOpenTop', root);
+    if (top) top.href = next;
+    const label = $('#crRange', root);
+    if (label) label.textContent = App.dateRangeLabel();
+  };
+  App.onDateRangeChange(refresh);
 }
 
 App.register('callreport', { title: 'گزارش تماس', render });
@@ -9400,9 +10926,12 @@ async function render(root) {
           <div class="field"><label>نام سازمان / سامانه (در هدر برگه و سایدبار)</label><input class="input" id="orgNameI" value="${esc(s.orgName)}"></div>
           <div class="field"><label>بازه‌ی پیش‌فرض داشبورد هنگام ورود</label>
             <select class="input" id="presetSel">
-              <option value="cur">ماه جاری</option>
-              <option value="prev">ماه قبل</option>
+              <option value="cur">ماه جاری (شمسی)</option>
+              <option value="prev">ماه قبل (شمسی)</option>
+              <option value="today">امروز</option>
               <option value="all">همه‌ی داده‌ها</option>
+              <option value="fm:cur">ماه مالی جاری</option>
+              <option value="fm:prev">ماه مالی قبل</option>
             </select>
           </div>
           <div class="field"><label>آستانه‌های رنگ نمره (سبز از … ، آبی از … ، زرد از …) — ۰ تا ۱۰۰</label>
@@ -9446,6 +10975,28 @@ async function render(root) {
             </div>
           </div>
           <div class="note" style="margin:0"><i class="fa-solid fa-circle-info"></i> مجموع وزن‌ها لازم نیست ۱۰۰ باشد — نمره همیشه نسبت‌بندی می‌شود.</div>
+        </div>
+      </div>
+
+      <!-- ماه‌های مالی (بند ۲) -->
+      <div class="card">
+        <div class="card-head brand"><div class="head-icon"><i class="fa-solid fa-calendar-days"></i></div>
+          <div><h3>ماه‌های مالی</h3><div class="sub">بازه‌های آماده‌ی فیلتر تاریخ بالا — از چندم تا چندم و نام ماه مالی</div></div></div>
+        <div class="card-pad">
+          <div class="table-scroll" style="max-height:290px">
+            <table class="tbl fm-tbl">
+              <thead><tr><th>نام ماه مالی</th><th>از تاریخ</th><th>تا تاریخ</th><th>یادداشت</th><th></th></tr></thead>
+              <tbody id="fmBody"></tbody>
+            </table>
+          </div>
+          <div class="fm-actions">
+            <button class="btn soft sm" id="fmAdd"><i class="fa-solid fa-plus"></i> افزودن ماه مالی</button>
+            <button class="btn ghost sm" id="fmAuto"><i class="fa-solid fa-wand-magic-sparkles"></i> ساخت خودکار ۱۲ ماه</button>
+            <div class="spacer"></div>
+            <button class="btn primary sm" id="fmSave"><i class="fa-solid fa-floppy-disk"></i> ذخیره ماه‌های مالی</button>
+          </div>
+          <div class="note" style="margin:12px 0 0"><i class="fa-solid fa-table"></i>
+            همین جدول در تب <code>Fiscal_Months</code> گوگل‌شیت هم نوشته می‌شود؛ می‌توانید تاریخ‌ها را مستقیم روی شیت بنویسید یا ویرایش کنید و سامانه در خواندن بعدی آن‌ها را به «بازه آماده» تبدیل می‌کند.</div>
         </div>
       </div>
 
@@ -9549,6 +11100,72 @@ async function render(root) {
     });
   });
 
+  /* ------------------------------------------------------ ماه‌های مالی */
+  let fiscal = (App.fiscalMonths || []).map((m) => Object.assign({}, m));
+  const fmBody = $('#fmBody');
+  function renderFiscal() {
+    if (!fiscal.length) {
+      fmBody.innerHTML = `<tr><td colspan="5" class="fm-empty">هنوز ماه مالی تعریف نشده — یک ردیف اضافه کنید یا ۱۲ ماه را خودکار بسازید.</td></tr>`;
+      return;
+    }
+    fmBody.innerHTML = fiscal.map((m, i) => `
+      <tr data-i="${i}">
+        <td><input class="input fm-name" value="${esc(m.name || '')}" placeholder="مثلاً مهر ۱۴۰۵"></td>
+        <td><div class="date-f"><input class="input fm-from" dir="ltr" inputmode="numeric" value="${esc(m.from || '')}" placeholder="1405-07-01">
+          <button type="button" class="cal-btn" data-cal="from" data-i="${i}" aria-label="تقویم شروع"><i class="fa-regular fa-calendar"></i></button></div></td>
+        <td><div class="date-f"><input class="input fm-to" dir="ltr" inputmode="numeric" value="${esc(m.to || '')}" placeholder="1405-07-30">
+          <button type="button" class="cal-btn" data-cal="to" data-i="${i}" aria-label="تقویم پایان"><i class="fa-regular fa-calendar"></i></button></div></td>
+        <td><input class="input fm-note" value="${esc(m.note || '')}" placeholder="اختیاری"></td>
+        <td class="fm-del"><button class="btn ghost sm" data-del="${i}" title="حذف"><i class="fa-solid fa-trash-can"></i></button></td>
+      </tr>`).join('');
+    $$('[data-del]', fmBody).forEach((b) => b.addEventListener('click', () => { fiscal.splice(+b.dataset.del, 1); renderFiscal(); }));
+    $$('.cal-btn', fmBody).forEach((b) => {
+      const row = fiscal[+b.dataset.i] || {};
+      const input = b.parentElement.querySelector('input');
+      JCal.attach(b, { input: input, onPick: () => { row[b.dataset.cal] = input.value; } });
+    });
+  }
+  function collectFiscal() {
+    return $$('tr[data-i]', fmBody).map((tr) => ({
+      id: (fiscal[+tr.dataset.i] || {}).id || '',
+      name: $('.fm-name', tr).value.trim(),
+      from: C.formatJalali(C.parseDate($('.fm-from', tr).value)) || $('.fm-from', tr).value.trim(),
+      to: C.formatJalali(C.parseDate($('.fm-to', tr).value)) || $('.fm-to', tr).value.trim(),
+      note: $('.fm-note', tr).value.trim()
+    })).filter((m) => m.name || m.from || m.to);
+  }
+  $('#fmAdd').addEventListener('click', () => { fiscal = collectFiscal(); fiscal.push({ id: '', name: '', from: '', to: '', note: '' }); renderFiscal(); });
+  $('#fmAuto').addEventListener('click', () => {
+    fiscal = collectFiscal();
+    const t = C.todayJalali();
+    const start = C.jalaliMonthAdd(t.jy, 1, 0);
+    for (let m = 1; m <= 12; m++) {
+      const r = C.jalaliMonthRange(start.jy, m);
+      const label = C.jalaliMonthLabel(start.jy, m);
+      if (fiscal.some((x) => x.from === C.formatJalali(r.from))) continue;
+      fiscal.push({ id: '', name: label, from: C.formatJalali(r.from), to: C.formatJalali(r.to), note: '' });
+    }
+    renderFiscal();
+    toast('۱۲ ماه سال جاری ساخته شد — نام و تاریخ‌ها را در صورت نیاز ویرایش کنید', 'info');
+  });
+  $('#fmSave').addEventListener('click', async () => {
+    const rows = collectFiscal();
+    for (const m of rows) {
+      if (!m.name) { toast('نام ماه مالی نمی‌تواند خالی باشد', 'error'); return; }
+      if (!C.parseDate(m.from) || !C.parseDate(m.to)) { toast('تاریخ «' + m.name + '» نامعتبر است', 'error'); return; }
+    }
+    const btn = $('#fmSave'); btn.disabled = true;
+    try {
+      await api.put('/api/fiscal-months', { months: rows });
+      await App.boot();
+      fiscal = (App.fiscalMonths || []).map((m) => Object.assign({}, m));
+      renderFiscal();
+      toast('ماه‌های مالی ذخیره شد — در «بازه آماده» بالای صفحه در دسترس‌اند', 'success');
+    } catch (e) { toast(e.message, 'error'); }
+    btn.disabled = false;
+  });
+  renderFiscal();
+
   weekendChips(); demoState();
 }
 
@@ -9604,7 +11221,7 @@ async function render(root) {
     </div>
 
     <div class="card" style="margin-bottom:16px">
-      <div class="filters" style="border-bottom:none">
+      <div class="filters plain">
         <div class="field" style="flex:1.4;min-width:220px"><label>جستجو (نام یا داخلی)</label>
           <input class="input" id="agSearch" placeholder="مثلاً الهه عسگری یا ۳۰۲۲ یا 3022" dir="auto" autocomplete="off">
         </div>
@@ -10050,6 +11667,7 @@ async function render(root) {
   root.innerHTML = `<div class="page-head"><div class="ph-ic"><i class="fa-solid fa-sliders"></i></div>
     <div><h2>تغییر المان‌ها</h2><p>نام نمایشی، ستون اکسل و المان‌های فعال ریت تماس هر تیم</p></div></div>
     <div class="note"><i class="fa-solid fa-shield-halved"></i><span>مقادیر واقعی فرم <b>1 / 0 / -</b> مبنای نرخ‌ها هستند. «-» در مخرج نرخ نیست و سلول خالی صفر محسوب نمی‌شود. نمره‌ی کلیِ اصلی اکسل و ریت‌های قبلی بازنویسی نمی‌شوند.</span></div>
+    <div class="note sheet-note"><i class="fa-solid fa-table"></i><span>همین جدول روی تب <code>Elements</code> گوگل‌شیت نوشته می‌شود: ستون <code>label</code> نام فارسی المان و ستون <code>excelKey</code> نام ستون در فایل اکسل دریافتی. هر دو را می‌توانید مستقیم روی شیت ویرایش کنید — در خواندن بعدی اعمال می‌شود و نام ستون قبلی خودکار به <code>aliases</code> منتقل می‌شود تا ریت‌های گذشته نشکنند.</span></div>
     <div class="criteria-layout"><aside class="card criteria-team-list" id="criteriaTeams"></aside>
       <div class="card"><div class="card-head"><div class="head-icon"><i class="fa-solid fa-list-check"></i></div>
         <div><h3 id="criteriaTitle"></h3><div class="sub" id="criteriaCaption"></div></div><div class="spacer"></div>
@@ -10115,6 +11733,382 @@ App.register('criteria',{title:'تغییر المان‌ها',render});
 </script>
 
 
+<script>/* pages/qcAdmin.js */
+/* qcAdmin.js — مدیریت QC (فقط مدیر): کاربران، رمزها و دسترسی داده‌ی هر کارشناس
+ * منبع داده تب `QC_Users` گوگل‌شیت است؛ هر تغییر اینجا مستقیم روی همان تب می‌نشیند
+ * و برعکس، ویرایش دستی روی شیت هم در خواندن بعدی اعمال می‌شود.
+ */
+(function () {
+'use strict';
+const { C, $, $$, api, fa, esc, el, toast, modal, modalHead, confirmDlg, emptyState } = UI;
+
+let state = { users: [], teams: [], agents: [], required: false, mode: 'auto' };
+
+function accessSummary(user) {
+  if (user.role === 'admin' || user.unrestricted) return { text: 'همه‌ی کارشناسان', cls: 'good', count: -1 };
+  const exts = (user.exts || []).filter(Boolean);
+  const names = (user.agents || []).filter(Boolean);
+  const teams = (user.teams || []).filter(Boolean);
+  const matched = matchedAgents(user).length;
+  if (!exts.length && !names.length && !teams.length) return { text: 'دسترسی تعریف نشده', cls: 'bad', count: 0 };
+  const bits = [];
+  if (exts.length) bits.push(fa(exts.length) + ' داخلی');
+  if (names.length) bits.push(fa(names.length) + ' نام');
+  if (teams.length) bits.push(fa(teams.length) + ' تیم');
+  return { text: bits.join(' · ') + ' → ' + fa(matched) + ' کارشناس', cls: matched ? 'info' : 'warn', count: matched };
+}
+
+function matchedAgents(user) {
+  const A = window.QCAccess;
+  if (!A) return [];
+  const allowed = A.allowedAgentNames({ agents: state.agents }, A.normalizeUser(user));
+  if (!allowed) return state.agents.slice();
+  return state.agents.filter((a) => allowed.has(a.name));
+}
+
+function modeText(mode, required) {
+  if (mode === 'off') return 'خاموش — همه بدون رمز وارد می‌شوند';
+  if (mode === 'on') return 'همیشه روشن — حتی بدون کاربر تعریف‌شده';
+  return required ? 'خودکار — روشن (کاربر فعال تعریف شده)' : 'خودکار — خاموش (هیچ کاربری تعریف نشده)';
+}
+
+async function load() {
+  state = await api.get('/api/qc-users');
+  state.agents = state.agents || [];
+  state.teams = state.teams || [];
+}
+
+async function render(root) {
+  root.innerHTML = `<div class="card">${emptyState('fa-spinner fa-spin', 'در حال بارگذاری', 'کاربران QC و دسترسی‌ها خوانده می‌شوند…')}</div>`;
+  try { await load(); }
+  catch (e) {
+    root.innerHTML = `<div class="card">${emptyState('fa-triangle-exclamation', 'خواندن کاربران ناموفق بود', e.message,
+      `<button class="btn ghost" onclick="App.route()"><i class="fa-solid fa-rotate-right"></i> تلاش دوباره</button>`)}</div>`;
+    return;
+  }
+  draw(root);
+}
+
+function draw(root) {
+  const users = state.users || [];
+  root.innerHTML = `
+    <div class="page-head">
+      <div class="ph-ic"><i class="fa-solid fa-user-shield"></i></div>
+      <div>
+        <h2>مدیریت QC</h2>
+        <p>رمز هر کارشناس QC، نقش او و اینکه کدام کارشناسان/داخلی‌ها را ببیند — فقط مدیر سیستم</p>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn soft" id="qcExport"><i class="fa-solid fa-file-excel"></i> خروجی اکسل</button>
+      <button class="btn primary" id="qcAdd"><i class="fa-solid fa-user-plus"></i> کاربر QC جدید</button>
+    </div>
+
+    <div class="card qc-mode-card">
+      <div class="card-head">
+        <div class="head-icon"><i class="fa-solid fa-lock"></i></div>
+        <div><h3>وضعیت ورود با رمز</h3><div class="sub">${esc(modeText(state.mode, state.required))}</div></div>
+      </div>
+      <div class="card-pad qc-mode">
+        <div class="qc-mode-options" role="radiogroup" aria-label="حالت احراز هویت">
+          ${[['auto', 'خودکار', 'به محض تعریف اولین کاربر فعال، ورود با رمز اجباری می‌شود'],
+             ['on', 'همیشه روشن', 'حتی اگر کاربری تعریف نشده باشد (احتیاط: ممکن است کسی نتواند وارد شود)'],
+             ['off', 'خاموش', 'ورود بدون رمز؛ دسترسی‌ها اعمال نمی‌شوند']]
+            .map(([value, label, hint]) => `
+            <label class="qc-mode-option${state.mode === value ? ' sel' : ''}">
+              <input type="radio" name="authMode" value="${value}" ${state.mode === value ? 'checked' : ''}>
+              <strong>${label}</strong><small>${hint}</small>
+            </label>`).join('')}
+        </div>
+        <div class="note"><i class="fa-solid fa-circle-info"></i>
+          رمزها به‌صورت اثر انگشت (hash) ذخیره می‌شوند. اگر رمزی را مستقیم روی تب <code>QC_Users</code> به‌صورت متن ساده بنویسید هم پذیرفته می‌شود تا مدیریت از داخل شیت ممکن بماند.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head teal">
+        <div class="head-icon"><i class="fa-solid fa-users-line"></i></div>
+        <div><h3>کاربران سامانه</h3><div class="sub">${fa(users.length)} کاربر تعریف شده — نام، نقش و دسترسی داده</div></div>
+      </div>
+      <div class="card-pad">
+        ${users.length ? `
+        <div class="table-scroll">
+          <table class="tbl qc-users">
+            <thead><tr><th>کاربر</th><th>نقش</th><th>وضعیت</th><th>دسترسی داده</th><th>رمز</th><th>عملیات</th></tr></thead>
+            <tbody>
+              ${users.map((u, i) => {
+                const acc = accessSummary(u);
+                return `<tr data-i="${i}">
+                  <td class="qc-name"><strong>${esc(u.name)}</strong>${u.note ? `<div class="cell-sub">${esc(u.note)}</div>` : ''}</td>
+                  <td>${u.role === 'admin'
+                    ? '<span class="badge brand"><i class="fa-solid fa-user-shield"></i>مدیر سیستم</span>'
+                    : '<span class="badge info"><i class="fa-solid fa-user-check"></i>کارشناس QC</span>'}</td>
+                  <td>${u.active ? '<span class="badge good"><i class="fa-solid fa-circle-check"></i>فعال</span>'
+                                 : '<span class="badge gray"><i class="fa-solid fa-ban"></i>غیرفعال</span>'}</td>
+                  <td><span class="badge ${acc.cls}">${esc(acc.text)}</span></td>
+                  <td>${u.password ? '<span class="badge gray"><i class="fa-solid fa-key"></i>تعریف شده</span>'
+                                   : '<span class="badge bad"><i class="fa-solid fa-key"></i>رمز ندارد</span>'}</td>
+                  <td class="qc-ops">
+                    <button class="btn ghost sm" data-edit="${i}" title="ویرایش"><i class="fa-solid fa-pen"></i></button>
+                    <button class="btn ghost sm" data-pass="${i}" title="تغییر رمز"><i class="fa-solid fa-key"></i></button>
+                    <button class="btn danger-soft sm" data-del="${i}" title="حذف"><i class="fa-solid fa-trash-can"></i></button>
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>` : emptyState('fa-user-slash', 'هنوز کاربری تعریف نشده',
+          'اولین کاربر را بسازید؛ از همان لحظه ورود با رمز اجباری می‌شود و هر کارشناس QC فقط داده‌ی کارشناسانی را می‌بیند که شما اجازه داده‌اید.',
+          '<button class="btn primary" id="qcEmptyAdd"><i class="fa-solid fa-user-plus"></i> ساخت اولین کاربر</button>')}
+        <div class="note" style="margin-top:14px"><i class="fa-solid fa-table"></i>
+          همین فهرست در تب <code>QC_Users</code> شیت نگهداری می‌شود: <code>name</code>، <code>password</code>، <code>role</code>،
+          <code>active</code>، <code>exts</code> (داخلی‌ها با ویرگول)، <code>agents</code> و <code>teams</code>.
+          می‌توانید دسترسی‌ها را مستقیم روی شیت هم بنویسید.</div>
+      </div>
+    </div>`;
+
+  $('#qcAdd').addEventListener('click', () => editor(null));
+  const emptyAdd = $('#qcEmptyAdd');
+  if (emptyAdd) emptyAdd.addEventListener('click', () => editor(null));
+  $('#qcExport').addEventListener('click', exportUsers);
+  $$('input[name="authMode"]', root).forEach((r) => r.addEventListener('change', async () => {
+    try {
+      await api.put('/api/settings', { authMode: r.value });
+      state.mode = r.value;
+      await App.boot();
+      toast('حالت ورود با رمز ذخیره شد', 'success');
+      draw(root);
+    } catch (e) { toast(e.message, 'error'); }
+  }));
+  $$('[data-edit]', root).forEach((b) => b.addEventListener('click', () => editor(state.users[+b.dataset.edit])));
+  $$('[data-pass]', root).forEach((b) => b.addEventListener('click', () => passwordDialog(state.users[+b.dataset.pass])));
+  $$('[data-del]', root).forEach((b) => b.addEventListener('click', () => {
+    const u = state.users[+b.dataset.del];
+    confirmDlg('حذف کاربر', `کاربر «${u.name}» و دسترسی‌هایش حذف می‌شود. داده‌های ارزیابی ثبت‌شده دست‌نخورده می‌مانند.`, async () => {
+      try {
+        await api.del('/api/qc-users/' + encodeURIComponent(u.id));
+        await load(); await App.boot(); draw(root);
+        toast('کاربر حذف شد', 'success');
+      } catch (e) { toast(e.message, 'error'); }
+    });
+  }));
+}
+
+function exportUsers() {
+  const rows = [['name', 'password', 'role', 'active', 'exts', 'agents', 'teams', 'note']]
+    .concat((state.users || []).map((u) => [u.name, u.password ? '(ذخیره‌شده)' : '', u.role, u.active ? 1 : 0,
+      (u.exts || []).join(','), (u.agents || []).join(','), (u.teams || []).join(','), u.note || '']));
+  const access = [['کارشناس QC', 'تیم', 'نام کارشناس', 'داخلی']]
+    .concat((state.users || []).reduce((all, u) => all.concat(matchedAgents(u).map((a) => [u.name, a.team, a.name, a.ext])), []));
+  window.QCExport.sheets('دسترسی کاربران QC', [{ name: 'QC_Users', rows: rows }, { name: 'Access', rows: access }]);
+}
+
+function passwordDialog(user) {
+  const m = modal(`${modalHead('تغییر رمز — ' + user.name, 'fa-key')}
+    <div class="modal-body">
+      <div class="field"><label>رمز جدید (حداقل ۴ نویسه)</label>
+        <div class="auth-pass"><input class="input" id="npPass" type="password" autocomplete="new-password">
+          <button type="button" class="btn ghost sm" id="npShow"><i class="fa-regular fa-eye"></i></button></div>
+        <div class="note" style="margin-top:8px"><i class="fa-solid fa-shield-halved"></i> رمز به‌صورت hash ذخیره می‌شود و در شیت قابل خواندن نیست.</div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" data-close>انصراف</button>
+      <button class="btn primary" id="npSave"><i class="fa-solid fa-floppy-disk"></i> ذخیره رمز</button></div>`);
+  $('#npShow', m).addEventListener('click', () => {
+    const inp = $('#npPass', m);
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+  });
+  $('#npSave', m).addEventListener('click', async () => {
+    const pass = $('#npPass', m).value;
+    if (pass.length < 4) { toast.error('رمز باید حداقل ۴ نویسه باشد'); return; }
+    try {
+      await api.put('/api/qc-users', { id: user.id, name: user.name, role: user.role, active: user.active,
+        exts: (user.exts || []).join(','), agents: (user.agents || []).join(','), teams: (user.teams || []).join(','),
+        note: user.note || '', password: pass });
+      m.close(); await load(); draw(document.querySelector('.route-view'));
+      toast.success('رمز «' + user.name + '» تغییر کرد');
+    } catch (e) { toast.error(e.message); }
+  });
+}
+
+/* ------------------------------------------------------- ساخت/ویرایش کاربر */
+function editor(user) {
+  const editing = !!user;
+  const selectedExt = new Set((user && user.exts || []).map(String));
+  const selectedNames = new Set((user && user.agents || []));
+  const selectedTeams = new Set((user && user.teams || []));
+  const byTeam = new Map();
+  state.agents.forEach((a) => {
+    const key = a.team || '—';
+    if (!byTeam.has(key)) byTeam.set(key, []);
+    byTeam.get(key).push(a);
+  });
+
+  const m = modal(`${modalHead(editing ? 'ویرایش کاربر — ' + user.name : 'کاربر QC جدید', 'fa-user-shield')}
+    <div class="modal-body qc-editor">
+      <div class="form-grid qc-form-grid">
+        <div class="field"><label>نام کارشناس QC <span class="req">*</span></label>
+          <input class="input" id="quName" value="${esc(user ? user.name : '')}" placeholder="همان نامی که در فرم‌ها به‌عنوان QC ثبت می‌شود" ${editing ? 'readonly' : ''}></div>
+        <div class="field"><label>نقش</label>
+          <select class="input" id="quRole">
+            <option value="qc" ${!user || user.role !== 'admin' ? 'selected' : ''}>کارشناس QC — فقط داده‌ی مجاز</option>
+            <option value="admin" ${user && user.role === 'admin' ? 'selected' : ''}>مدیر سیستم — همه‌ی صفحه‌ها و داده‌ها</option>
+          </select></div>
+        <div class="field"><label>${editing ? 'رمز جدید (خالی = بدون تغییر)' : 'رمز عبور'} ${editing ? '' : '<span class="req">*</span>'}</label>
+          <div class="auth-pass"><input class="input" id="quPass" type="password" autocomplete="new-password" placeholder="حداقل ۴ نویسه">
+            <button type="button" class="btn ghost sm" id="quShow"><i class="fa-regular fa-eye"></i></button></div></div>
+        <div class="field"><label>وضعیت</label>
+          <select class="input" id="quActive">
+            <option value="1" ${!user || user.active ? 'selected' : ''}>فعال — می‌تواند وارد شود</option>
+            <option value="0" ${user && !user.active ? 'selected' : ''}>غیرفعال — ورود بسته</option>
+          </select></div>
+      </div>
+
+      <div class="field qc-access">
+        <label>دسترسی داده — از هر تیم کدام کارشناسان (یا داخلی‌ها) دیده شوند</label>
+        <div class="qc-access-bar">
+          <input class="input" id="quSearch" placeholder="جستجوی نام یا داخلی…">
+          <span class="badge info" id="quCount">۰ کارشناس انتخاب شده</span>
+          <div class="spacer"></div>
+          <label class="qc-all"><input type="checkbox" id="quUnlimited"> همه‌ی کارشناسان (بدون محدودیت)</label>
+        </div>
+        <div class="qc-teams" id="quTeams">
+          ${[...byTeam.keys()].sort().map((team) => `
+            <div class="qc-team" data-team="${esc(team)}">
+              <div class="qc-team-head">
+                <strong>${esc(team)}</strong>
+                <span class="cell-sub" data-team-count></span>
+                <div class="spacer"></div>
+                <button type="button" class="btn ghost sm" data-team-all>همه</button>
+                <button type="button" class="btn ghost sm" data-team-none>هیچ</button>
+                <button type="button" class="btn ghost sm" data-team-scope title="کل تیم به‌عنوان دسترسی (کارشناسان جدید هم خودکار اضافه می‌شوند)">کل تیم</button>
+              </div>
+              <div class="qc-agents">
+                ${byTeam.get(team).map((a) => `
+                  <label class="qc-agent" data-name="${esc(a.name)}" data-ext="${esc(a.ext == null ? '' : a.ext)}">
+                    <input type="checkbox" data-agent="${esc(a.name)}" ${selectedExt.has(String(a.ext)) || selectedNames.has(a.name) ? 'checked' : ''}>
+                    <span>${esc(a.name)}</span><small>${esc(a.ext == null || a.ext === '' ? 'بدون داخلی' : 'داخلی ' + C.toFaDigits(a.ext))}</small>
+                  </label>`).join('')}
+              </div>
+            </div>`).join('')}
+        </div>
+        <div class="field" style="margin-top:12px"><label>داخلی‌های اضافه (جدا‌شده با ویرگول) — برای کارشناسانی که در فهرست نیستند</label>
+          <input class="input" id="quExtraExt" dir="ltr" style="text-align:right" placeholder="3121, 3122"
+            value="${esc([...selectedExt].filter((x) => !state.agents.some((a) => String(a.ext) === x)).join(', '))}"></div>
+        <div class="field"><label>یادداشت (اختیاری)</label><input class="input" id="quNote" value="${esc(user ? user.note || '' : '')}" placeholder="مثلاً: مسئول بررسی تیم MLM"></div>
+        <div class="note" id="quHint"><i class="fa-solid fa-circle-info"></i> دسترسی خالی یعنی این کارشناس هیچ داده‌ای نمی‌بیند.</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close>انصراف</button>
+      <button class="btn primary" id="quSave"><i class="fa-solid fa-floppy-disk"></i> ${editing ? 'ذخیره تغییرات' : 'ساخت کاربر'}</button>
+    </div>`, { lg: true });
+
+  const roleSel = $('#quRole', m), unlimited = $('#quUnlimited', m);
+  unlimited.checked = !!user && (user.role === 'admin' || !!user.unrestricted);
+
+  function selected() {
+    const names = $$('#quTeams input[data-agent]', m).filter((c) => c.checked).map((c) => c.dataset.agent);
+    const exts = names.map((n) => {
+      const a = state.agents.find((x) => x.name === n);
+      return a && a.ext != null && a.ext !== '' ? String(a.ext) : '';
+    }).filter(Boolean);
+    const extra = String($('#quExtraExt', m).value || '').split(/[,،;؛\\s]+/).map((x) => x.trim()).filter(Boolean);
+    return { names: names, exts: [...new Set(exts.concat(extra))] };
+  }
+  function refreshCount() {
+    const sel = selected();
+    const teamScoped = [...selectedTeams].length;
+    $('#quCount', m).textContent = unlimited.checked ? 'همه‌ی کارشناسان'
+      : fa(sel.names.length) + ' کارشناس انتخاب شده' + (teamScoped ? ' + ' + fa(teamScoped) + ' تیم کامل' : '');
+    $$('.qc-team', m).forEach((t) => {
+      const total = $$('input[data-agent]', t).length;
+      const on = $$('input[data-agent]', t).filter((c) => c.checked).length;
+      $('[data-team-count]', t).textContent = fa(on) + ' از ' + fa(total);
+      t.classList.toggle('scoped', selectedTeams.has(t.dataset.team));
+    });
+    const sel2 = selected();
+    $('#quHint', m).innerHTML = unlimited.checked
+      ? '<i class="fa-solid fa-circle-info"></i> این کاربر همه‌ی کارشناسان را می‌بیند.'
+      : (sel2.exts.length || sel2.names.length || selectedTeams.size)
+        ? '<i class="fa-solid fa-circle-info"></i> فقط ارزیابی‌های این کارشناسان در داشبورد، گزارش‌ها و سوابق دیده می‌شود.'
+        : '<i class="fa-solid fa-triangle-exclamation"></i> دسترسی خالی یعنی این کارشناس هیچ داده‌ای نمی‌بیند.';
+  }
+
+  $('#quShow', m).addEventListener('click', () => {
+    const inp = $('#quPass', m);
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+  });
+  $('#quSearch', m).addEventListener('input', debounce(() => {
+    const q = String($('#quSearch', m).value).trim().toLowerCase();
+    $$('.qc-agent', m).forEach((node) => {
+      const hay = (node.dataset.name + ' ' + node.dataset.ext).toLowerCase();
+      node.hidden = !!q && hay.indexOf(q) === -1;
+    });
+  }, 120));
+  unlimited.addEventListener('change', refreshCount);
+  roleSel.addEventListener('change', () => { if (roleSel.value === 'admin') { unlimited.checked = true; refreshCount(); } });
+  $$('#quTeams input[data-agent]', m).forEach((c) => c.addEventListener('change', () => {
+    const agent = state.agents.find((a) => a.name === c.dataset.agent);
+    if (agent && agent.ext != null && agent.ext !== '') {
+      if (c.checked) selectedExt.add(String(agent.ext)); else selectedExt.delete(String(agent.ext));
+    } else {
+      if (c.checked) selectedNames.add(c.dataset.agent); else selectedNames.delete(c.dataset.agent);
+    }
+    refreshCount();
+  }));
+  $$('.qc-team', m).forEach((t) => {
+    const boxes = () => $$('input[data-agent]', t);
+    $('[data-team-all]', t).addEventListener('click', () => { boxes().forEach((c) => { if (!c.checked) { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); } }); refreshCount(); });
+    $('[data-team-none]', t).addEventListener('click', () => { boxes().forEach((c) => { if (c.checked) { c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); } }); refreshCount(); });
+    $('[data-team-scope]', t).addEventListener('click', () => {
+      const team = t.dataset.team;
+      if (selectedTeams.has(team)) selectedTeams.delete(team); else selectedTeams.add(team);
+      refreshCount();
+    });
+  });
+
+  $('#quSave', m).addEventListener('click', async () => {
+    const name = $('#quName', m).value.trim();
+    const pass = $('#quPass', m).value;
+    if (!name) { toast.error('نام کارشناس QC الزامی است'); return; }
+    if (!editing && !pass) { toast.error('رمز اولیه الزامی است'); return; }
+    if (pass && pass.length < 4) { toast.error('رمز باید حداقل ۴ نویسه باشد'); return; }
+    const sel = selected();
+    const role = roleSel.value;
+    const payload = {
+      id: editing ? user.id : '',
+      name: name,
+      role: role,
+      active: $('#quActive', m).value === '1',
+      exts: role === 'admin' || unlimited.checked ? '*' : sel.exts.join(','),
+      agents: role === 'admin' || unlimited.checked ? '' : [...selectedNames].join(','),
+      teams: role === 'admin' || unlimited.checked ? '' : [...selectedTeams].join(','),
+      note: $('#quNote', m).value.trim()
+    };
+    if (pass) payload.password = pass;
+    const btn = $('#quSave', m); btn.disabled = true;
+    try {
+      if (editing) await api.put('/api/qc-users', payload);
+      else await api.post('/api/qc-users', payload);
+      m.close();
+      await load();
+      await App.boot();
+      draw(document.querySelector('.route-view'));
+      toast.success(editing ? 'کاربر به‌روز شد' : 'کاربر ساخته شد — از این پس با رمز وارد می‌شود');
+    } catch (e) { toast.error(e.message); btn.disabled = false; }
+  });
+
+  refreshCount();
+}
+
+function debounce(fn, ms) { let t; return function (...a) { clearTimeout(t); t = setTimeout(() => fn.apply(this, a), ms); }; }
+
+App.register('qcadmin', { title: 'مدیریت QC', render });
+})();
+
+</script>
+
+
 <script>
 window.APP_SCRIPT_MODE = true;
 window.APP_SCRIPT_URL = '__QC_APP_SCRIPT_URL__';
@@ -10152,7 +12146,7 @@ document.addEventListener('DOMContentLoaded', function () {
         .withFailureHandler(function (error) {
           resolve({ status: 500, data: { error: String(error && error.message || error || 'خطای Apps Script') } });
         })
-        .crmqcApi(method, requestUrl, body);
+        .crmqcApi(method, requestUrl, body, (window.QCAuth && window.QCAuth.token) || '');
     });
   }
 
@@ -10190,5 +12184,7 @@ document.addEventListener('DOMContentLoaded', function () {
 })();
 </script>
 <script>App.init();</script>
+<div class="auth-gate" id="authGate" hidden aria-live="polite"></div>
+
 </body>
 </html>

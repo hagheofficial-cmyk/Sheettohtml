@@ -134,7 +134,7 @@ URLSearchParams.prototype.forEach = function (callback, context) {
 };
 
 `;
-  const sharedOrder = ['calc.js', 'parseQc.js', 'reports.js', 'registry.js', 'importData.js', 'expertRef.js'];
+  const sharedOrder = ['calc.js', 'parseQc.js', 'reports.js', 'registry.js', 'importData.js', 'expertRef.js', 'access.js', 'fiscal.js', 'elements.js'];
   const shared = sharedOrder.map((name) => {
     const src = read(path.join(SHARED, name)).replace(/typeof self !== 'undefined' \? self : this/g, 'globalThis');
     return `\n/* ---- shared/${name} ---- */\n${src}\n`;
@@ -211,7 +211,7 @@ document.addEventListener('DOMContentLoaded', function () {
         .withFailureHandler(function (error) {
           resolve({ status: 500, data: { error: String(error && error.message || error || 'خطای Apps Script') } });
         })
-        .crmqcApi(method, requestUrl, body);
+        .crmqcApi(method, requestUrl, body, (window.QCAuth && window.QCAuth.token) || '');
     });
   }
 
@@ -286,12 +286,37 @@ function makeCallReport() {
     return scriptTag(read(file), `call-report ${clean}`);
   });
 
+  const backCss = `
+.crmqc-back { position: fixed; inset-inline-start: 14px; bottom: 14px; z-index: 99999; display: flex; gap: 6px;
+  padding: 6px; border-radius: 14px; background: rgba(11,18,32,.86); border: 1px solid rgba(148,163,184,.35);
+  box-shadow: 0 10px 26px rgba(2,6,23,.4); backdrop-filter: blur(6px); }
+.crmqc-back a { display: inline-flex; align-items: center; gap: 6px; padding: 8px 13px; border-radius: 10px;
+  font: 700 12.5px Vazirmatn, sans-serif; text-decoration: none; color: #e2e8f0; background: rgba(148,163,184,.14); }
+.crmqc-back a.crmqc-back-main { background: linear-gradient(135deg,#22c55e,#16a34a); color: #06210f; }
+.crmqc-back a:hover { filter: brightness(1.08); }
+@media print { .crmqc-back { display: none !important; } }
+`;
+
   const bridge = `<script>
 window.APP_SCRIPT_MODE = true;
 (function () {
   document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('img[data-app-logo]').forEach(function (img) { img.src = "${logo}"; });
   });
+
+  /* این صفحه در Apps Script جدا از سامانه باز می‌شود؛ دکمه‌ی بازگشت می‌گذارد
+   * کاربر بدون گم‌شدن به SPA برگردد (بند ۱۱). */
+  document.addEventListener('DOMContentLoaded', function () {
+    if (document.querySelector('.crmqc-back')) return;
+    var base = String(window.location.href).split('?')[0];
+    var bar = document.createElement('div');
+    bar.className = 'crmqc-back';
+    bar.innerHTML = '<a class="crmqc-back-main" href="' + base + '" target="_top">' +
+      '<i class="fa-solid fa-arrow-right"></i> بازگشت به سامانه QC</a>' +
+      '<a class="crmqc-back-tab" href="' + base + '" target="_blank" rel="noopener">تب جدید</a>';
+    document.body.appendChild(bar);
+  });
+
   var encoded = '__QC_CALL_REPORT_STORAGE_B64__';
   var keys = {};
   try {
@@ -302,26 +327,56 @@ window.APP_SCRIPT_MODE = true;
     }
   } catch (error) { console.warn('تنظیمات گزارش تماس از شیت خوانده نشد', error); }
   window.__CALL_REPORT_SHEETS_STORAGE__ = keys;
-  try {
-    var prototype = Storage.prototype;
-    var oldGet = prototype.getItem, oldSet = prototype.setItem;
-    prototype.getItem = function (key) {
-      if (Object.prototype.hasOwnProperty.call(keys, key)) return keys[key];
-      return oldGet.call(this, key);
-    };
-    prototype.setItem = function (key, value) {
-      var result = oldSet.call(this, key, value);
-      if (Object.prototype.hasOwnProperty.call(keys, key) && window.google && google.script && google.script.run) {
-        keys[key] = String(value);
-        google.script.run.withFailureHandler(function (error) { console.error('ذخیره تنظیمات گزارش تماس در شیت ناموفق بود', error); })
+
+  /* localStorage در فریم شنی گوگل ممکن است اصلاً در دسترس نباشد (خطای SecurityError).
+   * در آن صورت یک حافظه‌ی موقت با همان رابط ساخته می‌شود تا ابزار گزارش تماس
+   * متوقف نشود؛ دو کلید پیکربندی همچنان روی تب‌های اختصاصی شیت می‌نشینند. */
+  (function installStorageBridge() {
+    var memory = {};
+    function persist(key, value) {
+      if (!Object.prototype.hasOwnProperty.call(keys, key)) return;
+      keys[key] = String(value);
+      if (window.google && google.script && google.script.run) {
+        google.script.run
+          .withFailureHandler(function (error) { console.error('ذخیره تنظیمات گزارش تماس در شیت ناموفق بود', error); })
           .saveCallReportSetting(key, String(value));
       }
-      return result;
+    }
+    var shim = {
+      getItem: function (key) {
+        if (Object.prototype.hasOwnProperty.call(keys, key)) return keys[key];
+        return Object.prototype.hasOwnProperty.call(memory, key) ? memory[key] : null;
+      },
+      setItem: function (key, value) { memory[key] = String(value); persist(key, value); },
+      removeItem: function (key) { delete memory[key]; },
+      clear: function () { memory = {}; },
+      key: function (i) { return Object.keys(memory)[i] || null; },
+      length: 0
     };
-  } catch (error) { console.warn('اتصال تنظیمات گزارش تماس به شیت فعال نشد', error); }
+    var real = null;
+    try { real = window.localStorage; if (real) real.getItem('__crmqc_probe__'); }
+    catch (error) { real = null; }
+    if (!real) {
+      try { Object.defineProperty(window, 'localStorage', { value: shim, configurable: true }); }
+      catch (error) { window.localStorage = shim; }
+      return;
+    }
+    try {
+      var prototype = (typeof Storage !== 'undefined' && Storage.prototype) || Object.getPrototypeOf(real);
+      var oldGet = prototype.getItem, oldSet = prototype.setItem;
+      prototype.getItem = function (key) {
+        if (Object.prototype.hasOwnProperty.call(keys, key)) return keys[key];
+        try { return oldGet.call(this, key); } catch (error) { return shim.getItem(key); }
+      };
+      prototype.setItem = function (key, value) {
+        try { oldSet.call(this, key, value); } catch (error) { memory[key] = String(value); }
+        persist(key, value);
+      };
+    } catch (error) { console.warn('اتصال تنظیمات گزارش تماس به شیت فعال نشد', error); }
+  })();
 })();
 </script>`;
-  html = html.replace('<head>', `<head>\n${bridge}`);
+  html = html.replace('<head>', `<head>\n${bridge}\n${styleTag(backCss, 'bundled back-to-app button')}`);
   return html;
 }
 

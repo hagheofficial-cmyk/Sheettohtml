@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const crypto = require('node:crypto');
 
 class FakeRange {
   constructor(sheet, row, col, rows, cols) { Object.assign(this, { sheet, row, col, rows, cols }); }
@@ -118,10 +119,16 @@ function createAppsScriptContext() {
     CacheService: { getScriptCache: () => cache },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     Utilities: {
-      getUuid: () => `uuid-${++uuid}`,
+      getUuid: () => `a1b2c3d4-e5f6-4a7b-8c9d-${String(++uuid).padStart(12, '0')}`,
       base64Encode: value => Buffer.from(value).toString('base64'),
       newBlob: value => ({ getBytes: () => Buffer.from(value) }),
-      formatDate: date => date.toISOString()
+      formatDate: date => date.toISOString(),
+      /* Apps Script real digest: signed bytes, exactly like the Java-backed API */
+      DigestAlgorithm: { SHA_256: 'SHA_256', MD5: 'MD5' },
+      Charset: { UTF_8: 'UTF_8' },
+      computeDigest: (algorithm, value) => Array.from(
+        crypto.createHash(String(algorithm).indexOf('MD5') >= 0 ? 'md5' : 'sha256').update(String(value), 'utf8').digest(),
+        (byte) => (byte > 127 ? byte - 256 : byte))
     },
     Session: { getScriptTimeZone: () => 'UTC' },
     ScriptApp: {
@@ -252,4 +259,173 @@ test('standalone Apps Script creates per-dataset tabs and uses them as the live 
   // Cache TTL expiry simply falls back to reading the tabs.
   clock.advance((600 + 60) * 1000);
   assert.equal(context.crmqcApi('GET', '/api/data/status', {}).data.tickets, 2);
+});
+
+/* همان قابلیت‌های جدید، اما روی باندل مستقل Apps Script (بدون سرور Node). */
+test('standalone Apps Script: ورود با رمز، دسترسی هر کارشناس QC، ماه مالی، تب المان‌ها و صفحه‌ی گزارش تماس', () => {
+  const { context, spreadsheet, properties, cache, clock } = createAppsScriptContext();
+  const setup = context.setupStandaloneApp();
+  assert.equal(setup.ok, true);
+  const api = (method, url, body, token) => context.crmqcApi(method, url, body || {}, token);
+  const C = require('../shared/calc');
+  const t = C.todayJalali(), pm = C.jalaliMonthAdd(t.jy, t.jm, -1);
+  const cur = C.jalaliMonthRange(t.jy, t.jm), prev = C.jalaliMonthRange(pm.jy, pm.jm);
+  const months = [
+    { name: 'دوره قبل', from: C.formatJalali(prev.from), to: C.formatJalali(prev.to) },
+    { name: 'دوره جاری', from: C.formatJalali(cur.from), to: C.formatJalali(cur.to) }
+  ];
+  const ticketFor = (agentName, team, code, qcAgent) => ({
+    qcAgent: qcAgent, reviewDate: '1405/06/01', ticketDate: '1405/06/01',
+    agentName: agentName, team: team, ticketCode: code,
+    q1: '1', q2: '1', q3: '0', q4: '1', redline: '0', comment: 'gas'
+  });
+  const sheet = (name) => {
+    const found = spreadsheet.getSheetByName(name);
+    assert.ok(found, 'تب ' + name + ' ساخته شده است');
+    return { tab: found, head: found.data[0], rows: found.data.slice(1), col: (row, key) => row[found.data[0].indexOf(key)] };
+  };
+
+  /* ۱) تا وقتی کاربر رمزدار نیست، ورود خاموش است */
+  const openBoot = api('GET', '/api/bootstrap');
+  assert.equal(openBoot.status, 200);
+  assert.equal(openBoot.data.auth.required, false);
+  assert.equal(openBoot.data.auth.mode, 'auto');
+  const agents = openBoot.data.agents;
+  assert.ok(agents.length > 5, 'دیتای نمونه با کارشناسان بالا می‌آید');
+  const target = agents[0], other = agents[1];
+  assert.notEqual(target.ext, other.ext);
+
+  /* ۲) ساخت اولین مدیر → توکن نشست */
+  const made = api('POST', '/api/auth/setup', { name: 'مدیر سیستم', password: 'admin-1234' });
+  assert.equal(made.status, 200, JSON.stringify(made.data));
+  const adminToken = made.data.token;
+  assert.ok(adminToken && adminToken.length >= 24, 'نشست با توکن برگردانده می‌شود');
+  assert.equal(made.data.user.role, 'admin');
+
+  const lockedBoot = api('GET', '/api/bootstrap');
+  assert.equal(lockedBoot.data.auth.required, true);
+  assert.equal(lockedBoot.data.agents.length, 0, 'پیش از ورود داده‌ای از شیت لو نمی‌رود');
+  assert.equal(lockedBoot.data.counts.tickets, 0);
+  assert.deepEqual([...lockedBoot.data.auth.accounts].map((a) => a.name), ['مدیر سیستم']);
+  assert.equal(api('POST', '/api/auth/login', { name: 'مدیر سیستم', password: 'wrong' }).status, 401);
+  assert.equal(api('GET', '/api/settings', {}, 'not-a-token').status, 401);
+
+  /* ۳) رمز hash‌شده روی تب QC_Users می‌نشیند (بدون افشا) */
+  const users = sheet('QC_Users');
+  /* ستون‌های اصلی طبق QC_GAS_SCHEMAS؛ کلیدهای اضافه‌ی ردیف‌ها (مثل updatedAt) هم حفظ می‌شوند */
+  assert.deepEqual([...users.head].slice(0, 9), ['id', 'name', 'password', 'role', 'active', 'exts', 'agents', 'teams', 'note']);
+  assert.equal(users.rows.length, 1);
+  assert.equal(users.col(users.rows[0], 'name'), 'مدیر سیستم');
+  assert.ok(String(users.col(users.rows[0], 'password')).indexOf('sha256$') === 0, 'رمز به‌صورت اثر انگشت ذخیره می‌شود');
+  const adminBoot = api('GET', '/api/bootstrap', {}, adminToken);
+  assert.equal(adminBoot.data.agents.length, agents.length, 'مدیر همه‌ی کارشناسان را می‌بیند');
+  assert.equal(adminBoot.data.qcUsers[0].password, '••••••');
+
+  /* ۴) تعریف کارشناس QC با داخلی یک کارشناس مشخص */
+  const created = api('POST', '/api/qc-users',
+    { name: 'مبینا', password: 'qc-1234', role: 'qc', active: true, exts: String(target.ext) }, adminToken);
+  assert.equal(created.status, 200, JSON.stringify(created.data));
+  assert.deepEqual([...created.data.user.exts], [String(target.ext)]);
+  assert.equal(sheet('QC_Users').rows.length, 2, 'کاربر دوم روی تب نوشته شد');
+
+  /* ۵) ورود کارشناس QC → داده‌ی محدودشده و APIهای مدیریتی بسته */
+  const qcLogin = api('POST', '/api/auth/login', { name: 'مبینا', password: 'qc-1234' });
+  assert.equal(qcLogin.status, 200);
+  const qcToken = qcLogin.data.token;
+  const qcBoot = api('GET', '/api/bootstrap', {}, qcToken);
+  assert.deepEqual([...qcBoot.data.agents].map((a) => a.name), [target.name], 'فقط کارشناس مجاز');
+  assert.equal(qcBoot.data.qcUsers, undefined);
+  assert.equal(qcBoot.data.auth.admin, false);
+  for (const url of ['/api/settings', '/api/criteria', '/api/qc-users', '/api/elements', '/api/fiscal-months']) {
+    assert.equal(api('GET', url, {}, qcToken).status, 403, url + ' برای کارشناس QC بسته است');
+  }
+  assert.equal(api('GET', '/api/data/status', {}, qcToken).status, 200, 'شمارنده‌های صفحه برای QC باز است');
+
+  const denied = api('POST', '/api/tickets', ticketFor(other.name, other.team, 'GAS-DENY', 'مبینا'), qcToken);
+  assert.equal(denied.status, 403);
+  assert.ok(denied.data.error.includes('دسترسی ندارید'), denied.data.error);
+  const allowed = api('POST', '/api/tickets', ticketFor(target.name, target.team, 'GAS-OK', 'مبینا'), qcToken);
+  assert.equal(allowed.status, 200, JSON.stringify(allowed.data));
+  const tickets = sheet('Tickets');
+  assert.ok(tickets.rows.some((row) => row.includes('GAS-OK')), 'رکورد مجاز روی تب Tickets نوشته شد');
+  assert.ok(!tickets.rows.some((row) => row.includes('GAS-DENY')), 'رکورد غیرمجاز نوشته نمی‌شود');
+  assert.equal(api('GET', '/api/tickets?per=15', {}, qcToken).data.total, 1);
+
+  /* ۶) کش تحلیل برای کاربر محدودشده کلید جدا دارد و با نوشتن باطل می‌شود */
+  assert.ok(cache.hits > 0, 'خواندن‌ها از کش سرو می‌شوند');
+  const qcRead = api('GET', '/api/tickets?per=15', {}, qcToken);
+  assert.equal(qcRead.data.total, 1);
+  const adminRead = api('GET', '/api/tickets?per=15', {}, adminToken);
+  assert.equal(adminRead.data.total, 1, 'مدیر هم همان یک رکورد را می‌بیند (داده هنوز یکی است)');
+
+  /* ۷) خروج و خروج اجباری همه‌ی نشست‌ها */
+  assert.equal(api('POST', '/api/auth/logout', { token: qcToken }, qcToken).status, 200);
+  assert.equal(api('GET', '/api/bootstrap', {}, qcToken).data.auth.user, null);
+  const epochBefore = properties.get('QC_GAS_TOKEN_EPOCH');
+  assert.equal(context.clearSessions().ok, true);
+  assert.notEqual(properties.get('QC_GAS_TOKEN_EPOCH'), epochBefore, 'شماره‌ی نشست‌ها بالا می‌رود');
+  assert.equal(api('GET', '/api/bootstrap', {}, adminToken).data.auth.user, null, 'توکن مدیر هم باطل شد');
+  const relogin = api('POST', '/api/auth/login', { name: 'مدیر سیستم', password: 'admin-1234' });
+  const token2 = relogin.data.token;
+
+  /* ۸) بازه‌های ماه مالی روی تب Fiscal_Months */
+  const saved = api('PUT', '/api/fiscal-months', { months: months }, token2);
+  assert.equal(saved.status, 200, JSON.stringify(saved.data));
+  const fiscal = sheet('Fiscal_Months');
+  assert.deepEqual([...fiscal.head].slice(0, 5), ['id', 'name', 'from', 'to', 'note']);
+  assert.deepEqual([...fiscal.rows].map((row) => fiscal.col(row, 'name')), ['دوره قبل', 'دوره جاری']);
+  const readFiscal = api('GET', '/api/fiscal-months', {}, token2);
+  assert.equal(readFiscal.data.current.name, 'دوره جاری');
+  assert.equal(readFiscal.data.previous.name, 'دوره قبل');
+  assert.deepEqual([...readFiscal.data.options].map((o) => o.value).slice(0, 2), ['fm:cur', 'fm:prev']);
+  assert.equal(api('PUT', '/api/fiscal-months', { months: months }).status, 401, 'بدون نشست نوشته نمی‌شود');
+
+  /* ۹) تب Elements: نوشتن از سامانه و ویرایش مستقیم روی شیت */
+  const put = api('PUT', '/api/criteria',
+    { form: 'tele', elements: [{ key: 'q1', label: 'سلام و شروع', excelKey: 'Q1', active: true }] }, token2);
+  assert.equal(put.status, 200, JSON.stringify(put.data));
+  const elements = sheet('Elements');
+  assert.deepEqual([...elements.head].slice(0, 9), ['scope', 'team', 'form', 'key', 'label', 'excelKey', 'active', 'aliases', 'order']);
+  const q1 = elements.rows.find((row) => elements.col(row, 'key') === 'q1');
+  assert.ok(q1, 'ردیف المان روی تب نوشته شد');
+  assert.equal(elements.col(q1, 'excelKey'), 'Q1');
+
+  // ویرایش مستقیم روی شیت: نام فارسی و ستون اکسل جدید
+  q1[elements.head.indexOf('label')] = 'سلام (ویرایش روی شیت)';
+  q1[elements.head.indexOf('excelKey')] = 'Q1_SHEET';
+  clock.advance(31000);
+  context.crmqcOnSheetChange();
+  const afterEdit = api('GET', '/api/criteria', {}, token2);
+  const def = afterEdit.data.config.forms.tele.find((d) => d.key === 'q1');
+  assert.equal(def.label, 'سلام (ویرایش روی شیت)');
+  assert.equal(def.excelKey, 'Q1_SHEET');
+  assert.ok(def.aliases.includes('Q1'), 'ستون اکسل قبلی به aliases منتقل شد');
+  const flat = api('GET', '/api/elements', {}, token2);
+  assert.ok(flat.data.rows.some((row) => row.key === 'q1' && row.excelKey === 'Q1_SHEET'));
+
+  /* ۱۰) خلاصه‌ی ماهانه روی تب Monthly_Summary */
+  const rebuilt = context.rebuildMonthlySummary();
+  assert.equal(rebuilt.ok, true);
+  assert.ok(rebuilt.rows >= 1);
+  const summary = sheet('Monthly_Summary');
+  assert.deepEqual([...summary.head].slice(0, 4), ['month', 'monthLabel', 'fiscal', 'agent']);
+  assert.ok(summary.rows.length >= 1);
+  assert.ok(summary.rows.some((row) => summary.col(row, 'agent') === target.name));
+  /* رکورد نمونه در ۱۴۰۵/۰۶ است؛ نام ماه مالی همان بازه‌ی نوشته‌شده روی شیت می‌شود */
+  const ticketRow = summary.rows.find((row) => summary.col(row, 'agent') === target.name);
+  assert.equal(String(summary.col(ticketRow, 'month')), '1405/06');
+  assert.ok(months.some((m) => String(summary.col(ticketRow, 'fiscal')) === m.name),
+    'ستون fiscal از تب Fiscal_Months پر می‌شود: ' + summary.col(ticketRow, 'fiscal'));
+  const apiSummary = api('GET', '/api/monthly-summary', {}, token2);
+  assert.equal(apiSummary.status, 200);
+  assert.ok(apiSummary.data.rows.length >= 1);
+
+  /* ۱۱) صفحه‌ی گزارش تماس مستقل سرو می‌شود (بدون فریم تودرتو) */
+  const callPage = context.doGet({ parameter: { page: 'call-report' } });
+  assert.ok(callPage.content.includes('data-file="CallReport"'), 'فایل CallReport سرو می‌شود');
+  assert.equal(callPage.title, 'گزارش تماس روزانه');
+  assert.ok(!callPage.content.includes('__QC_CALL_REPORT_STORAGE_B64__'), 'placeholder با داده‌ی شیت جایگزین شد');
+  const indexPage = context.doGet({ parameter: {} });
+  assert.ok(indexPage.content.includes('data-file="Index"'));
+  assert.ok(!indexPage.content.includes('__QC_APP_SCRIPT_URL__'), 'نشانی وب‌اپ جایگزین شد');
 });

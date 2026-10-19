@@ -33,20 +33,39 @@ test('public: multi-select menu opens in a fixed layer on body, flips up when sh
   assert.equal(w.document.querySelector('.ms-portal'), null, 'outside click closes the menu');
 });
 
-test('public: hamburger collapses the sidebar on desktop, remembers the choice, and keeps the drawer on narrow screens', async (t) => {
+test('public: منوی همبرگری در همه‌ی اندازه‌ها پیش‌فرض بسته است و با کلیک باز می‌شود', async (t) => {
   const { w, dom } = browser('public');
   t.after(() => dom.window.close());
   w.innerWidth = 1440;
   await w.App.init();
-  const app = w.document.getElementById('app');
-  w.document.getElementById('hamburger').click();
-  assert.ok(app.classList.contains('sidebar-collapsed'), 'desktop click collapses');
-  assert.equal(w.localStorage.getItem('crmqc.sidebar.v1'), 'collapsed');
-  w.document.getElementById('hamburger').click();
-  assert.ok(!app.classList.contains('sidebar-collapsed'), 'second click expands');
-  assert.equal(w.localStorage.getItem('crmqc.sidebar.v1'), 'open');
+  const doc = w.document;
+  const sidebar = doc.getElementById('sidebar');
+  const backdrop = doc.getElementById('sidebarBackdrop');
+  const burger = doc.getElementById('hamburger');
+
+  assert.ok(!sidebar.classList.contains('open'), 'دسکتاپ: منو پیش‌فرض بسته است');
+  assert.equal(burger.getAttribute('aria-expanded'), 'false');
+  assert.ok(!doc.getElementById('app').classList.contains('sidebar-collapsed'), 'حالت جمع‌شدن دسکتاپ دیگر وجود ندارد');
+
+  burger.click();
+  assert.ok(sidebar.classList.contains('open'), 'کلیک همبرگر منو را باز می‌کند');
+  assert.ok(backdrop.classList.contains('show'), 'پس‌زمینه‌ی تیره با منو می‌آید');
+  assert.equal(burger.getAttribute('aria-expanded'), 'true');
+
+  backdrop.click();
+  assert.ok(!sidebar.classList.contains('open'), 'کلیک روی پس‌زمینه منو را می‌بندد');
+
+  burger.click();
+  doc.getElementById('sidebarClose').click();
+  assert.ok(!sidebar.classList.contains('open'), 'دکمه‌ی بستن داخل منو کار می‌کند');
+
+  burger.click();
+  await go(w, 'reports');
+  assert.ok(!sidebar.classList.contains('open'), 'رفتن به صفحه‌ی دیگر منو را می‌بندد');
+
   w.innerWidth = 800;
-  w.document.getElementById('hamburger').click();
-  assert.ok(w.document.getElementById('sidebar').classList.contains('open'), 'narrow screens open the drawer');
-  assert.ok(!app.classList.contains('sidebar-collapsed'), 'narrow screens do not collapse');
+  burger.click();
+  assert.ok(sidebar.classList.contains('open'), 'در عرض کم هم همان دراور باز می‌شود');
+  doc.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  assert.ok(!sidebar.classList.contains('open'), 'کلید Escape منو را می‌بندد');
 });

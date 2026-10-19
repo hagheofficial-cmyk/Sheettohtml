@@ -136,7 +136,7 @@ async function render(root, arg) {
       </div>
     </div>
     <div class="card" style="margin-bottom:16px">
-      <div class="filters" style="border-bottom:none;align-items:flex-end">
+      <div class="filters plain">
         <div class="field" style="flex:1.4;min-width:220px"><label>جستجو (نام یا داخلی)</label>
           <input class="input" id="erSearch" placeholder="مثلاً: مبینا یا ۳۰۷۳" autocomplete="off"></div>
         <div id="erTeamSlot"></div>

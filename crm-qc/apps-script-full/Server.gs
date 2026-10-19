@@ -31,7 +31,11 @@ var QC_GAS_SHEETS = {
   meta: 'Meta',
   callMeta: 'Call_Metadata',
   callReportExperts: 'Call_Report_Experts',
-  callReportAccess: 'Call_Report_Access'
+  callReportAccess: 'Call_Report_Access',
+  fiscalMonths: 'Fiscal_Months',
+  qcUsers: 'QC_Users',
+  elements: 'Elements',
+  monthlySummary: 'Monthly_Summary'
 };
 
 var QC_GAS_SCHEMAS = {
@@ -49,7 +53,17 @@ var QC_GAS_SCHEMAS = {
   Meta: ['key', 'value'],
   Call_Metadata: ['key', 'value'],
   Call_Report_Experts: ['json'],
-  Call_Report_Access: ['json']
+  Call_Report_Access: ['json'],
+  /* بازه‌های ماه مالی؛ مستقیم روی شیت قابل نوشتن‌اند (بند ۲) */
+  Fiscal_Months: ['id', 'name', 'from', 'to', 'note'],
+  /* کاربران QC: نام، رمز، نقش، فعال و دسترسی‌ها (بند ۵) */
+  QC_Users: ['id', 'name', 'password', 'role', 'active', 'exts', 'agents', 'teams', 'note'],
+  /* نگاشت المان‌ها: نام فارسی و ستون اکسل، قابل ویرایش روی شیت (بند ۹) */
+  Elements: ['scope', 'team', 'form', 'key', 'label', 'excelKey', 'active', 'aliases', 'order'],
+  /* خلاصه‌ی ماهانه‌ی آماده برای خواندن/خروجی سریع (بند ۸) */
+  Monthly_Summary: ['month', 'monthLabel', 'fiscal', 'agent', 'ext', 'team', 'qcAgents', 'tickets',
+    'ticketAvg', 'ticketRedline', 'socials', 'socialAvg', 'socialRedline', 'calls', 'callAvg',
+    'callRedline', 'totalCount', 'combinedAvg', 'redlines', 'actions']
 };
 
 var QC_GAS_CALL_REPORT_KEYS = {
@@ -70,6 +84,13 @@ var QC_GAS_CACHE_CHUNK_CHARS = 24000;
 /* Above this size the snapshot is read from the sheet every time instead. */
 var QC_GAS_CACHE_MAX_CHARS = 4000000;
 var QC_GAS_CHANGE_HANDLER = 'crmqcOnSheetChange';
+/* کش نتیجه‌ی تحلیل‌ها: کلید = نسخه‌ی داده + کاربر + مسیر؛ با هر نوشتن باطل می‌شود. */
+var QC_GAS_ANALYSIS_PREFIX = 'qcan@';
+var QC_GAS_ANALYSIS_TTL_SEC = 21600;
+var QC_GAS_ANALYSIS_MAX_CHARS = 900000;
+var QC_GAS_TOKEN_PREFIX = 'qctok@';
+var QC_GAS_TOKEN_EPOCH_KEY = 'QC_GAS_TOKEN_EPOCH';
+var QC_GAS_TOKEN_TTL_SEC = 21600; // ۶ ساعت؛ با هر درخواست تمدید می‌شود
 
 function onOpen() {
   try {
@@ -78,6 +99,9 @@ function onOpen() {
       .addItem('راه‌اندازی / بررسی تب‌های سامانه', 'setupStandaloneApp')
       .addSeparator()
       .addItem('خواندن تازه از شیت (پاک‌کردن کش)', 'refreshFromSheet')
+      .addItem('بازسازی تب خلاصه ماهانه', 'rebuildMonthlySummary')
+      .addSeparator()
+      .addItem('بستن همه نشست‌های فعال (خروج اجباری)', 'clearSessions')
       .addToUi();
   } catch (err) {
     // onOpen may also run outside the spreadsheet editor.
@@ -200,12 +224,20 @@ function doGet(e) {
  * under LockService, writes only the rows that changed and republishes the
  * cache for the next read.
  */
-function crmqcApi(method, requestUrl, body) {
+function crmqcApi(method, requestUrl, body, token) {
   method = String(method || 'GET').toUpperCase();
   requestUrl = String(requestUrl || '/');
   body = body && typeof body === 'object' ? body : {};
-
+  var pathOnly = requestUrl.split('?')[0];
   var isRead = method === 'GET';
+  var authPath = pathOnly.indexOf('/api/auth/') === 0;
+
+  /* سریع‌ترین پاسخ ممکن: فقط شماره‌ی نسخه‌ی داده تا کاربران همزمان بفهمند
+   * چیز جدیدی روی شیت آمده است (بند ۱۰). هیچ خواندنی از تب‌ها انجام نمی‌شود. */
+  if (isRead && pathOnly === '/api/revision') {
+    return { status: 200, data: { revision: currentRevision_(), at: Date.now() } };
+  }
+
   var lock = LockService.getScriptLock();
   var locked = false;
   try {
@@ -226,7 +258,20 @@ function crmqcApi(method, requestUrl, body) {
       if (isRead) publishRevision_(revision, before);
     }
 
+    /* نشست: توکن از کش، نقش و دسترسی‌ها همیشه از داده‌ی تازه‌ی شیت */
+    var session = refreshSession_(resolveSession_(token), before);
+
+    /* کش نتیجه‌ی تحلیل‌ها (بند ۸): کلید = نسخه‌ی داده + کاربر + درخواست.
+     * با هر نوشتن نسخه عوض می‌شود، پس پاسخ کهنه هرگز خوانده نمی‌شود. */
+    var analysisKey = isRead && !authPath && cacheableRead_(pathOnly)
+      ? analysisCacheKey_(revision, requestUrl, session) : null;
+    if (analysisKey) {
+      var cached = readAnalysisCache_(analysisKey);
+      if (cached) return { status: 200, data: cached, cached: true };
+    }
+
     window.LocalApi.replaceSnapshot(before);
+    window.LocalApi.setSession(session);
     window.__GAS_DB_DIRTY__ = false;
 
     var result = window.LocalApi.run(method, requestUrl, body);
@@ -234,7 +279,15 @@ function crmqcApi(method, requestUrl, body) {
     if (isRead) {
       // Reads must not persist: a GET only re-derives in-memory defaults, and
       // writing from a cached snapshot could clobber a concurrent edit.
-      return { status: 200, data: jsonSafe_(result) };
+      var payload = jsonSafe_(result);
+      if (analysisKey) writeAnalysisCache_(analysisKey, payload);
+      return { status: 200, data: payload };
+    }
+
+    if (authPath && pathOnly === '/api/auth/logout') dropToken_(token);
+    if (authPath && result && result.user && (pathOnly === '/api/auth/login' || pathOnly === '/api/auth/setup')) {
+      result.token = issueToken_(result.user);
+      session = refreshSession_(result.user, before);
     }
 
     var after = window.LocalApi.backup();
@@ -251,6 +304,147 @@ function crmqcApi(method, requestUrl, body) {
     };
   } finally {
     if (locked) { try { lock.releaseLock(); } catch (ignored) {} }
+    try { window.LocalApi.setSession(null); } catch (ignored) {}
+  }
+}
+
+/* ------------------------------------------------------------ احراز هویت */
+
+function sessionEpoch_() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    return Number(props.getProperty(QC_GAS_TOKEN_EPOCH_KEY) || 1);
+  } catch (err) {
+    return 1;
+  }
+}
+
+function tokenKey_(token, epoch) {
+  return QC_GAS_TOKEN_PREFIX + (epoch || sessionEpoch_()) + '@' + token;
+}
+
+function resolveSession_(token) {
+  token = String(token || '');
+  if (!token) return null;
+  try {
+    var cacheKey = tokenKey_(token);
+    var raw = CacheService.getScriptCache().get(cacheKey);
+    if (!raw) return null;
+    var hit = JSON.parse(raw);
+    if (!hit || !hit.name) return null;
+    if (Number(hit.exp || 0) < Date.now()) return null;
+    /* انقضای لغزان: تا وقتی کاربر کار می‌کند نشست بسته نمی‌شود */
+    CacheService.getScriptCache().put(cacheKey,
+      JSON.stringify({ name: hit.name, exp: Date.now() + QC_GAS_TOKEN_TTL_SEC * 1000 }), QC_GAS_TOKEN_TTL_SEC);
+    return { name: hit.name };
+  } catch (err) {
+    return null;
+  }
+}
+
+function refreshSession_(session, db) {
+  if (!session || !session.name) return null;
+  var fresh = window.QCAccess.findUser(window.QCAccess.normalizeUsers(db), session.name);
+  if (!fresh || !fresh.active) return null;
+  return fresh;
+}
+
+function issueToken_(user) {
+  var token = window.QCAccess.randomToken(24);
+  try {
+    CacheService.getScriptCache().put(tokenKey_(token),
+      JSON.stringify({ name: user.name, exp: Date.now() + QC_GAS_TOKEN_TTL_SEC * 1000 }), QC_GAS_TOKEN_TTL_SEC);
+  } catch (err) {
+    throw new Error('ذخیره‌ی نشست ممکن نشد؛ دوباره تلاش کنید');
+  }
+  return token;
+}
+
+function dropToken_(token) {
+  token = String(token || '');
+  if (!token) return;
+  try { CacheService.getScriptCache().remove(tokenKey_(token)); } catch (err) {}
+}
+
+/** Menu item: با یک پله جلو بردن «دوره‌ی نشست» همه‌ی توکن‌های فعال بی‌اثر می‌شوند. */
+function clearSessions() {
+  var props = PropertiesService.getScriptProperties();
+  var epoch = Number(props.getProperty(QC_GAS_TOKEN_EPOCH_KEY) || 1) + 1;
+  props.setProperty(QC_GAS_TOKEN_EPOCH_KEY, String(epoch));
+  return { ok: true, epoch: epoch };
+}
+
+/* ------------------------------------------------- کش نتیجه‌ی تحلیل‌ها */
+
+function cacheableRead_(path) {
+  if (!path || path.indexOf('/api/') !== 0) return false;
+  var name = path.slice(5).split('/')[0];
+  var allowed = ['bootstrap', 'dashboard', 'reports', 'portfolio', 'expert-ref', 'calls', 'tickets',
+    'socials', 'data', 'monthly-summary', 'elements', 'fiscal-months', 'qc-users', 'agents',
+    'criteria', 'settings', 'action-types', 'actions', 'reminders'];
+  if (allowed.indexOf(name) === -1) return false;
+  if (name === 'calls' && path.indexOf('/api/calls/analysis') !== 0) return false;
+  if (name === 'data' && path.indexOf('/api/data/status') !== 0) return false;
+  return true;
+}
+
+function analysisCacheKey_(revision, requestUrl, session) {
+  var who = session && session.name ? window.QCAccess.normalizeUser({ name: session.name }).key : 'guest';
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, who + '\u0001' + requestUrl, Utilities.Charset.UTF_8);
+  var hex = '';
+  for (var i = 0; i < digest.length; i++) hex += ('0' + (digest[i] < 0 ? digest[i] + 256 : digest[i]).toString(16)).slice(-2);
+  return QC_GAS_ANALYSIS_PREFIX + revision + '#' + hex.slice(0, 40);
+}
+
+function readAnalysisCache_(key) {
+  try {
+    var cache = CacheService.getScriptCache();
+    var meta = cache.get(key + '#meta');
+    if (!meta) return null;
+    var info = JSON.parse(meta), keys = [];
+    for (var i = 0; i < info.chunks; i++) keys.push(key + '#' + i);
+    var parts = cache.getAll(keys), json = '';
+    for (var c = 0; c < keys.length; c++) {
+      if (parts[keys[c]] == null) return null;
+      json += parts[keys[c]];
+    }
+    return JSON.parse(json);
+  } catch (err) {
+    return null;
+  }
+}
+
+function writeAnalysisCache_(key, payload) {
+  try {
+    var json = JSON.stringify(payload);
+    if (!json || json.length > QC_GAS_ANALYSIS_MAX_CHARS) return;
+    var cache = CacheService.getScriptCache();
+    var chunks = Math.max(1, Math.ceil(json.length / QC_GAS_CACHE_CHUNK_CHARS));
+    var values = {};
+    for (var i = 0; i < chunks; i++) {
+      values[key + '#' + i] = json.substr(i * QC_GAS_CACHE_CHUNK_CHARS, QC_GAS_CACHE_CHUNK_CHARS);
+    }
+    values[key + '#meta'] = JSON.stringify({ chunks: chunks, at: new Date().toISOString() });
+    cache.putAll(values, QC_GAS_ANALYSIS_TTL_SEC);
+  } catch (err) {
+    // کش تحلیل فقط یک بهینه‌سازی است؛ بدون آن پاسخ از راه عادی ساخته می‌شود.
+  }
+}
+
+/** Menu item: بازسازی تب خلاصه‌ی ماهانه از داده‌ی فعلی شیت (بند ۸). */
+function rebuildMonthlySummary() {
+  var ss = getDatabaseSpreadsheet_();
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var db = normalizeDatabase_(readDatabase_(ss));
+    var rows = window.QCFiscal.monthlySummary(db).rows;
+    markSelfWrite_();
+    writeRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.monthlySummary), [], rows, 'Monthly_Summary');
+    publishRevision_(bumpRevision_(), db);
+    return { ok: true, rows: rows.length };
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -382,7 +576,9 @@ function makeSeedDatabase_() {
     agentActions: {},
     actionTypes: Array.isArray(seed.actionTypes) ? seed.actionTypes : undefined,
     reminders: [],
-    registryCleared: false
+    registryCleared: false,
+    fiscalMonths: [],
+    qcUsers: []
   });
 }
 
@@ -401,6 +597,9 @@ function normalizeDatabase_(db) {
   db.agentActions = db.agentActions || {};
   db.actionTypes = Array.isArray(db.actionTypes) ? db.actionTypes : undefined;
   db.reminders = Array.isArray(db.reminders) ? db.reminders : [];
+  db.fiscalMonths = window.QCFiscal.normalizeMonths(db.fiscalMonths);
+  db.qcUsers = Array.isArray(db.qcUsers) ? db.qcUsers : [];
+  if (!db.settings.authMode) db.settings.authMode = 'auto';
   db.callImport = db.callImport || null;
   db.callRaw = db.callRaw || null;
   db.callSync = db.callSync || { files: {}, syncedAt: null };
@@ -458,9 +657,15 @@ function readDatabase_(ss) {
   var actionTypes = readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.actionTypes]))
     .map(function (row) { return String(row.label || '').trim(); }).filter(Boolean);
 
+  var fiscalMonths = window.QCFiscal.normalizeMonths(readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.fiscalMonths])));
+  var qcUsers = readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.qcUsers]));
+  var elementRows = readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.elements]));
+
   var db = {
     version: meta.version || 1,
     datasetId: meta.datasetId || '',
+    fiscalMonths: fiscalMonths,
+    qcUsers: qcUsers,
     createdAt: meta.createdAt || '',
     registryCleared: !!meta.registryCleared,
     seq: meta.seq || {},
@@ -480,6 +685,11 @@ function readDatabase_(ss) {
     lists: lists
   };
   if (criteria.callCriteria) db.settings.callCriteria = criteria.callCriteria;
+  /* تب Elements منبع اصلی نگاشت المان‌هاست تا مستقیم روی شیت ویرایش شود (بند ۹) */
+  if (elementRows.length) {
+    db.settings.callCriteria = window.QCElements.rowsToCriteria(elementRows, db.settings.callCriteria || null);
+  }
+  if (settings.authMode) db.settings.authMode = String(settings.authMode);
   return db;
 }
 
@@ -567,6 +777,22 @@ function writeDatabaseDiff_(ss, before, after, forceAll) {
     writeKeyValueSheet_(sheets[QC_GAS_SHEETS.criteria], {}, { callCriteria: (after.settings || {}).callCriteria || {} });
   }
   if (changed('lists')) writeKeyValueSheet_(sheets[QC_GAS_SHEETS.lists], before.lists || {}, after.lists || {});
+  if (changed('fiscalMonths')) writeRowsSheet_(sheets[QC_GAS_SHEETS.fiscalMonths], before.fiscalMonths || [], after.fiscalMonths || [], 'Fiscal_Months');
+  if (changed('qcUsers')) writeRowsSheet_(sheets[QC_GAS_SHEETS.qcUsers], before.qcUsers || [], after.qcUsers || [], 'QC_Users');
+
+  /* نگاشت تخت المان‌ها روی تب Elements (بند ۹) */
+  var beforeElements = window.QCElements.criteriaToRows((before.settings || {}).callCriteria || null);
+  var afterElements = window.QCElements.criteriaToRows((after.settings || {}).callCriteria || null);
+  if (forceAll || JSON.stringify(beforeElements) !== JSON.stringify(afterElements)) {
+    writeRowsSheet_(sheets[QC_GAS_SHEETS.elements], beforeElements, afterElements, 'Elements');
+  }
+
+  /* خلاصه‌ی ماهانه فقط وقتی داده‌ی مؤثر عوض شده بازسازی می‌شود (بند ۸) */
+  var summaryInputs = ['tickets', 'socials', 'callFeedbacks', 'agentActions', 'fiscalMonths', 'agents'];
+  if (forceAll || summaryInputs.some(changed)) {
+    writeRowsSheet_(sheets[QC_GAS_SHEETS.monthlySummary],
+      window.QCFiscal.monthlySummary(before).rows, window.QCFiscal.monthlySummary(after).rows, 'Monthly_Summary');
+  }
 
   var beforeMeta = {
     version: before.version || after.version,

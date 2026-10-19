@@ -4,7 +4,10 @@
 'use strict';
 const C = window.QCCalc, R = window.QCReports, KEY = 'crmqc.db.v1';
 const Registry = window.QCRegistry, ImportData = window.QCImport, X = window.QCExpertRef;
+const A = window.QCAccess, F = window.QCFiscal, E = window.QCElements;
 let db = null, saveTimer = null;
+/* نشست فعلی (کاربر واردشده). در Apps Script سمت سرور با هر درخواست ست می‌شود. */
+let session = null;
 
 function loadDb() {
   let raw = null;
@@ -31,6 +34,11 @@ function loadDb() {
   X.ensure(db);
   if (!db.settings.scoreBands) db.settings.scoreBands = [90, 75, 50];
   if (!db.settings.defaultPreset) db.settings.defaultPreset = 'cur';
+  /* ماه‌های مالی و کاربران QC: هر دو مستقیم روی شیت هم قابل ویرایش‌اند. */
+  if (!Array.isArray(db.fiscalMonths)) db.fiscalMonths = [];
+  db.fiscalMonths = F.normalizeMonths(db.fiscalMonths);
+  if (!Array.isArray(db.qcUsers)) db.qcUsers = [];
+  if (!db.settings.authMode) db.settings.authMode = 'auto';
 }
 function saveDb(sync) {
   const w = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {} };
@@ -45,6 +53,7 @@ function saveDb(sync) {
 if (typeof window.addEventListener === 'function') window.addEventListener('pagehide', () => saveDb(true));
 
 const str = (v) => (v == null ? '' : String(v)).trim();
+const text = str; /* نام دیگر str؛ در لایه‌ی دسترسی/ماه مالی استفاده می‌شود */
 const clone = (o) => (o == null ? o : JSON.parse(JSON.stringify(o)));
 function jstr(v) { const j = C.parseJalali(v); return j ? C.formatJalali(j) : null; }
 function teamOf(name) { const a = db.agents.find((x) => x.name === name); return a ? a.team : ''; }
@@ -128,7 +137,33 @@ function list(kind, q) {
   return { rows: clone(rows.slice((page-1)*per, page*per)), total, page, per };
 }
 
+/* لایه‌ی احراز هویت + محدوده‌ی داده؛ منطق اصلی در dispatch() است. */
 function route(method, url, body) {
+  const pathPart = '/' + String(url || '/').replace(/^\/+/, '').split('?')[0];
+  if (pathPart.indexOf('/api/auth') === 0) return dispatch(method, url, body);
+  /* bootstrap و revision بدون نشست هم پاسخ می‌دهند (دقیقاً مثل server.js):
+   * اولی پوسته‌ی خالی + فهرست حساب‌ها را برای صفحه‌ی ورود می‌فرستد و دومی برای
+   * همگام‌سازی خودکار مرورگرهاست. */
+  const publicPath = pathPart === '/api/bootstrap' || pathPart === '/api/revision';
+  const required = A.authRequired(db);
+  if (required && !publicPath) {
+    const allowed = A.canAccessApi(db, session, method, pathPart);
+    if (!allowed.ok) bad(allowed.error, allowed.status || 403);
+    if (method !== 'GET') {
+      const guard = A.writeGuard(db, session, method, pathPart, body);
+      if (!guard.ok) bad(guard.error, guard.status || 403);
+    }
+  }
+  if (method === 'GET' && required && session && !A.isAdmin(session)) {
+    /* خواندن‌ها روی کپی محدودشده اجرا می‌شوند؛ نوشتن در این مسیر ممنوع است. */
+    const full = db;
+    db = A.scopeDb(full, session);
+    try { return dispatch(method, url, body); } finally { db = full; }
+  }
+  return dispatch(method, url, body);
+}
+
+function dispatch(method, url, body) {
   // کوئری را اول جدا کن — تاریخ‌ها شامل «/» هستند و نباید در مسیر شکسته شوند
   const [pathPart, qsAll] = url.slice(1).split('?');
   const parts = pathPart.split('/');
@@ -150,8 +185,24 @@ function route(method, url, body) {
 
   if(name === 'session-snapshot' && method === 'GET')return clone(db);
 
+  if (name === 'auth') return authRoute(method, id, body);
+
   if (name === 'bootstrap' && method === 'GET') {
+    const auth = { required: A.authRequired(db), mode: A.authMode(db), accounts: A.accounts(db),
+      user: session ? A.publicUser(session) : null, admin: A.isAdmin(session) };
+    if (auth.required && !session) {
+      /* پیش از ورود هیچ داده‌ای لو نمی‌رود؛ فقط آنچه صفحه‌ی ورود لازم دارد. */
+      return { auth: auth, agents: [], teams: [], qcAgents: [], lists: clone(db.lists),
+        fiscalMonths: [], revision: db.revision || 0,
+        settings: { orgName: db.settings.orgName || 'سامانه کنترل کیفیت', scoreBands: db.settings.scoreBands,
+          defaultPreset: db.settings.defaultPreset, authMode: db.settings.authMode },
+        counts: { tickets: 0, socials: 0, calls: 0, callMeta: null } };
+    }
     return {
+      auth: auth,
+      fiscalMonths: clone(db.fiscalMonths || []),
+      revision: db.revision || 0,
+      qcUsers: A.isAdmin(session) ? clone(A.userMask(A.normalizeUsers(db))) : undefined,
       agents: clone(db.agents.filter((a) => a.active)),
       teams: [...new Set(db.agents.filter((a) => a.active).map((a) => a.team))],
       qcAgents: clone(db.qcAgents),
@@ -167,7 +218,7 @@ function route(method, url, body) {
     db.tickets.push(n); saveDb(); return clone(n);
   }
   if (name === 'tickets' && method === 'GET') { const r = db.tickets.find((x) => x.id === +id); return r ? clone(r) : bad('یافت نشد', 404); }
-  if (name === 'tickets' && method === 'PUT') { const r = db.tickets.find((x) => x.id === +id); if (!r) bad('یافت نشد', 404); const n = normalizeTicket(body, r); if (typeof n === 'string') bad(n); db.tickets = db.tickets.map((x) => x.id === r.id ? n : x); saveDb(); return clone(n); }
+  if (name === 'tickets' && method === 'PUT') { const r = db.tickets.find((x) => x.id === +id); if (!r) bad('یافت نشد', 404); conflict(r, body); const n = normalizeTicket(body, r); if (typeof n === 'string') bad(n); db.tickets = db.tickets.map((x) => x.id === r.id ? n : x); saveDb(); return clone(n); }
   if (name === 'tickets' && method === 'DELETE') { db.tickets = db.tickets.filter((x) => x.id !== +id); saveDb(); return { ok: true }; }
 
   if (name === 'socials' && method === 'GET' && id == null) return list('socials', q);
@@ -176,7 +227,7 @@ function route(method, url, body) {
     db.socials.push(n); saveDb(); return clone(n);
   }
   if (name === 'socials' && method === 'GET') { const r = db.socials.find((x) => x.id === +id); return r ? clone(r) : bad('یافت نشد', 404); }
-  if (name === 'socials' && method === 'PUT') { const r = db.socials.find((x) => x.id === +id); if (!r) bad('یافت نشد', 404); const n = normalizeSocial(body, r); if (typeof n === 'string') bad(n); db.socials = db.socials.map((x) => x.id === r.id ? n : x); saveDb(); return clone(n); }
+  if (name === 'socials' && method === 'PUT') { const r = db.socials.find((x) => x.id === +id); if (!r) bad('یافت نشد', 404); conflict(r, body); const n = normalizeSocial(body, r); if (typeof n === 'string') bad(n); db.socials = db.socials.map((x) => x.id === r.id ? n : x); saveDb(); return clone(n); }
   if (name === 'socials' && method === 'DELETE') { db.socials = db.socials.filter((x) => x.id !== +id); saveDb(); return { ok: true }; }
 
   if (name === 'reports' && method === 'GET') {
@@ -510,15 +561,145 @@ function route(method, url, body) {
     if (Array.isArray(b.scoreBands) && b.scoreBands.length === 3) {
       db.settings.scoreBands = b.scoreBands.map((x) => Math.min(100, Math.max(0, +x || 0))).sort((a, b) => b - a);
     }
-    if (['cur', 'prev', 'all'].indexOf(b.defaultPreset) !== -1) db.settings.defaultPreset = b.defaultPreset;
+    if (['cur', 'prev', 'all', 'today'].indexOf(b.defaultPreset) !== -1 || F.isFiscalPreset(b.defaultPreset)) db.settings.defaultPreset = b.defaultPreset;
+    if (['auto', 'on', 'off'].indexOf(text(b.authMode)) !== -1) db.settings.authMode = text(b.authMode);
     saveDb(); return clone(db.settings);
   }
+
+  const extended = extendedRoute(method, url, body, name, id, q);
+  if (extended !== null) return extended;
   bad('not found', 404);
+}
+
+/* ------------------------------------------------------- احراز هویت و دسترسی */
+function conflict(row, body) {
+  /* همزمانی چند کارشناس: اگر رکورد بعد از بازکردن فرم تغییر کرده باشد،
+   * به‌جای بازنویسی بی‌صدا خطای ۴۰۹ می‌دهیم تا کاربر انتخاب کند. */
+  const base = body && body.baseUpdatedAt;
+  if (base && row && row.updatedAt && String(base) !== String(row.updatedAt) && !body.overwrite) {
+    const e = new Error('این رکورد بعد از بازکردن فرم توسط شخص دیگری ویرایش شده است');
+    e.status = 409; e.conflict = { current: clone(row) };
+    throw e;
+  }
+}
+
+function authRoute(method, id, body) {
+  if (id === 'accounts' && method === 'GET') {
+    return { required: A.authRequired(db), mode: A.authMode(db), accounts: A.accounts(db),
+      firstRun: !A.normalizeUsers(db).length, orgName: db.settings.orgName || '' };
+  }
+  if (id === 'login' && method === 'POST') {
+    const result = A.login(db, (body || {}).name, (body || {}).password);
+    if (!result.ok) bad(result.error, 401);
+    return { ok: true, user: result.user };
+  }
+  if (id === 'logout' && method === 'POST') {
+    /* خروج: نشست همین لایه پاک می‌شود؛ باطل‌کردن خودِ توکن در لایه‌ی میزبان است
+     * (server.js نشست in-memory و Server.gs کلید qctok@… را حذف می‌کند). */
+    session = null;
+    return { ok: true };
+  }
+  if (id === 'me' && method === 'GET') {
+    return { required: A.authRequired(db), user: session ? A.publicUser(session) : null,
+      admin: A.isAdmin(session), accounts: A.accounts(db) };
+  }
+  if (id === 'setup' && method === 'POST') {
+    /* راه‌اندازی اولیه: فقط وقتی هیچ کاربری تعریف نشده مجاز است (بن‌بست مدیر). */
+    if (A.normalizeUsers(db).length) bad('قبلاً کاربری تعریف شده است؛ از بخش مدیریت QC استفاده کنید');
+    const b = body || {};
+    if (!text(b.name)) bad('نام مدیر الزامی است');
+    if (!text(b.password)) bad('رمز مدیر الزامی است');
+    db.qcUsers = [];
+    const row = A.saveUser(db, { name: b.name, password: b.password, role: 'admin', active: true, exts: '*', agents: '', teams: '' });
+    saveDb();
+    return { ok: true, user: A.publicUser(A.normalizeUser(row, 0)) };
+  }
+  bad('not found', 404);
+}
+
+/* کاربران QC (تب QC_Users) — فقط مدیر */
+function qcUsersRoute(method, id, body) {
+  const users = A.normalizeUsers(db);
+  if (method === 'GET' && id == null) {
+    return { users: clone(A.userMask(users)), required: A.authRequired(db), mode: A.authMode(db),
+      teams: [...new Set(db.agents.map((a) => a.team))].sort(),
+      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false }))) };
+  }
+  if (method === 'GET' && id != null) {
+    const u = users.find((x) => String(x.id) === String(id) || x.key === A.normalizeUser({ name: id }).key);
+    if (!u) bad('کاربر یافت نشد', 404);
+    return clone(A.userMask([u])[0]);
+  }
+  if (method === 'POST' || method === 'PUT') {
+    const existing = body && body.id != null && body.id !== ''
+      ? (db.qcUsers || []).find((u) => String(u.id) === String(body.id)) : null;
+    if (method === 'PUT' && !existing) bad('کاربر یافت نشد', 404);
+    const row = A.saveUser(db, body || {}, existing);
+    if (session && A.normalizeUser({ name: session.name }).key === row.name.toLowerCase().replace(/\s/g, '')) {
+      session = A.normalizeUser(row, 0); // تغییر نقش/دسترسی مدیر بلافاصله اعمال شود
+    }
+    saveDb();
+    return { ok: true, user: clone(A.userMask([A.normalizeUser(row, 0)])[0]), users: clone(A.userMask(A.normalizeUsers(db))) };
+  }
+  if (method === 'DELETE' && id != null) {
+    const target = users.find((x) => String(x.id) === String(id));
+    if (!target) bad('کاربر یافت نشد', 404);
+    if (session && target.key === session.key) bad('نمی‌توانید حساب کاربری خودتان را حذف کنید');
+    if (target.role === 'admin' && users.filter((u) => u.role === 'admin' && u.active).length <= 1) {
+      bad('حداقل یک مدیر فعال باید باقی بماند');
+    }
+    A.deleteUser(db, target.name); saveDb();
+    return { ok: true, users: clone(A.userMask(A.normalizeUsers(db))) };
+  }
+  bad('not found', 404);
+}
+
+/* ماه‌های مالی (تب Fiscal_Months) */
+function fiscalRoute(method, id, body) {
+  if (method === 'GET') {
+    const months = F.normalizeMonths(db.fiscalMonths);
+    const today = C.todayJalali();
+    return { months: clone(months), options: F.presetOptions(months, C.formatJalali(today)),
+      current: F.currentMonth(months, C.formatJalali(today)), previous: F.previousMonth(months, C.formatJalali(today)) };
+  }
+  if (method === 'PUT') {
+    const rows = Array.isArray(body && body.months) ? body.months : [];
+    const clean = rows.map((m) => ({ id: text(m.id), name: text(m.name), from: text(m.from), to: text(m.to), note: text(m.note) }))
+      .filter((m) => m.name || m.from || m.to);
+    clean.forEach((m) => {
+      if (!m.name) bad('نام ماه مالی الزامی است');
+      if (!C.parseDate(m.from) || !C.parseDate(m.to)) bad('تاریخ «' + m.name + '» نامعتبر است');
+    });
+    db.fiscalMonths = F.normalizeMonths(clean); saveDb();
+    return { ok: true, months: clone(db.fiscalMonths) };
+  }
+  if (method === 'DELETE' && id != null) {
+    db.fiscalMonths = F.normalizeMonths((db.fiscalMonths || []).filter((m) => m.id !== id));
+    saveDb(); return { ok: true, months: clone(db.fiscalMonths) };
+  }
+  bad('not found', 404);
+}
+
+/* --------------------------------------------------------------- مسیرهای جدید */
+function extendedRoute(method, url, body, name, id, q) {
+  if (name === 'qc-users') return qcUsersRoute(method, id, body);
+  if (name === 'fiscal-months') return fiscalRoute(method, id, body);
+  if (name === 'elements' && method === 'GET') {
+    return E.table(db.settings.callCriteria, [...new Set(db.agents.map((a) => a.team))]);
+  }
+  if (name === 'monthly-summary' && method === 'GET') return F.monthlySummary(db, q);
+  if (name === 'revision' && method === 'GET') return { revision: db.revision || 0, at: Date.now() };
+  return null;
 }
 
 window.LocalApi = {
   // Apps Script uses the same tested route logic on its server-side bundle.
   run(method, url, body) { return route(method, url, body); },
+  /* کاربر واردشده؛ null یعنی بدون احراز هویت (همه‌چیز باز). */
+  setSession(user) { session = user && user.name ? A.normalizeUser(user, 0) : null; return session; },
+  getSession() { return session ? A.publicUser(session) : null; },
+  authRequired() { return A.authRequired(db); },
+  setRevision(value) { db.revision = Number(value) || 0; },
   get(url) { return Promise.resolve().then(() => route('GET', url)); },
   post(url, b) { return Promise.resolve().then(() => route('POST', url, b)); },
   put(url, b) { return Promise.resolve().then(() => route('PUT', url, b)); },

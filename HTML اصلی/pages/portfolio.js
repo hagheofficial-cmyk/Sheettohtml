@@ -14,7 +14,7 @@ async function render(root, arg) {
     </div>
 
     <div class="card" style="margin-bottom:16px">
-      <div class="filters" style="border-bottom:none;align-items:flex-end">
+      <div class="filters plain">
         <div class="field" style="flex:1.4;min-width:220px"><label>جستجوی کارشناس (نام یا داخلی)</label>
           <div style="position:relative">
             <input class="input" id="pSearch" placeholder="مثلاً: الهه عسگری یا ۳۰۱۲ یا 3012" dir="auto" autocomplete="off">

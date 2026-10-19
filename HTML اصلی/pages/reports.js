@@ -93,7 +93,7 @@ async function render(root) {
     </div>
 
     <div class="card" style="margin-bottom:16px">
-      <div class="filters" style="border-bottom:none">
+      <div class="filters plain">
         <div class="field grow-0"><label>نوع ارزیابی</label>
           <div class="tabs" id="typeTabs">
             <button data-t="social" class="active"><i class="fa-solid fa-comments"></i> سوشال</button>

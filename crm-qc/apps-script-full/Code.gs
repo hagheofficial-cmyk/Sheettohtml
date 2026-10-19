@@ -2152,6 +2152,760 @@ return { requireMode, restore, calls, mergeRows, validateBackup, semantic, stabl
 });
 
 
+
+/* ---- shared/access.js ---- */
+/* =========================================================================
+ * access.js — نقش‌ها، رمزها و محدوده‌ی داده‌ی هر کارشناس QC
+ * یک منبع حقیقت برای هر سه اجرا: سرور Node، مرورگر (آفلاین) و Apps Script.
+ *
+ * کاربران در تب `QC_Users` شیت (یا store نسخه Node) نگهداری می‌شوند:
+ *   name      نام کارشناس QC (همان چیزی که در فرم‌ها به‌عنوان qcAgent ثبت می‌شود)
+ *   password  رمز؛ به‌صورت `sha256$<salt>$<hex>` یا متن ساده (برای ویرایش مستقیم روی شیت)
+ *   role      admin | qc
+ *   active    1/0
+ *   exts      داخلی‌های مجاز، جداشده با ویرگول/فاصله؛ `*` یعنی همه
+ *   agents    نام کارشناسان مجاز (اختیاری، مکمل داخلی‌ها)
+ *   teams     نام تیم‌های مجاز (اختیاری)
+ * ========================================================================= */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./calc'), require('./parseQc'));
+  else root.QCAccess = factory(root.QCCalc, root.QCParse);
+})(globalThis, function (C, P) {
+'use strict';
+
+const text = (v) => (v == null ? '' : String(v).trim());
+const clone = (o) => (o == null ? o : JSON.parse(JSON.stringify(o)));
+const nameKey = (s) => (P && P.nameKey ? P.nameKey(s) : text(s).toLowerCase().replace(/\s/g, ''));
+const teamKey = (s) => (P && P.teamKey ? P.teamKey(s) : text(s).toLowerCase().replace(/[\s_/-]/g, ''));
+const digits = (v) => (C && C.faToEn ? C.faToEn(text(v)) : text(v).replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+
+/* صفحه‌هایی که فقط مدیر می‌بیند (بند ۶) و صفحه‌های عملیاتی مشترک. */
+const ADMIN_ROUTES = ['criteria', 'directory', 'agents', 'data', 'qcadmin', 'sheets'];
+const SHARED_ROUTES = ['dashboard', 'tickets', 'tickets-new', 'socials', 'socials-new', 'reports',
+  'portfolio', 'expert-ref', 'expert-review', 'call-analysis', 'callreport', 'reminders'];
+
+/* اندپوینت‌هایی که همیشه مخصوص مدیرند (بدون توجه به نقش درخواست‌کننده). */
+const ADMIN_API = ['/api/criteria', '/api/settings', '/api/qc-users', '/api/fiscal-months', '/api/elements',
+  '/api/backup', '/api/demo', '/api/data', '/api/sheets', '/api/calls/import', '/api/calls/meta',
+  '/api/action-types', '/api/agents'];
+
+/* خواندن‌هایی که برای صفحه‌های عملیاتیِ کارشناس QC لازم‌اند (با داده‌ی محدودشده)؛
+ * وگرنه صفحه‌هایی مثل «پرونده کارشناس» و شمارنده‌های پایین صفحه با ۴۰۳ می‌افتند. */
+const OPEN_API = ['/api/data/status', '/api/agents', '/api/qc-agents', '/api/action-types'];
+
+/* ---------------------------------------------------------- SHA-256 خالص JS
+ * یک پیاده‌سازی کوچک و بدون وابستگی تا hash در Node، مرورگر و Apps Script
+ * دقیقاً یکسان باشد (رمزها روی شیت قابل حمل بمانند). */
+const K256 = [
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2];
+
+function rotr(x, n) { return (x >>> n) | (x << (32 - n)); }
+
+function utf8Bytes(str) {
+  const out = [], s = String(str);
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c < 0x80) out.push(c);
+    else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length && s.charCodeAt(i + 1) >= 0xdc00 && s.charCodeAt(i + 1) <= 0xdfff) {
+      const cp = 0x10000 + ((c - 0xd800) << 10) + (s.charCodeAt(i + 1) - 0xdc00);
+      out.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3f), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+      i++;
+    } else out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+  }
+  return out;
+}
+
+function sha256Hex(message) {
+  const bytes = utf8Bytes(message);
+  const bitLen = bytes.length * 8;
+  bytes.push(0x80);
+  while (bytes.length % 64 !== 56) bytes.push(0);
+  const hi = Math.floor(bitLen / 0x100000000), lo = bitLen >>> 0;
+  bytes.push((hi >>> 24) & 0xff, (hi >>> 16) & 0xff, (hi >>> 8) & 0xff, hi & 0xff,
+             (lo >>> 24) & 0xff, (lo >>> 16) & 0xff, (lo >>> 8) & 0xff, lo & 0xff);
+  let H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+  const w = new Array(64);
+  for (let off = 0; off < bytes.length; off += 64) {
+    for (let i = 0; i < 16; i++) {
+      w[i] = ((bytes[off + i * 4] << 24) | (bytes[off + i * 4 + 1] << 16) |
+              (bytes[off + i * 4 + 2] << 8) | bytes[off + i * 4 + 3]) >>> 0;
+    }
+    for (let i = 16; i < 64; i++) {
+      const x = w[i - 15], y = w[i - 2];
+      const s0 = (rotr(x, 7) ^ rotr(x, 18) ^ (x >>> 3)) >>> 0;
+      const s1 = (rotr(y, 17) ^ rotr(y, 19) ^ (y >>> 10)) >>> 0;
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+    }
+    let a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+    for (let i = 0; i < 64; i++) {
+      const S1 = (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) >>> 0;
+      const ch = ((e & f) ^ (~e & g)) >>> 0;
+      const t1 = (h + S1 + ch + K256[i] + w[i]) >>> 0;
+      const S0 = (rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) >>> 0;
+      const maj = ((a & b) ^ (a & c) ^ (b & c)) >>> 0;
+      const t2 = (S0 + maj) >>> 0;
+      h = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    H = [(H[0] + a) >>> 0, (H[1] + b) >>> 0, (H[2] + c) >>> 0, (H[3] + d) >>> 0,
+         (H[4] + e) >>> 0, (H[5] + f) >>> 0, (H[6] + g) >>> 0, (H[7] + h) >>> 0];
+  }
+  return H.map((x) => ('00000000' + x.toString(16)).slice(-8)).join('');
+}
+
+function randomToken(bytes) {
+  const n = bytes || 16;
+  const g = typeof globalThis !== 'undefined' ? globalThis : root;
+  if (g.crypto && typeof g.crypto.getRandomValues === 'function') {
+    const arr = new Uint8Array(n); g.crypto.getRandomValues(arr);
+    return Array.prototype.map.call(arr, (x) => ('0' + x.toString(16)).slice(-2)).join('');
+  }
+  if (g.Utilities && g.Utilities.getUuid) return String(g.Utilities.getUuid()).replace(/-/g, '').slice(0, n * 2);
+  let out = '';
+  while (out.length < n * 2) out += Math.random().toString(16).slice(2);
+  return out.slice(0, n * 2);
+}
+
+function hashPassword(plain, salt) {
+  const s = salt || randomToken(8);
+  return 'sha256$' + s + '$' + sha256Hex(s + '$' + text(plain));
+}
+
+function isHashed(value) { return /^sha256\$[^$]*\$[0-9a-f]{64}$/i.test(text(value)); }
+
+function verifyPassword(stored, plain) {
+  const s = text(stored), p = text(plain);
+  if (!s) return false;
+  if (isHashed(s)) {
+    const parts = s.split('$');
+    return sha256Hex(parts[1] + '$' + p) === parts[2].toLowerCase();
+  }
+  /* مقدار نوشته‌شده مستقیم روی شیت: مقایسه‌ی متن ساده (با یکدست‌سازی اعداد/فاصله). */
+  return nameKey(s) === nameKey(p) || s === p;
+}
+
+/* ------------------------------------------------------------- نرمال‌سازی */
+function splitList(value) {
+  return text(value).split(/[,،;؛|\n\r\t]+/).map((x) => text(x)).filter(Boolean);
+}
+
+function isWildcard(list) {
+  return (list || []).some((x) => ['*', 'all', 'همه', 'همه‌چیز', '-'].indexOf(digits(x).toLowerCase()) !== -1);
+}
+
+function normalizeUser(row, index) {
+  const r = row || {};
+  const name = P && P.normName ? P.normName(text(r.name)) : text(r.name);
+  const user = {
+    id: r.id == null || r.id === '' ? 'u' + (index + 1) : String(r.id),
+    name: name,
+    key: nameKey(name),
+    password: text(r.password),
+    role: /^ad/i.test(text(r.role)) || text(r.role) === 'مدیر' ? 'admin' : 'qc',
+    active: r.active === undefined || r.active === null || r.active === ''
+      ? true : /^(1|true|yes|y|بله|فعال|on)$/i.test(digits(r.active)),
+    exts: splitList(r.exts).map(digits),
+    agents: splitList(r.agents).map((x) => (P && P.normName ? P.normName(x) : x)),
+    teams: splitList(r.teams).map((x) => (P && P.normName ? P.normName(x) : x)),
+    note: text(r.note),
+    updatedAt: text(r.updatedAt)
+  };
+  user.unrestricted = user.role === 'admin' || isWildcard(user.exts) || isWildcard(user.agents) || isWildcard(user.teams);
+  user.hasScope = user.unrestricted || !!user.exts.length || !!user.agents.length || !!user.teams.length;
+  return user;
+}
+
+function normalizeUsers(db) {
+  const rows = (db && Array.isArray(db.qcUsers) ? db.qcUsers : []);
+  const seen = new Set(), out = [];
+  rows.forEach((row, i) => {
+    const u = normalizeUser(row, i);
+    if (!u.name || seen.has(u.key)) return;
+    seen.add(u.key); out.push(u);
+  });
+  return out;
+}
+
+function authMode(db) {
+  const mode = text(db && db.settings && db.settings.authMode).toLowerCase();
+  return mode === 'on' || mode === 'off' ? mode : 'auto';
+}
+
+function authRequired(db) {
+  const mode = authMode(db);
+  if (mode === 'off') return false;
+  if (mode === 'on') return true;
+  return normalizeUsers(db).some((u) => u.active && u.password);
+}
+
+function findUser(users, name) {
+  const key = nameKey(P && P.normName ? P.normName(text(name)) : text(name));
+  return (users || []).find((u) => u.key === key) || null;
+}
+
+function login(db, name, password) {
+  const users = normalizeUsers(db);
+  const user = findUser(users, name);
+  if (!user) return { ok: false, error: 'کاربری با این نام تعریف نشده است' };
+  if (!user.active) return { ok: false, error: 'دسترسی این کاربر غیرفعال شده است' };
+  if (!verifyPassword(user.password, password)) return { ok: false, error: 'رمز واردشده درست نیست' };
+  return { ok: true, user: publicUser(user) };
+}
+
+function publicUser(user) {
+  return { name: user.name, role: user.role, active: user.active,
+    exts: user.exts.slice(), agents: user.agents.slice(), teams: user.teams.slice(),
+    note: user.note, unrestricted: !!user.unrestricted, hasScope: !!user.hasScope };
+}
+
+/* فهرست حساب‌ها برای صفحه‌ی ورود (بدون رمز). */
+function accounts(db) {
+  return normalizeUsers(db).filter((u) => u.active).map((u) => ({ name: u.name, role: u.role }));
+}
+
+/* ------------------------------------------------------- محدوده‌ی داده */
+function allowedAgentNames(db, user) {
+  if (!user) return null;
+  if (user.role === 'admin' || user.unrestricted) return null; // null = بدون محدودیت
+  const agents = (db && db.agents) || [];
+  const exts = new Set((user.exts || []).map(digits));
+  const names = new Set((user.agents || []).map(nameKey));
+  const teams = new Set((user.teams || []).map(teamKey));
+  const out = new Set();
+  agents.forEach((a) => {
+    const hit = (a.ext != null && a.ext !== '' && exts.has(digits(a.ext))) ||
+      names.has(nameKey(a.name)) || (a.aliases || []).some((al) => names.has(nameKey(al))) ||
+      (a.team && teams.has(teamKey(a.team)));
+    if (hit) out.add(text(a.name));
+  });
+  return out;
+}
+
+function recordById(db, path, id) {
+  const key = String(id);
+  if (path.indexOf('/api/tickets') === 0) return (db.tickets || []).find((x) => String(x.id) === key) || null;
+  if (path.indexOf('/api/socials') === 0) return (db.socials || []).find((x) => String(x.id) === key) || null;
+  if (path.indexOf('/api/reminders') === 0) return (db.reminders || []).find((x) => String(x.id) === key) || null;
+  if (path.indexOf('/api/actions') === 0) {
+    const map = db.agentActions || {};
+    for (const name of Object.keys(map)) {
+      const hit = (map[name] || []).find((x) => String(x.id) === key);
+      if (hit) return Object.assign({ agent: name }, hit);
+    }
+  }
+  return null;
+}
+
+function agentOfRecord(row) {
+  if (!row) return '';
+  return text(row.agentName || row.sourceAgentName || row.expertName || row.sourceExpertName || row.agent || '');
+}
+
+function isAllowedName(allowed, name) {
+  if (!allowed) return true;
+  const n = text(name);
+  if (!n) return false;
+  return allowed.has(n);
+}
+
+/* کپی محدودشده‌ی db برای خواندن (هرگز خود db را تغییر نمی‌دهد). */
+function scopeDb(db, user) {
+  if (!db || !user || user.role === 'admin' || user.unrestricted) return db;
+  const allowed = allowedAgentNames(db, user);
+  const keepRow = (row) => isAllowedName(allowed, agentOfRecord(row));
+  const out = Object.assign({}, db);
+  out.agents = (db.agents || []).filter((a) => isAllowedName(allowed, a.name));
+  out.tickets = (db.tickets || []).filter(keepRow);
+  out.socials = (db.socials || []).filter(keepRow);
+  out.callFeedbacks = (db.callFeedbacks || []).filter(keepRow);
+  out.reminders = (db.reminders || []).filter(keepRow);
+  const actions = {};
+  Object.keys(db.agentActions || {}).forEach((name) => { if (isAllowedName(allowed, name)) actions[name] = db.agentActions[name]; });
+  out.agentActions = actions;
+  out.__scope = { user: user.name, agents: out.agents.length };
+  return out;
+}
+
+/* دسترسی نوشتن: مدیر آزاد؛ کارشناس QC فقط روی رکوردهای مجاز. */
+function writeGuard(db, user, method, pathname, body) {
+  if (!authRequired(db)) return { ok: true };
+  if (!user) return { ok: false, status: 401, error: 'برای این کار باید وارد سامانه شوید' };
+  if (user.role === 'admin' || user.unrestricted) return { ok: true };
+  const path = String(pathname || '');
+  if (method === 'GET') return { ok: true };
+  if (ADMIN_API.some((p) => path === p || path.indexOf(p + '/') === 0)) {
+    return { ok: false, status: 403, error: 'این بخش فقط برای مدیر سیستم باز است' };
+  }
+  const scopedWrite = ['/api/tickets', '/api/socials', '/api/actions', '/api/reminders'];
+  if (!scopedWrite.some((p) => path === p || path.indexOf(p + '/') === 0)) {
+    return { ok: false, status: 403, error: 'اجازه‌ی این تغییر را ندارید' };
+  }
+  const allowed = allowedAgentNames(db, user);
+  const candidates = [];
+  const b = body || {};
+  ['agentName', 'sourceAgentName', 'expertName', 'agent'].forEach((k) => { if (text(b[k])) candidates.push(text(b[k])); });
+  const id = path.split('/')[3];
+  if (id != null && id !== '') {
+    const row = recordById(db, path, id);
+    if (row) candidates.push(agentOfRecord(row));
+  }
+  if (!candidates.length) return { ok: false, status: 400, error: 'کارشناس این رکورد مشخص نیست' };
+  const denied = candidates.filter((name) => !isAllowedName(allowed, name));
+  if (denied.length) {
+    return { ok: false, status: 403, error: 'به داده‌ی کارشناس «' + denied[0] + '» دسترسی ندارید' };
+  }
+  return { ok: true };
+}
+
+/* ------------------------------------------------------------ دسترسی UI */
+function isAdmin(user) { return !!user && (user.role === 'admin' || !!user.unrestricted); }
+
+function canAccessRoute(user, route, authOn) {
+  if (!authOn) return true; // وقتی هیچ کاربری تعریف نشده، همه‌چیز باز است
+  if (!user) return false;
+  if (isAdmin(user)) return true;
+  const key = String(route || '');
+  return SHARED_ROUTES.includes(key) || SHARED_ROUTES.includes(key.replace(/-new$/, ''));
+}
+
+function visibleRoutes(user, authOn) {
+  return SHARED_ROUTES.concat(ADMIN_ROUTES).filter((r) => canAccessRoute(user, r, authOn));
+}
+
+function canAccessApi(db, user, method, pathname) {
+  if (!authRequired(db)) return { ok: true };
+  if (!user) return { ok: false, status: 401, error: 'نشست شما معتبر نیست؛ دوباره وارد شوید' };
+  if (isAdmin(user)) return { ok: true };
+  const path = String(pathname || '').split('?')[0];
+  if (method === 'GET' && OPEN_API.some((p) => path === p || path.indexOf(p + '/') === 0)) return { ok: true };
+  if (ADMIN_API.some((p) => path === p || path.indexOf(p + '/') === 0)) {
+    return { ok: false, status: 403, error: 'این بخش فقط برای مدیر سیستم باز است' };
+  }
+  return { ok: true };
+}
+
+/* ویرایش کاربر توسط مدیر (ساخت/به‌روزرسانی رکورد تب QC_Users). */
+function saveUser(db, body, existing) {
+  const users = Array.isArray(db.qcUsers) ? db.qcUsers : (db.qcUsers = []);
+  const fail = (message, status) => { const e = new Error(message); e.status = status || 400; throw e; };
+  const name = P && P.normName ? P.normName(text(body.name)) : text(body.name);
+  if (!name) fail('نام کارشناس QC الزامی است');
+  const key = nameKey(name);
+  const clash = users.find((u) => nameKey(u.name) === key && (!existing || String(u.id) !== String(existing.id)));
+  if (clash) fail('کاربری با این نام قبلاً تعریف شده است');
+  let row;
+  if (existing) row = Object.assign({}, existing);
+  else {
+    const maxId = users.reduce((m, u) => Math.max(m, Number(String(u.id || '').replace(/\D/g, '')) || 0), 0);
+    row = { id: 'u' + (maxId + 1) };
+  }
+  row.name = name;
+  row.role = /^ad/i.test(text(body.role)) ? 'admin' : 'qc';
+  row.active = body.active === undefined ? true : !!body.active;
+  row.exts = Array.isArray(body.exts) ? body.exts.map(digits).filter(Boolean).join(',') : text(body.exts);
+  row.agents = Array.isArray(body.agents) ? body.agents.map(text).filter(Boolean).join(',') : text(body.agents);
+  row.teams = Array.isArray(body.teams) ? body.teams.map(text).filter(Boolean).join(',') : text(body.teams);
+  row.note = text(body.note);
+  row.updatedAt = new Date().toISOString();
+  const plain = body.password == null ? '' : text(body.password);
+  if (plain) {
+    if (plain.length < 4) fail('رمز باید حداقل ۴ نویسه باشد');
+    row.password = hashPassword(plain);
+  } else if (!existing) fail('رمز اولیه الزامی است');
+  if (!existing) users.push(row);
+  /* نام کارشناس QC باید در فهرست qcAgents هم باشد تا در فرم‌ها قابل انتخاب باشد. */
+  if (!Array.isArray(db.qcAgents)) db.qcAgents = [];
+  if (!db.qcAgents.some((x) => nameKey(x) === key)) db.qcAgents.push(name);
+  return clone(row);
+}
+
+function deleteUser(db, name) {
+  const users = Array.isArray(db.qcUsers) ? db.qcUsers : [];
+  const key = nameKey(P && P.normName ? P.normName(text(name)) : text(name));
+  const found = users.find((u) => nameKey(u.name) === key);
+  if (!found) { const e = new Error('کاربر یافت نشد'); e.status = 404; throw e; }
+  db.qcUsers = users.filter((u) => u !== found);
+  return { ok: true };
+}
+
+/* ردیف‌های آماده‌ی نوشتن روی تب (بدون رمز hash‌شده؟ رمز hash می‌ماند). */
+function usersToRows(users) {
+  return (users || []).map((u) => ({ id: u.id, name: u.name, password: u.password, role: u.role,
+    active: u.active ? 1 : 0, exts: (u.exts || []).join(','), agents: (u.agents || []).join(','),
+    teams: (u.teams || []).join(','), note: u.note || '' }));
+}
+
+function userMask(users) {
+  return (users || []).map((u) => Object.assign({}, u, { password: u.password ? '••••••' : '' }));
+}
+
+return {
+  sha256Hex: sha256Hex, hashPassword: hashPassword, verifyPassword: verifyPassword, isHashed: isHashed,
+  randomToken: randomToken, splitList: splitList, normalizeUser: normalizeUser, normalizeUsers: normalizeUsers,
+  authMode: authMode, authRequired: authRequired, findUser: findUser, login: login, accounts: accounts,
+  publicUser: publicUser, allowedAgentNames: allowedAgentNames, scopeDb: scopeDb, writeGuard: writeGuard,
+  canAccessApi: canAccessApi, canAccessRoute: canAccessRoute, visibleRoutes: visibleRoutes, isAdmin: isAdmin,
+  saveUser: saveUser, deleteUser: deleteUser, usersToRows: usersToRows, userMask: userMask,
+  ADMIN_ROUTES: ADMIN_ROUTES, SHARED_ROUTES: SHARED_ROUTES, ADMIN_API: ADMIN_API, OPEN_API: OPEN_API
+};
+});
+
+
+
+/* ---- shared/fiscal.js ---- */
+/* =========================================================================
+ * fiscal.js — ماه‌های مالی و خلاصه‌ی ماهانه‌ی آماده (بند ۲ و ۸)
+ *
+ * ماه‌های مالی در تب `Fiscal_Months` شیت نوشته می‌شوند:
+ *   name  نام ماه مالی (مثلاً «مهر ۱۴۰۵» یا «دوره ۰۷»)
+ *   from  تاریخ شروع (جلالی، مثل 1405/07/01)
+ *   to    تاریخ پایان (جلالی)
+ * چون منبع داده خودِ شیت است، تاریخ‌ها را می‌توان مستقیم روی شیت ویرایش کرد؛
+ * سامانه در هر بار خواندن آن‌ها را به «بازه آماده» تبدیل می‌کند.
+ *
+ * خلاصه‌ی ماهانه (تب `Monthly_Summary`) همان اعدادی است که گزارش‌ها می‌سازند،
+ * اما از قبل محاسبه و روی شیت نوشته شده‌اند تا بررسی/خروجی گرفتن سریع باشد.
+ * ========================================================================= */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./calc'));
+  else root.QCFiscal = factory(root.QCCalc);
+})(globalThis, function (C) {
+'use strict';
+
+const text = (v) => (v == null ? '' : String(v).trim());
+const avg = (nums) => {
+  const list = (nums || []).map(Number).filter((n) => !isNaN(n));
+  return list.length ? Math.round((list.reduce((a, b) => a + b, 0) / list.length) * 100) / 100 : '';
+};
+
+function monthOf(value) {
+  const j = C.parseDate(value);
+  if (!j) return null;
+  return { jy: j.jy, jm: j.jm, key: j.jy + '/' + ('0' + j.jm).slice(-2), label: C.jalaliMonthLabel(j.jy, j.jm) };
+}
+
+/* ------------------------------------------------------------- ماه مالی */
+function normalizeMonths(rows) {
+  const out = [];
+  (rows || []).forEach((row, i) => {
+    const from = C.parseDate(row && row.from), to = C.parseDate(row && row.to);
+    if (!from || !to) return;
+    if (C.jalaliCmp(from, to) > 0) return; // بازه‌ی وارونه نادیده گرفته می‌شود
+    const name = text(row.name) || C.jalaliMonthLabel(from.jy, from.jm);
+    out.push({
+      id: text(row.id) || 'fm' + (i + 1),
+      name: name,
+      from: C.formatJalali(from),
+      to: C.formatJalali(to),
+      note: text(row.note)
+    });
+  });
+  out.sort((a, b) => C.jalaliCmp(C.parseDate(a.from), C.parseDate(b.from)) || C.jalaliCmp(C.parseDate(a.to), C.parseDate(b.to)));
+  return out;
+}
+
+function monthById(months, id) {
+  return (months || []).find((m) => m.id === text(id)) || null;
+}
+
+function monthOfDate(months, date) {
+  const j = C.parseDate(date || C.todayJalali());
+  if (!j) return null;
+  return (months || []).find((m) => C.jalaliInRange(j, C.parseDate(m.from), C.parseDate(m.to))) || null;
+}
+
+function currentIndex(months, today) {
+  const list = months || [];
+  const hit = monthOfDate(list, today);
+  if (hit) return list.indexOf(hit);
+  const t = C.parseDate(today || C.todayJalali());
+  let idx = -1;
+  list.forEach((m, i) => { if (t && C.jalaliCmp(C.parseDate(m.from), t) <= 0) idx = i; });
+  return idx >= 0 ? idx : (list.length ? 0 : -1);
+}
+
+function currentMonth(months, today) {
+  const i = currentIndex(months, today);
+  return i < 0 ? null : months[i];
+}
+
+function previousMonth(months, today) {
+  const i = currentIndex(months, today);
+  if (i < 0) return null;
+  return months[i - 1] || null;
+}
+
+/* مقدار «بازه آماده» → بازه‌ی واقعی. کلیدها: fm:cur | fm:prev | fm:<id> */
+function presetRange(months, preset, today) {
+  const list = months || [];
+  if (!list.length || !/^fm:/.test(text(preset))) return null;
+  const id = text(preset).slice(3);
+  const month = id === 'cur' ? currentMonth(list, today) : id === 'prev' ? previousMonth(list, today) : monthById(list, id);
+  return month ? { from: month.from, to: month.to, preset: preset } : null;
+}
+
+function isFiscalPreset(preset) { return /^fm:/.test(text(preset)); }
+
+/* گزینه‌های dropdown (با برچسب فارسی و بازه‌ی readable). */
+function presetOptions(months, today) {
+  const list = normalizeMonths(months);
+  if (!list.length) return [];
+  const cur = currentMonth(list, today), prev = previousMonth(list, today);
+  const span = (m) => m ? m.from + ' تا ' + m.to : '';
+  const options = [];
+  if (cur) options.push({ value: 'fm:cur', label: 'ماه مالی جاری — ' + cur.name, group: 'ماه مالی', hint: span(cur) });
+  if (prev) options.push({ value: 'fm:prev', label: 'ماه مالی قبل — ' + prev.name, group: 'ماه مالی', hint: span(prev) });
+  list.slice().reverse().forEach((m) => {
+    options.push({ value: 'fm:' + m.id, label: m.name, group: 'همه ماه‌های مالی', hint: span(m) });
+  });
+  return options;
+}
+
+function labelFor(months, date) {
+  const m = monthOfDate(months, date);
+  return m ? m.name : '';
+}
+
+/* ------------------------------------------------------- خلاصه‌ی ماهانه */
+function redlineOf(row, kind) {
+  if (kind === 'call') return !!(row && row.redline);
+  if (kind === 'social') return false;
+  return !!(row && row.redline);
+}
+
+function monthlySummary(db, opts) {
+  const o = opts || {};
+  const from = o.from ? C.parseDate(o.from) : null;
+  const to = o.to ? C.parseDate(o.to) : null;
+  const months = normalizeMonths(db && db.fiscalMonths);
+  const agents = (db && db.agents) || [];
+  const groups = new Map();
+
+  function ensure(month, name, team) {
+    const key = month.key + '|' + name;
+    if (!groups.has(key)) {
+      const agent = agents.find((a) => a.name === name) || null;
+      groups.set(key, {
+        month: month.key, monthLabel: month.label, fiscal: labelFor(months, month.key + '/01'),
+        agent: name, ext: agent ? text(agent.ext) : '', team: text(team || (agent && agent.team) || ''),
+        ticketScores: [], socialScores: [], callScores: [],
+        ticketRedline: 0, socialRedline: 0, callRedline: 0,
+        qc: new Set(), actions: 0
+      });
+    }
+    return groups.get(key);
+  }
+
+  function inRange(row) {
+    const j = C.parseDate(row && row.reviewDate);
+    if (!j) return null;
+    if (from && C.jalaliCmp(j, from) < 0) return null;
+    if (to && C.jalaliCmp(j, to) > 0) return null;
+    return monthOf(row.reviewDate);
+  }
+
+  ((db && db.tickets) || []).forEach((r) => {
+    const m = inRange(r); const name = text(r.agentName);
+    if (!m || !name) return;
+    const g = ensure(m, name, r.team);
+    if (r.score !== '' && r.score != null) g.ticketScores.push(Number(r.score));
+    if (redlineOf(r, 'ticket')) g.ticketRedline++;
+    if (text(r.qcAgent)) g.qc.add(text(r.qcAgent));
+  });
+  ((db && db.socials) || []).forEach((r) => {
+    const m = inRange(r); const name = text(r.agentName);
+    if (!m || !name) return;
+    const g = ensure(m, name, r.team);
+    if (r.score !== '' && r.score != null) g.socialScores.push(Number(r.score));
+    if (text(r.qcAgent)) g.qc.add(text(r.qcAgent));
+  });
+  ((db && db.callFeedbacks) || []).forEach((r) => {
+    const m = inRange(r); const name = text(r.expertName);
+    if (!m || !name) return;
+    const g = ensure(m, name, r.team);
+    if (r.score !== '' && r.score != null) g.callScores.push(Number(r.score));
+    if (redlineOf(r, 'call')) g.callRedline++;
+    if (text(r.qcAgent)) g.qc.add(text(r.qcAgent));
+  });
+  Object.keys((db && db.agentActions) || {}).forEach((name) => {
+    (((db && db.agentActions) || {})[name] || []).forEach((a) => {
+      const m = monthOf(a && a.date);
+      if (!m) return;
+      if (from && C.jalaliCmp(C.parseDate(a.date), from) < 0) return;
+      if (to && C.jalaliCmp(C.parseDate(a.date), to) > 0) return;
+      ensure(m, text(name), '').actions++;
+    });
+  });
+
+  const rows = Array.from(groups.values()).map((g) => {
+    const all = g.ticketScores.concat(g.socialScores, g.callScores);
+    return {
+      month: g.month, monthLabel: g.monthLabel, fiscal: g.fiscal,
+      agent: g.agent, ext: g.ext, team: g.team,
+      qcAgents: Array.from(g.qc).join('، '),
+      tickets: g.ticketScores.length, ticketAvg: avg(g.ticketScores), ticketRedline: g.ticketRedline,
+      socials: g.socialScores.length, socialAvg: avg(g.socialScores), socialRedline: g.socialRedline,
+      calls: g.callScores.length, callAvg: avg(g.callScores), callRedline: g.callRedline,
+      totalCount: all.length, combinedAvg: avg(all),
+      redlines: g.ticketRedline + g.callRedline, actions: g.actions
+    };
+  }).sort((a, b) => (a.month < b.month ? 1 : a.month > b.month ? -1 : a.agent.localeCompare(b.agent, 'fa')));
+
+  return {
+    generatedAt: new Date().toISOString(),
+    range: { from: from ? C.formatJalali(from) : '', to: to ? C.formatJalali(to) : '' },
+    months: Array.from(new Set(rows.map((r) => r.month))).sort().reverse(),
+    count: rows.length,
+    rows: rows
+  };
+}
+
+return {
+  monthOf: monthOf, normalizeMonths: normalizeMonths, monthById: monthById, monthOfDate: monthOfDate,
+  currentMonth: currentMonth, previousMonth: previousMonth, currentIndex: currentIndex,
+  presetRange: presetRange, presetOptions: presetOptions, isFiscalPreset: isFiscalPreset,
+  labelFor: labelFor, monthlySummary: monthlySummary
+};
+});
+
+
+
+/* ---- shared/elements.js ---- */
+/* =========================================================================
+ * elements.js — نگاشت المان‌ها بین پیکربندی JSON و تب تخت `Elements` (بند ۹)
+ *
+ * تب Elements روی شیت یک ردیف برای هر المان دارد تا مستقیم قابل ویرایش باشد:
+ *   scope   form | team     (form = تعریف پیش‌فرض کل فرم، team = فقط همان تیم)
+ *   team    نام تیم (برای scope=team)
+ *   form    نوع فرم: tele | account | mlm
+ *   key     شناسه‌ی پایدار المان (هرگز تغییر نکند؛ تاریخچه به آن وابسته است)
+ *   label   نام فارسی المان (در سامانه دیده می‌شود)
+ *   excelKey نام ستون در فایل اکسل دریافتی (برای نگاشت خودکار هنگام import)
+ *   active  1/0
+ *   aliases ستون‌های قدیمی/جایگزین، جداشده با «|»
+ *   order   ترتیب نمایش
+ *
+ * قاعده‌ی ادغام: هر scope که در تب ردیف دارد، کاملاً با ردیف‌های همان scope
+ * تعریف می‌شود؛ scope‌های بدون ردیف از پیکربندی قبلی دست‌نخورده می‌مانند.
+ * اگر excelKey روی شیت عوض شود، مقدار قبلی خودکار به aliases اضافه می‌شود تا
+ * نمره‌های تاریخی از دست نروند.
+ * ========================================================================= */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./parseQc'));
+  else root.QCElements = factory(root.QCParse);
+})(globalThis, function (P) {
+'use strict';
+
+const text = (v) => (v == null ? '' : String(v).trim());
+const clone = (o) => (o == null ? o : JSON.parse(JSON.stringify(o)));
+const truthy = (v) => v === undefined || v === null || v === '' ? true : /^(1|true|yes|y|on|فعال|بله)$/i.test(text(v));
+
+function aliasesOf(value) {
+  return text(value).split(/[|،,;؛\n\r\t]+/).map(text).filter(Boolean);
+}
+
+function emptyConfig() { return { version: 0, forms: {}, teams: {} }; }
+
+/* پیکربندی → ردیف‌های تخت (برای نوشتن روی تب). */
+function criteriaToRows(cfg) {
+  const config = cfg || emptyConfig();
+  const rows = [];
+  let order = 0;
+  Object.keys(config.forms || {}).forEach((form) => {
+    (config.forms[form] || []).forEach((d) => {
+      rows.push({ scope: 'form', team: '', form: form, key: text(d.key), label: text(d.label),
+        excelKey: text(d.excelKey), active: d.active !== false ? 1 : 0,
+        aliases: (d.aliases || []).join('|'), order: ++order });
+    });
+  });
+  Object.keys(config.teams || {}).forEach((id) => {
+    const entry = config.teams[id] || {};
+    (entry.elements || []).forEach((d) => {
+      rows.push({ scope: 'team', team: text(entry.team), form: text(entry.form), key: text(d.key),
+        label: text(d.label), excelKey: text(d.excelKey), active: d.active !== false ? 1 : 0,
+        aliases: (d.aliases || []).join('|'), order: ++order });
+    });
+  });
+  return rows;
+}
+
+function teamId(team) { return P && P.teamKey ? P.teamKey(team) : text(team).toLowerCase().replace(/[\s_/-]/g, ''); }
+
+function definitionsFrom(rows) {
+  return rows.map((r) => ({
+    key: text(r.key),
+    label: text(r.label),
+    excelKey: text(r.excelKey),
+    active: truthy(r.active),
+    aliases: aliasesOf(r.aliases)
+  })).filter((d) => d.key);
+}
+
+/* ردیف‌های تخت → پیکربندی (برای خواندن از تب؛ base پیکربندی قبلی است). */
+function rowsToCriteria(rows, base) {
+  const cfg = clone(base) || emptyConfig();
+  cfg.forms = cfg.forms || {}; cfg.teams = cfg.teams || {};
+  const list = (rows || []).filter((r) => text(r.key));
+  if (!list.length) return cfg;
+
+  const previousElement = (scopeTeam, form, key) => {
+    const source = scopeTeam ? (cfg.teams[teamId(scopeTeam)] || {}).elements : cfg.forms[form];
+    return (source || []).find((d) => d.key === key) || null;
+  };
+
+  const merged = (r) => {
+    const before = previousElement(text(r.team), text(r.form), text(r.key));
+    const aliases = new Set(aliasesOf(r.aliases).concat((before && before.aliases) || []));
+    const excelKey = text(r.excelKey);
+    if (before && text(before.excelKey) && text(before.excelKey) !== excelKey) aliases.add(text(before.excelKey));
+    aliases.delete(excelKey);
+    return { key: text(r.key), label: text(r.label) || (before && before.label) || text(r.key),
+      excelKey: excelKey || (before && before.excelKey) || '', active: truthy(r.active), aliases: Array.from(aliases) };
+  };
+
+  const formRows = new Map(), teamRows = new Map();
+  list.slice().sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)).forEach((r) => {
+    const scope = /^team/i.test(text(r.scope)) ? 'team' : 'form';
+    if (scope === 'team') {
+      const id = teamId(r.team);
+      if (!id) return;
+      if (!teamRows.has(id)) teamRows.set(id, { team: text(r.team), form: text(r.form), elements: [] });
+      const entry = teamRows.get(id);
+      if (!entry.form) entry.form = text(r.form);
+      entry.elements.push(merged(r));
+    } else {
+      const form = text(r.form);
+      if (!form) return;
+      if (!formRows.has(form)) formRows.set(form, []);
+      formRows.get(form).push(merged(r));
+    }
+  });
+
+  formRows.forEach((elements, form) => { if (elements.length) cfg.forms[form] = elements; });
+  teamRows.forEach((entry, id) => { if (entry.elements.length) cfg.teams[id] = entry; });
+  return cfg;
+}
+
+/* جدول تخت برای نمایش در سامانه (هر ردیف = یک المان). */
+function table(cfg, teams) {
+  const rows = criteriaToRows(cfg);
+  return { rows: rows, teams: (teams || []).slice(), version: Number((cfg || {}).version || 0) };
+}
+
+return {
+  criteriaToRows: criteriaToRows, rowsToCriteria: rowsToCriteria, table: table,
+  aliasesOf: aliasesOf, emptyConfig: emptyConfig, teamId: teamId
+};
+});
+
+
 /* ---- Initial reference data; copied into tabs only by setupStandaloneApp. ---- */
 window.QC_SEED = {"version":1,"agents":[{"id":1,"ext":3073,"name":"مبینا سیدآبادی","team":"Tele sales","active":true},{"id":2,"ext":3082,"name":"حامد میرزایی","team":"Tele sales","active":true},{"id":3,"ext":3086,"name":"محمد توجهی","team":"Tele sales","active":true},{"id":4,"ext":3090,"name":"هلیا هنرکار","team":"Tele sales","active":true},{"id":5,"ext":3095,"name":"مهناز جبارزاده","team":"Tele sales","active":true},{"id":6,"ext":3097,"name":"جواهر باکودزفولی","team":"Tele sales","active":true},{"id":7,"ext":3109,"name":"پریناز ناظمیان پور","team":"Tele sales","active":true},{"id":8,"ext":3110,"name":"آزاده فیروزی","team":"Tele sales","active":true},{"id":9,"ext":3127,"name":"سجاد موسوی","team":"Tele sales","active":true},{"id":10,"ext":3129,"name":"محمدایلیا ممانی","team":"Tele sales","active":true},{"id":11,"ext":3132,"name":"بردیا جانفشان","team":"Tele sales","active":true},{"id":12,"ext":3136,"name":"آتوسا آرامی","team":"Tele sales","active":true},{"id":13,"ext":3140,"name":"آتنا نوربخش","team":"Tele sales","active":true},{"id":14,"ext":3145,"name":"یگانه ویسی","team":"Tele sales","active":true},{"id":15,"ext":3165,"name":"مهتاب چراغی","team":"Tele sales","active":true},{"id":16,"ext":3196,"name":"محمدمهدی علیپور","team":"Tele sales","active":true},{"id":17,"ext":3204,"name":"هانیه معزز","team":"Tele sales","active":true},{"id":18,"ext":3212,"name":"آسیه احمدی فر","team":"Tele sales","active":true},{"id":19,"ext":3214,"name":"مهرداد سعیدمهدوی","team":"Tele sales","active":true},{"id":20,"ext":3220,"name":"آرزو محمودکلایه","team":"Tele sales","active":true},{"id":21,"ext":3222,"name":"صبا یاری","team":"Tele sales","active":true},{"id":22,"ext":3226,"name":"مریم رئوف","team":"Tele sales","active":true},{"id":23,"ext":3238,"name":"محدثه کریمی","team":"Tele sales","active":true},{"id":24,"ext":3239,"name":"سارا زرآینه","team":"Tele sales","active":true},{"id":25,"ext":3241,"name":"سحر ثامنی","team":"Tele sales","active":true},{"id":26,"ext":3242,"name":"زهرا شجاعی","team":"Tele sales","active":true},{"id":27,"ext":3244,"name":"صدیقه هوشمندی","team":"Tele sales","active":true},{"id":28,"ext":3258,"name":"امیررادمان رشیدی","team":"Tele sales","active":true},{"id":29,"ext":3259,"name":"مهسا موسوی","team":"Tele sales","active":true},{"id":30,"ext":3266,"name":"حامد جبروتی","team":"Tele sales","active":true},{"id":31,"ext":3268,"name":"نرگس پورخلیلی","team":"Tele sales","active":true},{"id":32,"ext":3274,"name":"لیلا بیاتی","team":"Tele sales","active":true},{"id":33,"ext":3022,"name":"رعنا غیاثی‌نژاد","team":"MLM","active":true},{"id":34,"ext":3246,"name":"محمد بوئینی","team":"MLM","active":true},{"id":35,"ext":3249,"name":"شاهین حسنی زاد","team":"MLM","active":true},{"id":36,"ext":3065,"name":"نیوشا موسوی","team":"MLM","active":true},{"id":37,"ext":3265,"name":"پوریا لرستانی","team":"MLM","active":true},{"id":38,"ext":3172,"name":"الهه عسگری","team":"MLM","active":true},{"id":39,"ext":3173,"name":"سمیرا شکیب","team":"MLM","active":true},{"id":40,"ext":3248,"name":"سپهر فلاح دوست بدایی","team":"MLM","active":true},{"id":41,"ext":3245,"name":"مائده بهنامی‌فر","team":"MLM","active":true},{"id":42,"ext":3146,"name":"الهام شمس نیا","team":"Account","active":true},{"id":43,"ext":3111,"name":"ریحانه روح بخش","team":"Account","active":true},{"id":44,"ext":3081,"name":"سیما معصومی","team":"Account","active":true},{"id":45,"ext":3118,"name":"نرگس یوسفیان","team":"Account","active":true},{"id":46,"ext":3261,"name":"هانیه مظهری","team":"Account","active":true},{"id":47,"ext":3263,"name":"ترانه محمودی","team":"Account","active":true},{"id":48,"ext":3264,"name":"زینب میرزاده","team":"Account","active":true},{"id":49,"ext":3210,"name":"آیسان نورافکن","team":"Account","active":true},{"id":50,"ext":3155,"name":"پریا شیشه گر","team":"Account","active":true},{"id":51,"ext":3176,"name":"سیده متین سید حسینی","team":"Account","active":true},{"id":52,"ext":3067,"name":"عارفه ایزدان","team":"Account","active":true},{"id":53,"ext":3151,"name":"متین تدین خواه","team":"Account","active":true},{"id":54,"ext":3125,"name":"مریم بیات","team":"Account","active":true},{"id":55,"ext":3128,"name":"نیلوفر رنجبر","team":"Account","active":true},{"id":56,"ext":3069,"name":"آنیتا کرمانشاه","team":"Account","active":true},{"id":57,"ext":3079,"name":"زهرا میرزائی","team":"Account","active":true},{"id":58,"ext":3194,"name":"عاطفه گلباز","team":"Account","active":true},{"id":59,"ext":3103,"name":"مائده سرمدی","team":"Account","active":true},{"id":60,"ext":3122,"name":"محمدرضا محتشمیان کاشانی","team":"Account","active":true},{"id":61,"ext":3225,"name":"مینا فرنام","team":"Account","active":true},{"id":62,"ext":3106,"name":"هما میرزائی","team":"Account","active":true},{"id":63,"ext":3276,"name":"فاطمه حسنوند","team":"Account","active":true},{"id":64,"ext":3275,"name":"شادی قنبری","team":"Account","active":true},{"id":65,"ext":3139,"name":"علیرضا قمی","team":"BNPL","active":true}],"qcAgents":["هادی","مبینا","شیدا","هانیه"],"lists":{"messengers":["بله","روبیکا","ایتا","تلگرام","واتساپ","پیامک"],"responseStatuses":["پاسخ داده شده","عدم پاسخ"],"delayReasons":["ندارد","اختلال سامانه یا پیام‌رسان","خارج از ساعت کاری","عدم دسترسی به اطلاعات ضروری","حجم بالای پیام‌ها","فراموشی یا عدم پیگیری","سایر"],"reasonVerdicts":["موجه و تأییدشده","بدون دلیل موجه","در انتظار بررسی"]},"settings":{"ticketWeights":[40,20,20,20],"socialWeights":[30,30,25,15],"slaMinutes":60,"workStart":"09:00","workEnd":"18:00","weekendDays":[4,5],"orgName":"سامانه یکپارچه کنترل کیفیت","scoreBands":[90,75,50],"defaultPreset":"cur"}};
 
@@ -2162,7 +2916,10 @@ window.QC_SEED = {"version":1,"agents":[{"id":1,"ext":3073,"name":"مبینا س
 'use strict';
 const C = window.QCCalc, R = window.QCReports, KEY = 'crmqc.db.v1';
 const Registry = window.QCRegistry, ImportData = window.QCImport, X = window.QCExpertRef;
+const A = window.QCAccess, F = window.QCFiscal, E = window.QCElements;
 let db = null, saveTimer = null;
+/* نشست فعلی (کاربر واردشده). در Apps Script سمت سرور با هر درخواست ست می‌شود. */
+let session = null;
 
 function loadDb() {
   let raw = null;
@@ -2189,6 +2946,11 @@ function loadDb() {
   X.ensure(db);
   if (!db.settings.scoreBands) db.settings.scoreBands = [90, 75, 50];
   if (!db.settings.defaultPreset) db.settings.defaultPreset = 'cur';
+  /* ماه‌های مالی و کاربران QC: هر دو مستقیم روی شیت هم قابل ویرایش‌اند. */
+  if (!Array.isArray(db.fiscalMonths)) db.fiscalMonths = [];
+  db.fiscalMonths = F.normalizeMonths(db.fiscalMonths);
+  if (!Array.isArray(db.qcUsers)) db.qcUsers = [];
+  if (!db.settings.authMode) db.settings.authMode = 'auto';
 }
 function saveDb(sync) {
   const w = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {} };
@@ -2203,6 +2965,7 @@ function saveDb(sync) {
 if (typeof window.addEventListener === 'function') window.addEventListener('pagehide', () => saveDb(true));
 
 const str = (v) => (v == null ? '' : String(v)).trim();
+const text = str; /* نام دیگر str؛ در لایه‌ی دسترسی/ماه مالی استفاده می‌شود */
 const clone = (o) => (o == null ? o : JSON.parse(JSON.stringify(o)));
 function jstr(v) { const j = C.parseJalali(v); return j ? C.formatJalali(j) : null; }
 function teamOf(name) { const a = db.agents.find((x) => x.name === name); return a ? a.team : ''; }
@@ -2286,7 +3049,33 @@ function list(kind, q) {
   return { rows: clone(rows.slice((page-1)*per, page*per)), total, page, per };
 }
 
+/* لایه‌ی احراز هویت + محدوده‌ی داده؛ منطق اصلی در dispatch() است. */
 function route(method, url, body) {
+  const pathPart = '/' + String(url || '/').replace(/^\/+/, '').split('?')[0];
+  if (pathPart.indexOf('/api/auth') === 0) return dispatch(method, url, body);
+  /* bootstrap و revision بدون نشست هم پاسخ می‌دهند (دقیقاً مثل server.js):
+   * اولی پوسته‌ی خالی + فهرست حساب‌ها را برای صفحه‌ی ورود می‌فرستد و دومی برای
+   * همگام‌سازی خودکار مرورگرهاست. */
+  const publicPath = pathPart === '/api/bootstrap' || pathPart === '/api/revision';
+  const required = A.authRequired(db);
+  if (required && !publicPath) {
+    const allowed = A.canAccessApi(db, session, method, pathPart);
+    if (!allowed.ok) bad(allowed.error, allowed.status || 403);
+    if (method !== 'GET') {
+      const guard = A.writeGuard(db, session, method, pathPart, body);
+      if (!guard.ok) bad(guard.error, guard.status || 403);
+    }
+  }
+  if (method === 'GET' && required && session && !A.isAdmin(session)) {
+    /* خواندن‌ها روی کپی محدودشده اجرا می‌شوند؛ نوشتن در این مسیر ممنوع است. */
+    const full = db;
+    db = A.scopeDb(full, session);
+    try { return dispatch(method, url, body); } finally { db = full; }
+  }
+  return dispatch(method, url, body);
+}
+
+function dispatch(method, url, body) {
   // کوئری را اول جدا کن — تاریخ‌ها شامل «/» هستند و نباید در مسیر شکسته شوند
   const [pathPart, qsAll] = url.slice(1).split('?');
   const parts = pathPart.split('/');
@@ -2308,8 +3097,24 @@ function route(method, url, body) {
 
   if(name === 'session-snapshot' && method === 'GET')return clone(db);
 
+  if (name === 'auth') return authRoute(method, id, body);
+
   if (name === 'bootstrap' && method === 'GET') {
+    const auth = { required: A.authRequired(db), mode: A.authMode(db), accounts: A.accounts(db),
+      user: session ? A.publicUser(session) : null, admin: A.isAdmin(session) };
+    if (auth.required && !session) {
+      /* پیش از ورود هیچ داده‌ای لو نمی‌رود؛ فقط آنچه صفحه‌ی ورود لازم دارد. */
+      return { auth: auth, agents: [], teams: [], qcAgents: [], lists: clone(db.lists),
+        fiscalMonths: [], revision: db.revision || 0,
+        settings: { orgName: db.settings.orgName || 'سامانه کنترل کیفیت', scoreBands: db.settings.scoreBands,
+          defaultPreset: db.settings.defaultPreset, authMode: db.settings.authMode },
+        counts: { tickets: 0, socials: 0, calls: 0, callMeta: null } };
+    }
     return {
+      auth: auth,
+      fiscalMonths: clone(db.fiscalMonths || []),
+      revision: db.revision || 0,
+      qcUsers: A.isAdmin(session) ? clone(A.userMask(A.normalizeUsers(db))) : undefined,
       agents: clone(db.agents.filter((a) => a.active)),
       teams: [...new Set(db.agents.filter((a) => a.active).map((a) => a.team))],
       qcAgents: clone(db.qcAgents),
@@ -2325,7 +3130,7 @@ function route(method, url, body) {
     db.tickets.push(n); saveDb(); return clone(n);
   }
   if (name === 'tickets' && method === 'GET') { const r = db.tickets.find((x) => x.id === +id); return r ? clone(r) : bad('یافت نشد', 404); }
-  if (name === 'tickets' && method === 'PUT') { const r = db.tickets.find((x) => x.id === +id); if (!r) bad('یافت نشد', 404); const n = normalizeTicket(body, r); if (typeof n === 'string') bad(n); db.tickets = db.tickets.map((x) => x.id === r.id ? n : x); saveDb(); return clone(n); }
+  if (name === 'tickets' && method === 'PUT') { const r = db.tickets.find((x) => x.id === +id); if (!r) bad('یافت نشد', 404); conflict(r, body); const n = normalizeTicket(body, r); if (typeof n === 'string') bad(n); db.tickets = db.tickets.map((x) => x.id === r.id ? n : x); saveDb(); return clone(n); }
   if (name === 'tickets' && method === 'DELETE') { db.tickets = db.tickets.filter((x) => x.id !== +id); saveDb(); return { ok: true }; }
 
   if (name === 'socials' && method === 'GET' && id == null) return list('socials', q);
@@ -2334,7 +3139,7 @@ function route(method, url, body) {
     db.socials.push(n); saveDb(); return clone(n);
   }
   if (name === 'socials' && method === 'GET') { const r = db.socials.find((x) => x.id === +id); return r ? clone(r) : bad('یافت نشد', 404); }
-  if (name === 'socials' && method === 'PUT') { const r = db.socials.find((x) => x.id === +id); if (!r) bad('یافت نشد', 404); const n = normalizeSocial(body, r); if (typeof n === 'string') bad(n); db.socials = db.socials.map((x) => x.id === r.id ? n : x); saveDb(); return clone(n); }
+  if (name === 'socials' && method === 'PUT') { const r = db.socials.find((x) => x.id === +id); if (!r) bad('یافت نشد', 404); conflict(r, body); const n = normalizeSocial(body, r); if (typeof n === 'string') bad(n); db.socials = db.socials.map((x) => x.id === r.id ? n : x); saveDb(); return clone(n); }
   if (name === 'socials' && method === 'DELETE') { db.socials = db.socials.filter((x) => x.id !== +id); saveDb(); return { ok: true }; }
 
   if (name === 'reports' && method === 'GET') {
@@ -2668,15 +3473,145 @@ function route(method, url, body) {
     if (Array.isArray(b.scoreBands) && b.scoreBands.length === 3) {
       db.settings.scoreBands = b.scoreBands.map((x) => Math.min(100, Math.max(0, +x || 0))).sort((a, b) => b - a);
     }
-    if (['cur', 'prev', 'all'].indexOf(b.defaultPreset) !== -1) db.settings.defaultPreset = b.defaultPreset;
+    if (['cur', 'prev', 'all', 'today'].indexOf(b.defaultPreset) !== -1 || F.isFiscalPreset(b.defaultPreset)) db.settings.defaultPreset = b.defaultPreset;
+    if (['auto', 'on', 'off'].indexOf(text(b.authMode)) !== -1) db.settings.authMode = text(b.authMode);
     saveDb(); return clone(db.settings);
   }
+
+  const extended = extendedRoute(method, url, body, name, id, q);
+  if (extended !== null) return extended;
   bad('not found', 404);
+}
+
+/* ------------------------------------------------------- احراز هویت و دسترسی */
+function conflict(row, body) {
+  /* همزمانی چند کارشناس: اگر رکورد بعد از بازکردن فرم تغییر کرده باشد،
+   * به‌جای بازنویسی بی‌صدا خطای ۴۰۹ می‌دهیم تا کاربر انتخاب کند. */
+  const base = body && body.baseUpdatedAt;
+  if (base && row && row.updatedAt && String(base) !== String(row.updatedAt) && !body.overwrite) {
+    const e = new Error('این رکورد بعد از بازکردن فرم توسط شخص دیگری ویرایش شده است');
+    e.status = 409; e.conflict = { current: clone(row) };
+    throw e;
+  }
+}
+
+function authRoute(method, id, body) {
+  if (id === 'accounts' && method === 'GET') {
+    return { required: A.authRequired(db), mode: A.authMode(db), accounts: A.accounts(db),
+      firstRun: !A.normalizeUsers(db).length, orgName: db.settings.orgName || '' };
+  }
+  if (id === 'login' && method === 'POST') {
+    const result = A.login(db, (body || {}).name, (body || {}).password);
+    if (!result.ok) bad(result.error, 401);
+    return { ok: true, user: result.user };
+  }
+  if (id === 'logout' && method === 'POST') {
+    /* خروج: نشست همین لایه پاک می‌شود؛ باطل‌کردن خودِ توکن در لایه‌ی میزبان است
+     * (server.js نشست in-memory و Server.gs کلید qctok@… را حذف می‌کند). */
+    session = null;
+    return { ok: true };
+  }
+  if (id === 'me' && method === 'GET') {
+    return { required: A.authRequired(db), user: session ? A.publicUser(session) : null,
+      admin: A.isAdmin(session), accounts: A.accounts(db) };
+  }
+  if (id === 'setup' && method === 'POST') {
+    /* راه‌اندازی اولیه: فقط وقتی هیچ کاربری تعریف نشده مجاز است (بن‌بست مدیر). */
+    if (A.normalizeUsers(db).length) bad('قبلاً کاربری تعریف شده است؛ از بخش مدیریت QC استفاده کنید');
+    const b = body || {};
+    if (!text(b.name)) bad('نام مدیر الزامی است');
+    if (!text(b.password)) bad('رمز مدیر الزامی است');
+    db.qcUsers = [];
+    const row = A.saveUser(db, { name: b.name, password: b.password, role: 'admin', active: true, exts: '*', agents: '', teams: '' });
+    saveDb();
+    return { ok: true, user: A.publicUser(A.normalizeUser(row, 0)) };
+  }
+  bad('not found', 404);
+}
+
+/* کاربران QC (تب QC_Users) — فقط مدیر */
+function qcUsersRoute(method, id, body) {
+  const users = A.normalizeUsers(db);
+  if (method === 'GET' && id == null) {
+    return { users: clone(A.userMask(users)), required: A.authRequired(db), mode: A.authMode(db),
+      teams: [...new Set(db.agents.map((a) => a.team))].sort(),
+      agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false }))) };
+  }
+  if (method === 'GET' && id != null) {
+    const u = users.find((x) => String(x.id) === String(id) || x.key === A.normalizeUser({ name: id }).key);
+    if (!u) bad('کاربر یافت نشد', 404);
+    return clone(A.userMask([u])[0]);
+  }
+  if (method === 'POST' || method === 'PUT') {
+    const existing = body && body.id != null && body.id !== ''
+      ? (db.qcUsers || []).find((u) => String(u.id) === String(body.id)) : null;
+    if (method === 'PUT' && !existing) bad('کاربر یافت نشد', 404);
+    const row = A.saveUser(db, body || {}, existing);
+    if (session && A.normalizeUser({ name: session.name }).key === row.name.toLowerCase().replace(/\s/g, '')) {
+      session = A.normalizeUser(row, 0); // تغییر نقش/دسترسی مدیر بلافاصله اعمال شود
+    }
+    saveDb();
+    return { ok: true, user: clone(A.userMask([A.normalizeUser(row, 0)])[0]), users: clone(A.userMask(A.normalizeUsers(db))) };
+  }
+  if (method === 'DELETE' && id != null) {
+    const target = users.find((x) => String(x.id) === String(id));
+    if (!target) bad('کاربر یافت نشد', 404);
+    if (session && target.key === session.key) bad('نمی‌توانید حساب کاربری خودتان را حذف کنید');
+    if (target.role === 'admin' && users.filter((u) => u.role === 'admin' && u.active).length <= 1) {
+      bad('حداقل یک مدیر فعال باید باقی بماند');
+    }
+    A.deleteUser(db, target.name); saveDb();
+    return { ok: true, users: clone(A.userMask(A.normalizeUsers(db))) };
+  }
+  bad('not found', 404);
+}
+
+/* ماه‌های مالی (تب Fiscal_Months) */
+function fiscalRoute(method, id, body) {
+  if (method === 'GET') {
+    const months = F.normalizeMonths(db.fiscalMonths);
+    const today = C.todayJalali();
+    return { months: clone(months), options: F.presetOptions(months, C.formatJalali(today)),
+      current: F.currentMonth(months, C.formatJalali(today)), previous: F.previousMonth(months, C.formatJalali(today)) };
+  }
+  if (method === 'PUT') {
+    const rows = Array.isArray(body && body.months) ? body.months : [];
+    const clean = rows.map((m) => ({ id: text(m.id), name: text(m.name), from: text(m.from), to: text(m.to), note: text(m.note) }))
+      .filter((m) => m.name || m.from || m.to);
+    clean.forEach((m) => {
+      if (!m.name) bad('نام ماه مالی الزامی است');
+      if (!C.parseDate(m.from) || !C.parseDate(m.to)) bad('تاریخ «' + m.name + '» نامعتبر است');
+    });
+    db.fiscalMonths = F.normalizeMonths(clean); saveDb();
+    return { ok: true, months: clone(db.fiscalMonths) };
+  }
+  if (method === 'DELETE' && id != null) {
+    db.fiscalMonths = F.normalizeMonths((db.fiscalMonths || []).filter((m) => m.id !== id));
+    saveDb(); return { ok: true, months: clone(db.fiscalMonths) };
+  }
+  bad('not found', 404);
+}
+
+/* --------------------------------------------------------------- مسیرهای جدید */
+function extendedRoute(method, url, body, name, id, q) {
+  if (name === 'qc-users') return qcUsersRoute(method, id, body);
+  if (name === 'fiscal-months') return fiscalRoute(method, id, body);
+  if (name === 'elements' && method === 'GET') {
+    return E.table(db.settings.callCriteria, [...new Set(db.agents.map((a) => a.team))]);
+  }
+  if (name === 'monthly-summary' && method === 'GET') return F.monthlySummary(db, q);
+  if (name === 'revision' && method === 'GET') return { revision: db.revision || 0, at: Date.now() };
+  return null;
 }
 
 window.LocalApi = {
   // Apps Script uses the same tested route logic on its server-side bundle.
   run(method, url, body) { return route(method, url, body); },
+  /* کاربر واردشده؛ null یعنی بدون احراز هویت (همه‌چیز باز). */
+  setSession(user) { session = user && user.name ? A.normalizeUser(user, 0) : null; return session; },
+  getSession() { return session ? A.publicUser(session) : null; },
+  authRequired() { return A.authRequired(db); },
+  setRevision(value) { db.revision = Number(value) || 0; },
   get(url) { return Promise.resolve().then(() => route('GET', url)); },
   post(url, b) { return Promise.resolve().then(() => route('POST', url, b)); },
   put(url, b) { return Promise.resolve().then(() => route('PUT', url, b)); },
@@ -2740,7 +3675,11 @@ var QC_GAS_SHEETS = {
   meta: 'Meta',
   callMeta: 'Call_Metadata',
   callReportExperts: 'Call_Report_Experts',
-  callReportAccess: 'Call_Report_Access'
+  callReportAccess: 'Call_Report_Access',
+  fiscalMonths: 'Fiscal_Months',
+  qcUsers: 'QC_Users',
+  elements: 'Elements',
+  monthlySummary: 'Monthly_Summary'
 };
 
 var QC_GAS_SCHEMAS = {
@@ -2758,7 +3697,17 @@ var QC_GAS_SCHEMAS = {
   Meta: ['key', 'value'],
   Call_Metadata: ['key', 'value'],
   Call_Report_Experts: ['json'],
-  Call_Report_Access: ['json']
+  Call_Report_Access: ['json'],
+  /* بازه‌های ماه مالی؛ مستقیم روی شیت قابل نوشتن‌اند (بند ۲) */
+  Fiscal_Months: ['id', 'name', 'from', 'to', 'note'],
+  /* کاربران QC: نام، رمز، نقش، فعال و دسترسی‌ها (بند ۵) */
+  QC_Users: ['id', 'name', 'password', 'role', 'active', 'exts', 'agents', 'teams', 'note'],
+  /* نگاشت المان‌ها: نام فارسی و ستون اکسل، قابل ویرایش روی شیت (بند ۹) */
+  Elements: ['scope', 'team', 'form', 'key', 'label', 'excelKey', 'active', 'aliases', 'order'],
+  /* خلاصه‌ی ماهانه‌ی آماده برای خواندن/خروجی سریع (بند ۸) */
+  Monthly_Summary: ['month', 'monthLabel', 'fiscal', 'agent', 'ext', 'team', 'qcAgents', 'tickets',
+    'ticketAvg', 'ticketRedline', 'socials', 'socialAvg', 'socialRedline', 'calls', 'callAvg',
+    'callRedline', 'totalCount', 'combinedAvg', 'redlines', 'actions']
 };
 
 var QC_GAS_CALL_REPORT_KEYS = {
@@ -2779,6 +3728,13 @@ var QC_GAS_CACHE_CHUNK_CHARS = 24000;
 /* Above this size the snapshot is read from the sheet every time instead. */
 var QC_GAS_CACHE_MAX_CHARS = 4000000;
 var QC_GAS_CHANGE_HANDLER = 'crmqcOnSheetChange';
+/* کش نتیجه‌ی تحلیل‌ها: کلید = نسخه‌ی داده + کاربر + مسیر؛ با هر نوشتن باطل می‌شود. */
+var QC_GAS_ANALYSIS_PREFIX = 'qcan@';
+var QC_GAS_ANALYSIS_TTL_SEC = 21600;
+var QC_GAS_ANALYSIS_MAX_CHARS = 900000;
+var QC_GAS_TOKEN_PREFIX = 'qctok@';
+var QC_GAS_TOKEN_EPOCH_KEY = 'QC_GAS_TOKEN_EPOCH';
+var QC_GAS_TOKEN_TTL_SEC = 21600; // ۶ ساعت؛ با هر درخواست تمدید می‌شود
 
 function onOpen() {
   try {
@@ -2787,6 +3743,9 @@ function onOpen() {
       .addItem('راه‌اندازی / بررسی تب‌های سامانه', 'setupStandaloneApp')
       .addSeparator()
       .addItem('خواندن تازه از شیت (پاک‌کردن کش)', 'refreshFromSheet')
+      .addItem('بازسازی تب خلاصه ماهانه', 'rebuildMonthlySummary')
+      .addSeparator()
+      .addItem('بستن همه نشست‌های فعال (خروج اجباری)', 'clearSessions')
       .addToUi();
   } catch (err) {
     // onOpen may also run outside the spreadsheet editor.
@@ -2909,12 +3868,20 @@ function doGet(e) {
  * under LockService, writes only the rows that changed and republishes the
  * cache for the next read.
  */
-function crmqcApi(method, requestUrl, body) {
+function crmqcApi(method, requestUrl, body, token) {
   method = String(method || 'GET').toUpperCase();
   requestUrl = String(requestUrl || '/');
   body = body && typeof body === 'object' ? body : {};
-
+  var pathOnly = requestUrl.split('?')[0];
   var isRead = method === 'GET';
+  var authPath = pathOnly.indexOf('/api/auth/') === 0;
+
+  /* سریع‌ترین پاسخ ممکن: فقط شماره‌ی نسخه‌ی داده تا کاربران همزمان بفهمند
+   * چیز جدیدی روی شیت آمده است (بند ۱۰). هیچ خواندنی از تب‌ها انجام نمی‌شود. */
+  if (isRead && pathOnly === '/api/revision') {
+    return { status: 200, data: { revision: currentRevision_(), at: Date.now() } };
+  }
+
   var lock = LockService.getScriptLock();
   var locked = false;
   try {
@@ -2935,7 +3902,20 @@ function crmqcApi(method, requestUrl, body) {
       if (isRead) publishRevision_(revision, before);
     }
 
+    /* نشست: توکن از کش، نقش و دسترسی‌ها همیشه از داده‌ی تازه‌ی شیت */
+    var session = refreshSession_(resolveSession_(token), before);
+
+    /* کش نتیجه‌ی تحلیل‌ها (بند ۸): کلید = نسخه‌ی داده + کاربر + درخواست.
+     * با هر نوشتن نسخه عوض می‌شود، پس پاسخ کهنه هرگز خوانده نمی‌شود. */
+    var analysisKey = isRead && !authPath && cacheableRead_(pathOnly)
+      ? analysisCacheKey_(revision, requestUrl, session) : null;
+    if (analysisKey) {
+      var cached = readAnalysisCache_(analysisKey);
+      if (cached) return { status: 200, data: cached, cached: true };
+    }
+
     window.LocalApi.replaceSnapshot(before);
+    window.LocalApi.setSession(session);
     window.__GAS_DB_DIRTY__ = false;
 
     var result = window.LocalApi.run(method, requestUrl, body);
@@ -2943,7 +3923,15 @@ function crmqcApi(method, requestUrl, body) {
     if (isRead) {
       // Reads must not persist: a GET only re-derives in-memory defaults, and
       // writing from a cached snapshot could clobber a concurrent edit.
-      return { status: 200, data: jsonSafe_(result) };
+      var payload = jsonSafe_(result);
+      if (analysisKey) writeAnalysisCache_(analysisKey, payload);
+      return { status: 200, data: payload };
+    }
+
+    if (authPath && pathOnly === '/api/auth/logout') dropToken_(token);
+    if (authPath && result && result.user && (pathOnly === '/api/auth/login' || pathOnly === '/api/auth/setup')) {
+      result.token = issueToken_(result.user);
+      session = refreshSession_(result.user, before);
     }
 
     var after = window.LocalApi.backup();
@@ -2960,6 +3948,147 @@ function crmqcApi(method, requestUrl, body) {
     };
   } finally {
     if (locked) { try { lock.releaseLock(); } catch (ignored) {} }
+    try { window.LocalApi.setSession(null); } catch (ignored) {}
+  }
+}
+
+/* ------------------------------------------------------------ احراز هویت */
+
+function sessionEpoch_() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    return Number(props.getProperty(QC_GAS_TOKEN_EPOCH_KEY) || 1);
+  } catch (err) {
+    return 1;
+  }
+}
+
+function tokenKey_(token, epoch) {
+  return QC_GAS_TOKEN_PREFIX + (epoch || sessionEpoch_()) + '@' + token;
+}
+
+function resolveSession_(token) {
+  token = String(token || '');
+  if (!token) return null;
+  try {
+    var cacheKey = tokenKey_(token);
+    var raw = CacheService.getScriptCache().get(cacheKey);
+    if (!raw) return null;
+    var hit = JSON.parse(raw);
+    if (!hit || !hit.name) return null;
+    if (Number(hit.exp || 0) < Date.now()) return null;
+    /* انقضای لغزان: تا وقتی کاربر کار می‌کند نشست بسته نمی‌شود */
+    CacheService.getScriptCache().put(cacheKey,
+      JSON.stringify({ name: hit.name, exp: Date.now() + QC_GAS_TOKEN_TTL_SEC * 1000 }), QC_GAS_TOKEN_TTL_SEC);
+    return { name: hit.name };
+  } catch (err) {
+    return null;
+  }
+}
+
+function refreshSession_(session, db) {
+  if (!session || !session.name) return null;
+  var fresh = window.QCAccess.findUser(window.QCAccess.normalizeUsers(db), session.name);
+  if (!fresh || !fresh.active) return null;
+  return fresh;
+}
+
+function issueToken_(user) {
+  var token = window.QCAccess.randomToken(24);
+  try {
+    CacheService.getScriptCache().put(tokenKey_(token),
+      JSON.stringify({ name: user.name, exp: Date.now() + QC_GAS_TOKEN_TTL_SEC * 1000 }), QC_GAS_TOKEN_TTL_SEC);
+  } catch (err) {
+    throw new Error('ذخیره‌ی نشست ممکن نشد؛ دوباره تلاش کنید');
+  }
+  return token;
+}
+
+function dropToken_(token) {
+  token = String(token || '');
+  if (!token) return;
+  try { CacheService.getScriptCache().remove(tokenKey_(token)); } catch (err) {}
+}
+
+/** Menu item: با یک پله جلو بردن «دوره‌ی نشست» همه‌ی توکن‌های فعال بی‌اثر می‌شوند. */
+function clearSessions() {
+  var props = PropertiesService.getScriptProperties();
+  var epoch = Number(props.getProperty(QC_GAS_TOKEN_EPOCH_KEY) || 1) + 1;
+  props.setProperty(QC_GAS_TOKEN_EPOCH_KEY, String(epoch));
+  return { ok: true, epoch: epoch };
+}
+
+/* ------------------------------------------------- کش نتیجه‌ی تحلیل‌ها */
+
+function cacheableRead_(path) {
+  if (!path || path.indexOf('/api/') !== 0) return false;
+  var name = path.slice(5).split('/')[0];
+  var allowed = ['bootstrap', 'dashboard', 'reports', 'portfolio', 'expert-ref', 'calls', 'tickets',
+    'socials', 'data', 'monthly-summary', 'elements', 'fiscal-months', 'qc-users', 'agents',
+    'criteria', 'settings', 'action-types', 'actions', 'reminders'];
+  if (allowed.indexOf(name) === -1) return false;
+  if (name === 'calls' && path.indexOf('/api/calls/analysis') !== 0) return false;
+  if (name === 'data' && path.indexOf('/api/data/status') !== 0) return false;
+  return true;
+}
+
+function analysisCacheKey_(revision, requestUrl, session) {
+  var who = session && session.name ? window.QCAccess.normalizeUser({ name: session.name }).key : 'guest';
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, who + '\u0001' + requestUrl, Utilities.Charset.UTF_8);
+  var hex = '';
+  for (var i = 0; i < digest.length; i++) hex += ('0' + (digest[i] < 0 ? digest[i] + 256 : digest[i]).toString(16)).slice(-2);
+  return QC_GAS_ANALYSIS_PREFIX + revision + '#' + hex.slice(0, 40);
+}
+
+function readAnalysisCache_(key) {
+  try {
+    var cache = CacheService.getScriptCache();
+    var meta = cache.get(key + '#meta');
+    if (!meta) return null;
+    var info = JSON.parse(meta), keys = [];
+    for (var i = 0; i < info.chunks; i++) keys.push(key + '#' + i);
+    var parts = cache.getAll(keys), json = '';
+    for (var c = 0; c < keys.length; c++) {
+      if (parts[keys[c]] == null) return null;
+      json += parts[keys[c]];
+    }
+    return JSON.parse(json);
+  } catch (err) {
+    return null;
+  }
+}
+
+function writeAnalysisCache_(key, payload) {
+  try {
+    var json = JSON.stringify(payload);
+    if (!json || json.length > QC_GAS_ANALYSIS_MAX_CHARS) return;
+    var cache = CacheService.getScriptCache();
+    var chunks = Math.max(1, Math.ceil(json.length / QC_GAS_CACHE_CHUNK_CHARS));
+    var values = {};
+    for (var i = 0; i < chunks; i++) {
+      values[key + '#' + i] = json.substr(i * QC_GAS_CACHE_CHUNK_CHARS, QC_GAS_CACHE_CHUNK_CHARS);
+    }
+    values[key + '#meta'] = JSON.stringify({ chunks: chunks, at: new Date().toISOString() });
+    cache.putAll(values, QC_GAS_ANALYSIS_TTL_SEC);
+  } catch (err) {
+    // کش تحلیل فقط یک بهینه‌سازی است؛ بدون آن پاسخ از راه عادی ساخته می‌شود.
+  }
+}
+
+/** Menu item: بازسازی تب خلاصه‌ی ماهانه از داده‌ی فعلی شیت (بند ۸). */
+function rebuildMonthlySummary() {
+  var ss = getDatabaseSpreadsheet_();
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var db = normalizeDatabase_(readDatabase_(ss));
+    var rows = window.QCFiscal.monthlySummary(db).rows;
+    markSelfWrite_();
+    writeRowsSheet_(ss.getSheetByName(QC_GAS_SHEETS.monthlySummary), [], rows, 'Monthly_Summary');
+    publishRevision_(bumpRevision_(), db);
+    return { ok: true, rows: rows.length };
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -3091,7 +4220,9 @@ function makeSeedDatabase_() {
     agentActions: {},
     actionTypes: Array.isArray(seed.actionTypes) ? seed.actionTypes : undefined,
     reminders: [],
-    registryCleared: false
+    registryCleared: false,
+    fiscalMonths: [],
+    qcUsers: []
   });
 }
 
@@ -3110,6 +4241,9 @@ function normalizeDatabase_(db) {
   db.agentActions = db.agentActions || {};
   db.actionTypes = Array.isArray(db.actionTypes) ? db.actionTypes : undefined;
   db.reminders = Array.isArray(db.reminders) ? db.reminders : [];
+  db.fiscalMonths = window.QCFiscal.normalizeMonths(db.fiscalMonths);
+  db.qcUsers = Array.isArray(db.qcUsers) ? db.qcUsers : [];
+  if (!db.settings.authMode) db.settings.authMode = 'auto';
   db.callImport = db.callImport || null;
   db.callRaw = db.callRaw || null;
   db.callSync = db.callSync || { files: {}, syncedAt: null };
@@ -3167,9 +4301,15 @@ function readDatabase_(ss) {
   var actionTypes = readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.actionTypes]))
     .map(function (row) { return String(row.label || '').trim(); }).filter(Boolean);
 
+  var fiscalMonths = window.QCFiscal.normalizeMonths(readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.fiscalMonths])));
+  var qcUsers = readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.qcUsers]));
+  var elementRows = readRowsGrid_(gridValues_(sheets[QC_GAS_SHEETS.elements]));
+
   var db = {
     version: meta.version || 1,
     datasetId: meta.datasetId || '',
+    fiscalMonths: fiscalMonths,
+    qcUsers: qcUsers,
     createdAt: meta.createdAt || '',
     registryCleared: !!meta.registryCleared,
     seq: meta.seq || {},
@@ -3189,6 +4329,11 @@ function readDatabase_(ss) {
     lists: lists
   };
   if (criteria.callCriteria) db.settings.callCriteria = criteria.callCriteria;
+  /* تب Elements منبع اصلی نگاشت المان‌هاست تا مستقیم روی شیت ویرایش شود (بند ۹) */
+  if (elementRows.length) {
+    db.settings.callCriteria = window.QCElements.rowsToCriteria(elementRows, db.settings.callCriteria || null);
+  }
+  if (settings.authMode) db.settings.authMode = String(settings.authMode);
   return db;
 }
 
@@ -3276,6 +4421,22 @@ function writeDatabaseDiff_(ss, before, after, forceAll) {
     writeKeyValueSheet_(sheets[QC_GAS_SHEETS.criteria], {}, { callCriteria: (after.settings || {}).callCriteria || {} });
   }
   if (changed('lists')) writeKeyValueSheet_(sheets[QC_GAS_SHEETS.lists], before.lists || {}, after.lists || {});
+  if (changed('fiscalMonths')) writeRowsSheet_(sheets[QC_GAS_SHEETS.fiscalMonths], before.fiscalMonths || [], after.fiscalMonths || [], 'Fiscal_Months');
+  if (changed('qcUsers')) writeRowsSheet_(sheets[QC_GAS_SHEETS.qcUsers], before.qcUsers || [], after.qcUsers || [], 'QC_Users');
+
+  /* نگاشت تخت المان‌ها روی تب Elements (بند ۹) */
+  var beforeElements = window.QCElements.criteriaToRows((before.settings || {}).callCriteria || null);
+  var afterElements = window.QCElements.criteriaToRows((after.settings || {}).callCriteria || null);
+  if (forceAll || JSON.stringify(beforeElements) !== JSON.stringify(afterElements)) {
+    writeRowsSheet_(sheets[QC_GAS_SHEETS.elements], beforeElements, afterElements, 'Elements');
+  }
+
+  /* خلاصه‌ی ماهانه فقط وقتی داده‌ی مؤثر عوض شده بازسازی می‌شود (بند ۸) */
+  var summaryInputs = ['tickets', 'socials', 'callFeedbacks', 'agentActions', 'fiscalMonths', 'agents'];
+  if (forceAll || summaryInputs.some(changed)) {
+    writeRowsSheet_(sheets[QC_GAS_SHEETS.monthlySummary],
+      window.QCFiscal.monthlySummary(before).rows, window.QCFiscal.monthlySummary(after).rows, 'Monthly_Summary');
+  }
 
   var beforeMeta = {
     version: before.version || after.version,

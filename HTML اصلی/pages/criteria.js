@@ -20,6 +20,7 @@ async function render(root) {
   root.innerHTML = `<div class="page-head"><div class="ph-ic"><i class="fa-solid fa-sliders"></i></div>
     <div><h2>تغییر المان‌ها</h2><p>نام نمایشی، ستون اکسل و المان‌های فعال ریت تماس هر تیم</p></div></div>
     <div class="note"><i class="fa-solid fa-shield-halved"></i><span>مقادیر واقعی فرم <b>1 / 0 / -</b> مبنای نرخ‌ها هستند. «-» در مخرج نرخ نیست و سلول خالی صفر محسوب نمی‌شود. نمره‌ی کلیِ اصلی اکسل و ریت‌های قبلی بازنویسی نمی‌شوند.</span></div>
+    <div class="note sheet-note"><i class="fa-solid fa-table"></i><span>همین جدول روی تب <code>Elements</code> گوگل‌شیت نوشته می‌شود: ستون <code>label</code> نام فارسی المان و ستون <code>excelKey</code> نام ستون در فایل اکسل دریافتی. هر دو را می‌توانید مستقیم روی شیت ویرایش کنید — در خواندن بعدی اعمال می‌شود و نام ستون قبلی خودکار به <code>aliases</code> منتقل می‌شود تا ریت‌های گذشته نشکنند.</span></div>
     <div class="criteria-layout"><aside class="card criteria-team-list" id="criteriaTeams"></aside>
       <div class="card"><div class="card-head"><div class="head-icon"><i class="fa-solid fa-list-check"></i></div>
         <div><h3 id="criteriaTitle"></h3><div class="sub" id="criteriaCaption"></div></div><div class="spacer"></div>

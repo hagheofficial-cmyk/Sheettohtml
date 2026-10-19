@@ -26,9 +26,12 @@ async function render(root) {
           <div class="field"><label>نام سازمان / سامانه (در هدر برگه و سایدبار)</label><input class="input" id="orgNameI" value="${esc(s.orgName)}"></div>
           <div class="field"><label>بازه‌ی پیش‌فرض داشبورد هنگام ورود</label>
             <select class="input" id="presetSel">
-              <option value="cur">ماه جاری</option>
-              <option value="prev">ماه قبل</option>
+              <option value="cur">ماه جاری (شمسی)</option>
+              <option value="prev">ماه قبل (شمسی)</option>
+              <option value="today">امروز</option>
               <option value="all">همه‌ی داده‌ها</option>
+              <option value="fm:cur">ماه مالی جاری</option>
+              <option value="fm:prev">ماه مالی قبل</option>
             </select>
           </div>
           <div class="field"><label>آستانه‌های رنگ نمره (سبز از … ، آبی از … ، زرد از …) — ۰ تا ۱۰۰</label>
@@ -72,6 +75,28 @@ async function render(root) {
             </div>
           </div>
           <div class="note" style="margin:0"><i class="fa-solid fa-circle-info"></i> مجموع وزن‌ها لازم نیست ۱۰۰ باشد — نمره همیشه نسبت‌بندی می‌شود.</div>
+        </div>
+      </div>
+
+      <!-- ماه‌های مالی (بند ۲) -->
+      <div class="card">
+        <div class="card-head brand"><div class="head-icon"><i class="fa-solid fa-calendar-days"></i></div>
+          <div><h3>ماه‌های مالی</h3><div class="sub">بازه‌های آماده‌ی فیلتر تاریخ بالا — از چندم تا چندم و نام ماه مالی</div></div></div>
+        <div class="card-pad">
+          <div class="table-scroll" style="max-height:290px">
+            <table class="tbl fm-tbl">
+              <thead><tr><th>نام ماه مالی</th><th>از تاریخ</th><th>تا تاریخ</th><th>یادداشت</th><th></th></tr></thead>
+              <tbody id="fmBody"></tbody>
+            </table>
+          </div>
+          <div class="fm-actions">
+            <button class="btn soft sm" id="fmAdd"><i class="fa-solid fa-plus"></i> افزودن ماه مالی</button>
+            <button class="btn ghost sm" id="fmAuto"><i class="fa-solid fa-wand-magic-sparkles"></i> ساخت خودکار ۱۲ ماه</button>
+            <div class="spacer"></div>
+            <button class="btn primary sm" id="fmSave"><i class="fa-solid fa-floppy-disk"></i> ذخیره ماه‌های مالی</button>
+          </div>
+          <div class="note" style="margin:12px 0 0"><i class="fa-solid fa-table"></i>
+            همین جدول در تب <code>Fiscal_Months</code> گوگل‌شیت هم نوشته می‌شود؛ می‌توانید تاریخ‌ها را مستقیم روی شیت بنویسید یا ویرایش کنید و سامانه در خواندن بعدی آن‌ها را به «بازه آماده» تبدیل می‌کند.</div>
         </div>
       </div>
 
@@ -174,6 +199,72 @@ async function render(root) {
       } catch (e) { toast(e.message, 'error'); }
     });
   });
+
+  /* ------------------------------------------------------ ماه‌های مالی */
+  let fiscal = (App.fiscalMonths || []).map((m) => Object.assign({}, m));
+  const fmBody = $('#fmBody');
+  function renderFiscal() {
+    if (!fiscal.length) {
+      fmBody.innerHTML = `<tr><td colspan="5" class="fm-empty">هنوز ماه مالی تعریف نشده — یک ردیف اضافه کنید یا ۱۲ ماه را خودکار بسازید.</td></tr>`;
+      return;
+    }
+    fmBody.innerHTML = fiscal.map((m, i) => `
+      <tr data-i="${i}">
+        <td><input class="input fm-name" value="${esc(m.name || '')}" placeholder="مثلاً مهر ۱۴۰۵"></td>
+        <td><div class="date-f"><input class="input fm-from" dir="ltr" inputmode="numeric" value="${esc(m.from || '')}" placeholder="1405-07-01">
+          <button type="button" class="cal-btn" data-cal="from" data-i="${i}" aria-label="تقویم شروع"><i class="fa-regular fa-calendar"></i></button></div></td>
+        <td><div class="date-f"><input class="input fm-to" dir="ltr" inputmode="numeric" value="${esc(m.to || '')}" placeholder="1405-07-30">
+          <button type="button" class="cal-btn" data-cal="to" data-i="${i}" aria-label="تقویم پایان"><i class="fa-regular fa-calendar"></i></button></div></td>
+        <td><input class="input fm-note" value="${esc(m.note || '')}" placeholder="اختیاری"></td>
+        <td class="fm-del"><button class="btn ghost sm" data-del="${i}" title="حذف"><i class="fa-solid fa-trash-can"></i></button></td>
+      </tr>`).join('');
+    $$('[data-del]', fmBody).forEach((b) => b.addEventListener('click', () => { fiscal.splice(+b.dataset.del, 1); renderFiscal(); }));
+    $$('.cal-btn', fmBody).forEach((b) => {
+      const row = fiscal[+b.dataset.i] || {};
+      const input = b.parentElement.querySelector('input');
+      JCal.attach(b, { input: input, onPick: () => { row[b.dataset.cal] = input.value; } });
+    });
+  }
+  function collectFiscal() {
+    return $$('tr[data-i]', fmBody).map((tr) => ({
+      id: (fiscal[+tr.dataset.i] || {}).id || '',
+      name: $('.fm-name', tr).value.trim(),
+      from: C.formatJalali(C.parseDate($('.fm-from', tr).value)) || $('.fm-from', tr).value.trim(),
+      to: C.formatJalali(C.parseDate($('.fm-to', tr).value)) || $('.fm-to', tr).value.trim(),
+      note: $('.fm-note', tr).value.trim()
+    })).filter((m) => m.name || m.from || m.to);
+  }
+  $('#fmAdd').addEventListener('click', () => { fiscal = collectFiscal(); fiscal.push({ id: '', name: '', from: '', to: '', note: '' }); renderFiscal(); });
+  $('#fmAuto').addEventListener('click', () => {
+    fiscal = collectFiscal();
+    const t = C.todayJalali();
+    const start = C.jalaliMonthAdd(t.jy, 1, 0);
+    for (let m = 1; m <= 12; m++) {
+      const r = C.jalaliMonthRange(start.jy, m);
+      const label = C.jalaliMonthLabel(start.jy, m);
+      if (fiscal.some((x) => x.from === C.formatJalali(r.from))) continue;
+      fiscal.push({ id: '', name: label, from: C.formatJalali(r.from), to: C.formatJalali(r.to), note: '' });
+    }
+    renderFiscal();
+    toast('۱۲ ماه سال جاری ساخته شد — نام و تاریخ‌ها را در صورت نیاز ویرایش کنید', 'info');
+  });
+  $('#fmSave').addEventListener('click', async () => {
+    const rows = collectFiscal();
+    for (const m of rows) {
+      if (!m.name) { toast('نام ماه مالی نمی‌تواند خالی باشد', 'error'); return; }
+      if (!C.parseDate(m.from) || !C.parseDate(m.to)) { toast('تاریخ «' + m.name + '» نامعتبر است', 'error'); return; }
+    }
+    const btn = $('#fmSave'); btn.disabled = true;
+    try {
+      await api.put('/api/fiscal-months', { months: rows });
+      await App.boot();
+      fiscal = (App.fiscalMonths || []).map((m) => Object.assign({}, m));
+      renderFiscal();
+      toast('ماه‌های مالی ذخیره شد — در «بازه آماده» بالای صفحه در دسترس‌اند', 'success');
+    } catch (e) { toast(e.message, 'error'); }
+    btn.disabled = false;
+  });
+  renderFiscal();
 
   weekendChips(); demoState();
 }

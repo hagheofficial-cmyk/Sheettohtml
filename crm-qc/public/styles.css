@@ -59,17 +59,25 @@ a { color: var(--brand); text-decoration: none; }
 i { font-style: normal; }
 
 /* --------------------------------------------------------------- چیدمان */
-.app { display: flex; min-height: 100vh; }
-.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.app { display: block; min-height: 100vh; }
+.main { min-width: 0; display: flex; flex-direction: column; }
 .content { padding: 20px 22px 46px; max-width: 1460px; width: 100%; margin: 0 auto; }
 
 /* --------------------------------------------------------------- سایدبار */
+/* فهرست کناری: دراور همیشگی — پیش‌فرض بسته، با دکمه‌ی همبرگر باز می‌شود (بند ۳) */
 .sidebar {
-  width: var(--sidebar-w); flex-shrink: 0; position: sticky; top: 0; height: 100vh;
+  width: var(--sidebar-w); position: fixed; inset-block: 0; inset-inline-start: 0;
+  transform: translateX(100%); transition: transform .25s ease;
   background: linear-gradient(180deg, #0d1528 0%, #0a1120 100%);
   border-left: 1px solid var(--line-soft);
-  display: flex; flex-direction: column; z-index: 60;
+  display: flex; flex-direction: column; z-index: 60; overflow: hidden;
 }
+.sidebar.open { transform: none; box-shadow: -20px 0 60px rgba(0,0,0,.5); }
+.sidebar-backdrop {
+  position: fixed; inset: 0; background: rgba(2,8,23,.55); z-index: 55;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.sidebar-backdrop.show { opacity: 1; pointer-events: auto; }
 .brand { display: flex; align-items: center; gap: 11px; padding: 18px 16px 14px; border-bottom: 1px solid var(--line-soft); }
 .brand-logo {
   width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; font-size: 19px;
@@ -81,7 +89,7 @@ i { font-style: normal; }
 .brand-text { display: flex; flex-direction: column; line-height: 1.35; }
 .brand-text strong { font-size: 14px; font-weight: 800; }
 .brand-text span { font-size: 10px; color: var(--muted); letter-spacing: .4px; }
-.sidebar-close { display: none; margin-inline-start: auto; background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; }
+.sidebar-close { display: grid; place-items: center; margin-inline-start: auto; background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; }
 
 .nav { padding: 12px 10px; overflow-y: auto; flex: 1; }
 .nav-item, .nav-group-title {
@@ -122,7 +130,7 @@ i { font-style: normal; }
 .topbar-left { margin-inline-start: auto; display: flex; align-items: center; gap: 10px; }
 .today-chip { display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); padding: 7px 14px; border-radius: 99px; font-size: 12.2px; color: var(--ink-2); }
 .today-chip i { color: var(--brand); }
-.hamburger { display: none; background: var(--panel); border: 1px solid var(--line); color: var(--ink); width: 38px; height: 38px; border-radius: 10px; cursor: pointer; font-size: 15px; }
+.hamburger { display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); color: var(--ink); width: 38px; height: 38px; border-radius: 10px; cursor: pointer; font-size: 15px; }
 
 /* ------------------------------------------------------------------- کارت‌ها */
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); }
@@ -427,12 +435,6 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
 
 /* -------------------------------------------------------------------------------- */
 @media (max-width: 1024px) {
-  .sidebar { position: fixed; inset-inline-start: 0; transform: translateX(100%); transition: transform .25s ease; }
-  .sidebar.open { transform: none; box-shadow: -20px 0 60px rgba(0,0,0,.5); }
-  .sidebar-close { display: grid; }
-  .sidebar-backdrop { position: fixed; inset: 0; background: rgba(2,8,23,.55); z-index: 55; opacity: 0; pointer-events: none; transition: opacity .2s; }
-  .sidebar-backdrop.show { opacity: 1; pointer-events: auto; }
-  .hamburger { display: grid; place-items: center; }
   .content { padding: 15px 13px 40px; }
   .iframe-shell { height: calc(100vh - var(--topbar-h) - 50px); }
 }
@@ -488,19 +490,32 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
 }
 .date-f .cal-btn:hover { color: var(--brand); }
 
+/* برگه‌ی گزارش تماس */
+.cr-frame-card { padding:0; overflow:hidden; }
+#crWrap { position:relative; background:var(--bg-2,#0f172a); height:calc(100vh - 178px); min-height:560px; }
+#crFrame { width:100%; height:100%; border:0; display:block; }
+
+/* فیلترهای بدون خط جداکننده (وقتی داخل کارت‌اند) */
+.filters.plain { border-bottom:none; }
+
 /* نشان حالت آفلاین */
 #offlineBadge { position: fixed; bottom: 14px; inset-inline-start: 14px; z-index: 1200; background: var(--warn-soft); border: 1px solid var(--warn); color: var(--warn); border-radius: 10px; padding: 7px 13px; font-size: 12.2px; font-weight: 800; box-shadow: var(--shadow); display: flex; align-items: center; gap: 7px; }
 #offlineBadge i { font-size: 13px; }
 
-/* فیلتر یگانه‌ی تاریخ — بیرون از محتوای روت، همیشه در همه‌ی سربرگ‌ها موجود است. */
-.global-range { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px 14px; padding:12px 22px;
-  background:var(--bg-2); border-bottom:1px solid var(--line); position:sticky; top:var(--topbar-h); z-index:45; }
-.global-range .field { margin:0; flex:0 0 auto; }
+/* فیلتر یگانه‌ی تاریخ — بیرون از محتوای روت، همیشه در همه‌ی سربرگ‌ها موجود است.
+ * چیدمان مرتب: عنوان | فیلدها | ابزارها، و یادداشت در خط جدا (بند ۲). */
+.global-range { display:block; padding:12px 22px; background:var(--bg-2);
+  border-bottom:1px solid var(--line); position:sticky; top:var(--topbar-h); z-index:45; }
+.range-bar { display:flex; flex-wrap:wrap; align-items:center; gap:12px 18px; }
+.range-fields { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px 14px; flex:1 1 460px; min-width:0; }
+.range-fields .field { margin:0; flex:0 0 auto; }
+.range-fields .field-preset { flex:1 1 220px; min-width:200px; }
+.range-tools { display:flex; align-items:center; gap:10px; margin-inline-start:auto; }
 .global-range .date-f .input { width:156px; text-align:right; padding-left:34px; }
 .global-range select { min-width:140px; }
-.range-title { display:flex; align-items:center; gap:8px; align-self:center; font-weight:700; font-size:12px; color:var(--ink-2); }
+.range-title { display:flex; align-items:center; gap:8px; font-weight:700; font-size:12px; color:var(--ink-2); }
 .range-title i { color:var(--brand); }
-.range-note { flex-basis:100%; color:var(--muted); font-size:11px; }
+.range-note { margin-top:9px; color:var(--muted); font-size:11px; }
 .range-note.bad { color:var(--bad); }
 .tri-value { display:inline-flex; justify-content:center; min-width:26px; padding:3px 7px; border-radius:6px; font-weight:800; }
 .tri-value.ok { background:var(--good-soft); color:var(--good); }
@@ -512,8 +527,11 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.6px; }
 .call-detail-row > td { padding:12px; background:var(--bg-2); }
 .redline-link { cursor:pointer; border:1px solid rgba(248,113,113,.35); }
 @media (max-width:700px) {
-  .global-range { position:relative; top:0; padding:12px 14px; gap:10px; }
+  .global-range { position:relative; top:0; padding:12px 14px; }
+  .range-bar { gap:10px; }
   .range-title { flex-basis:100%; }
+  .range-fields { flex-basis:100%; }
+  .range-tools { margin-inline-start:0; width:100%; justify-content:space-between; }
   .global-range .date-f .input { width:142px; }
 }
 @media print { .global-range { display:none; } }

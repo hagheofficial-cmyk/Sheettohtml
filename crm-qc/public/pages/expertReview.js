@@ -37,7 +37,7 @@ function render(root) {
       </div>
     </div>
     <div class="card" style="margin-bottom:16px">
-      <div class="filters" style="border-bottom:none">
+      <div class="filters plain">
         <div id="rvTeamSlot"></div><div id="rvAgentSlot"></div><div id="rvTypeSlot"></div><div id="rvResultSlot"></div>
         <div class="field"><label>وضعیت انجام</label>
           <select class="input" id="rvStatus"><option value="">همه</option><option value="${DONE}">انجام شده</option><option value="${NOT_DONE}">انجام نشده</option></select></div>

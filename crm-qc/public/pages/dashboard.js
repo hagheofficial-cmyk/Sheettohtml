@@ -24,7 +24,7 @@ App.register('dashboard', {
       </div>
 
       <div class="card" style="margin-bottom:16px">
-        <div class="filters" style="border-bottom:none"><div id="dTeamSlot"></div></div>
+        <div class="filters plain"><div id="dTeamSlot"></div></div>
       </div>
       <div id="dContent"><div class="loading-page"><div class="spinner"></div><p>در حال دریافت آمار…</p></div></div>`;
 

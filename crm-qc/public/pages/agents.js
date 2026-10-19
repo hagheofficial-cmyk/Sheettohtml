@@ -43,7 +43,7 @@ async function render(root) {
     </div>
 
     <div class="card" style="margin-bottom:16px">
-      <div class="filters" style="border-bottom:none">
+      <div class="filters plain">
         <div class="field" style="flex:1.4;min-width:220px"><label>جستجو (نام یا داخلی)</label>
           <input class="input" id="agSearch" placeholder="مثلاً الهه عسگری یا ۳۰۲۲ یا 3022" dir="auto" autocomplete="off">
         </div>
