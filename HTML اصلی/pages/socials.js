@@ -173,7 +173,7 @@ async function formPage(root, editId) {
     try {
       const saved = editId ? await api.put('/api/socials/' + editId, body) : await api.post('/api/socials', body);
       toast((editId ? 'تغییرات ذخیره شد' : 'ارزیابی ثبت شد') + ' — نمره: ' + fa(saved.score == null ? '—' : saved.score), 'success');
-      await App.boot();
+      App.applyWrite('socials', editId ? 0 : 1);
       location.hash = '#/socials';
     } catch (e) {
       saveBtn.disabled = false;
@@ -307,7 +307,7 @@ async function listPage(root) {
       if (act === 'view') return showView(id);
       if (act === 'del') {
         confirmDlg('حذف ارزیابی سوشال', `ارزیابی «${b.closest('tr').children[1].textContent}» برای همیشه حذف می‌شود.`, async () => {
-          try { await api.del('/api/socials/' + id); toast('رکورد حذف شد', 'success'); await App.boot(); load(); }
+          try { await api.del('/api/socials/' + id); toast('رکورد حذف شد', 'success'); App.applyWrite('socials', -1); load(); }
           catch (e) { toast(e.message, 'error'); }
         });
       }

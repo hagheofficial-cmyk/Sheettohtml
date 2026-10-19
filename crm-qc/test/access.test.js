@@ -906,56 +906,67 @@ for (const build of ['public', 'offline']) {
       await settle();
       assert.ok($('#quName') && $('#quRole') && $('#quPass') && $('#quActive') && $('#quSave'));
       assert.ok($('#quUnlimited'), 'گزینه‌ی «همه‌ی کارشناسان»');
-      /* ساختار جدید: یک ناحیهٔ اسکرول، گروه بر اساس تیم، ردیف‌های با چک‌باکس باز */
-      const groups = doc.querySelectorAll('#quList .qc-group');
-      assert.ok(groups.length >= 2, 'کارشناسان هر تیم جدا چیده می‌شوند');
-      const rows = [...doc.querySelectorAll('#quList .qc-row')];
-      assert.ok(rows.length >= 4, 'هر کارشناس یک ردیف');
-      assert.equal(doc.querySelectorAll('#quList .qc-row input[type="checkbox"]').length, rows.length,
+      /* ساختار تازه: فهرست تخت و همیشه تیک‌خور، فیلتر تیم با چیپ
+       * (گروه‌های تودرتو حذف شدند تا کارشناس‌ها گم نشوند) */
+      const teamChips = [...doc.querySelectorAll('#quTeams .qc-team-chip')];
+      assert.ok(teamChips.length >= 3, 'تیم‌ها به‌شکل چیپ فیلتر می‌شوند: ' + teamChips.length);
+      const rows = () => [...doc.querySelectorAll('#quList .qc-row')];
+      assert.ok(rows().length >= 4, 'هر کارشناس یک ردیف');
+      assert.equal(doc.querySelectorAll('#quList .qc-row input[type="checkbox"]').length, rows().length,
         'هر ردیف چک‌باکس دارد');
-      assert.equal(doc.querySelectorAll('#quPicker').length, 1, 'فقط یک ناحیهٔ انتخاب (بدون اسکرول تودرتو)');
+      assert.equal(doc.querySelectorAll('#quPicker').length, 1, 'فقط یک ناحیهٔ انتخاب');
       assert.ok($('#quPicked'), 'ناحیهٔ نمایش انتخاب‌شده‌ها');
+      const rowOf = (name) => doc.querySelector('#quList .qc-row[data-name="' + name + '"]');
 
       /* تیک‌زدن واقعی: کلیک روی چک‌باکس و کلیک روی خود ردیف */
-      const rowA = rows.find((r) => r.dataset.name === 'کارشناس الف');
-      assert.ok(rowA, 'ردیف کارشناس الف');
-      rowA.querySelector('input[type="checkbox"]').click();
+      rowOf('کارشناس الف').querySelector('input').click();
       await settle();
-      assert.equal(rowA.querySelector('input').checked, true, 'چک‌باکس با کلیک تیک می‌خورد');
+      assert.equal(rowOf('کارشناس الف').querySelector('input').checked, true, 'چک‌باکس تیک می‌خورد');
       assert.ok($('#quCount').textContent.includes('۱'), 'شمارنده: ' + $('#quCount').textContent);
       assert.ok([...doc.querySelectorAll('.qc-chip')].some((c) => c.textContent.includes('کارشناس الف')),
         'انتخاب‌شده به‌شکل چیپ نشان داده می‌شود');
-      /* برداشتن تیک از راه چیپ */
       doc.querySelector('.qc-chip [data-unpick]').click();
       await settle();
-      assert.equal(rowA.querySelector('input').checked, false, 'چیپ تیک را برمی‌دارد');
-      rowA.click();
+      assert.equal(rowOf('کارشناس الف').querySelector('input').checked, false, 'چیپ تیک را برمی‌دارد');
+      rowOf('کارشناس الف').click();
       await settle();
-      assert.equal(rowA.querySelector('input').checked, true, 'کلیک روی خود ردیف هم تیک می‌زند');
+      assert.equal(rowOf('کارشناس الف').querySelector('input').checked, true, 'کلیک روی خود ردیف هم تیک می‌زند');
 
-      /* دکمه‌های گروه: همه / هیچ / کل تیم */
-      const other = [...groups].find((g) => g !== rowA.closest('.qc-group'));
-      other.querySelector('[data-team-all]').click();
+      /* انتخاب همه/هیچ روی نتایج فیلترشده */
+      $('#quAll').click();
       await settle();
-      assert.ok([...other.querySelectorAll('input[data-agent]')].every((c) => c.checked), 'دکمهٔ همه');
-      other.querySelector('[data-team-none]').click();
+      assert.ok(rows().every((r) => r.querySelector('input').checked), 'انتخاب همه‌ی نتایج');
+      $('#quNone').click();
       await settle();
-      assert.ok([...other.querySelectorAll('input[data-agent]')].every((c) => !c.checked), 'دکمهٔ هیچ');
-      assert.equal(rowA.querySelector('input').checked, true, 'تیک گروه دیگر دست‌نخورده می‌ماند');
+      assert.ok(rows().every((r) => !r.querySelector('input').checked), 'پاک‌کردن نتایج');
+
+      /* فیلتر تیم: فقط کارشناسان همان تیم می‌مانند */
+      const teamKey = rowOf('کارشناس الف').dataset.team;
+      const teamChip = teamChips.find((c) => c.dataset.team === teamKey);
+      assert.ok(teamChip, 'چیپ تیم کارشناس الف');
+      teamChip.click();
+      await settle();
+      assert.ok(rows().length >= 1 && rows().every((r) => r.dataset.team === teamKey), 'فیلتر تیم اعمال شد');
+      assert.ok(doc.querySelector('#quTeams .qc-team-chip[data-team="' + teamKey + '"]').classList.contains('sel'),
+        'چیپ تیم انتخاب‌شده است');
+      doc.querySelector('#quTeams .qc-team-chip[data-team=""]').click();
+      await settle();
+      assert.ok(rows().length >= 4, 'برداشتن فیلتر، همه را برمی‌گرداند');
 
       /* جستجو فقط فیلتر می‌کند؛ تیک‌ها حفظ می‌شوند */
+      rowOf('کارشناس الف').querySelector('input').click();
+      await settle();
       $('#quSearch').value = 'کارشناس الف';
       $('#quSearch').dispatchEvent(new w.Event('input', { bubbles: true }));
       await new Promise((r) => setTimeout(r, 160));
       await settle();
-      assert.equal(rowA.hidden, false, 'ردیف مطابق دیده می‌شود');
-      assert.ok([...doc.querySelectorAll('#quList .qc-row')].some((r) => r.hidden), 'بقیه پنهان می‌شوند');
-      assert.equal(rowA.querySelector('input').checked, true, 'تیک بعد از جستجو حفظ می‌شود');
+      assert.ok(rows().length >= 1 && rows().every((r) => r.dataset.name === 'کارشناس الف'), 'جستجو نتیجه را محدود می‌کند');
+      assert.equal(rowOf('کارشناس الف').querySelector('input').checked, true, 'تیک بعد از جستجو حفظ می‌شود');
       $('#quSearch').value = '';
       $('#quSearch').dispatchEvent(new w.Event('input', { bubbles: true }));
       await new Promise((r) => setTimeout(r, 160));
       await settle();
-      assert.ok([...doc.querySelectorAll('#quList .qc-row')].every((r) => !r.hidden), 'با خالی‌شدن جستجو همه برمی‌گردند');
+      assert.ok(rows().length >= 4, 'با خالی‌شدن جستجو همه برمی‌گردند');
 
       /* گزینهٔ نامحدود فهرست را بی‌اثر و کم‌رنگ می‌کند */
       $('#quUnlimited').checked = true;
@@ -1143,7 +1154,7 @@ for (const build of ['public', 'offline']) {
       delete w.APP_SCRIPT_MODE; delete w.APP_SCRIPT_URL;
     });
 
-    await t.test('ستون qcAgents: ویرایش از شیت/اکسل هم دسترسی می‌دهد و ویرایش کاربر ذخیره می‌شود', async () => {
+    await t.test('ستون‌های QC: ویرایش از شیت/اکسل هم دسترسی می‌دهد و ویرایش کاربر ذخیره می‌شود', async () => {
       await login('مدیر سیستم', 'admin-1234');
 
       /* فرض: مدیر مستقیم روی تب Agents نوشته است که «کارشناس ب» را مبینا ریت می‌کند */
@@ -1181,22 +1192,26 @@ for (const build of ['public', 'offline']) {
       /* صفحهٔ مدیریت کارشناسان: ستون جدید و ویرایش آن‌لاین */
       await go(w, 'agents');
       await settle(); await settle();
-      assert.ok(txt('#agentsBody').includes('کارشناس QC مسئول'), 'سرستون جدید در صفحهٔ کارشناسان');
+      assert.ok(txt('#agentsBody').includes('کارشناسان QC مسئول'), 'سرستون جدید در صفحهٔ کارشناسان');
       const agentRow = [...doc.querySelectorAll('#agentsBody tbody tr')].find((tr) => tr.dataset.name === 'کارشناس بدون ریت');
-      assert.ok(agentRow.querySelector('.row-qc'), 'سلول قابل ویرایش برای ستون QC');
-      assert.equal(agentRow.querySelector('.row-qc').value, '', 'فعلاً خالی است');
-      agentRow.querySelector('.row-qc').value = 'هادی';
-      agentRow.querySelector('.row-qc').dispatchEvent(new w.Event('blur'));
+      assert.ok(agentRow.querySelector('[data-qc-cell]'), 'سلول انتخاب کارشناسان QC');
+      assert.ok(agentRow.querySelector('[data-qc-edit]'), 'دکمه‌ی انتخاب (بدون ورودی ویرگولی)');
+      assert.equal(agentRow.querySelector('.row-qc'), null, 'ورودی متنی حذف شده است');
+      agentRow.querySelector('[data-qc-edit]').click();
+      await settle();
+      const pick = [...doc.querySelectorAll('#qpList .qc-pick-row')].find((r) => r.textContent.includes('هادی'));
+      assert.ok(pick, 'هادی در انتخاب‌گر هست');
+      pick.querySelector('input').click();
+      $('#qpSave').click();
       await settle(); await settle(); await settle();
       const col3 = (await w.LocalApi.run('GET', '/api/agents')).find((a) => a.name === 'کارشناس بدون ریت');
-      assert.deepEqual([...col3.qcAgents], ['هادی'], 'ویرایش آن‌لاین ستون ذخیره شد');
+      assert.deepEqual([...col3.qcAgents], ['هادی'], 'انتخاب با تیک ذخیره شد');
 
-      /* فرم افزودن/ویرایش کارشناس هم همین فیلد را دارد */
+      /* فرم افزودن/ویرایش کارشناس هم انتخاب‌گر تیکی دارد */
       doc.querySelector('#agentsBody tbody tr [data-act="edit"]').click();
       await settle();
-      assert.ok($('#aQ'), 'فیلد کارشناس QC در فرم کارشناس');
-      assert.ok(doc.querySelectorAll('#qcDlForm option').length > 0, 'پیشنهاد نام‌های QC');
-      doc.querySelector('[data-close]').click();
+      assert.ok($('#aQcBox') && $('#aQcPick'), 'انتخاب‌گر کارشناسان QC در فرم کارشناس');
+      doc.querySelector('#modalRoot .modal-back [data-close]').click();
       await settle();
 
       /* حذف کاربر QC → نامش از ستون همهی ردیف‌ها پاک می‌شود */

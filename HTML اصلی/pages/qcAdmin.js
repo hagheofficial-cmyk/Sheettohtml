@@ -16,7 +16,7 @@ function accessSummary(user) {
   const matched = matchedAgents(user).length;
   if (!exts.length && !names.length && !teams.length) {
     return matched
-      ? { text: fa(matched) + ' کارشناس ← از ستون qcAgents شیت', cls: 'info', count: matched }
+      ? { text: fa(matched) + ' کارشناس ← از ستون‌های QC شیت', cls: 'info', count: matched }
       : { text: 'دسترسی تعریف نشده', cls: 'bad', count: 0 };
   }
   const bits = [];
@@ -128,11 +128,11 @@ function draw(root) {
           'اولین کاربر را بسازید؛ از همان لحظه ورود با رمز اجباری می‌شود و هر کارشناس QC فقط داده‌ی کارشناسانی را می‌بیند که شما اجازه داده‌اید.',
           '<button class="btn primary" id="qcEmptyAdd"><i class="fa-solid fa-user-plus"></i> ساخت اولین کاربر</button>')}
         <div class="note" style="margin-top:14px"><i class="fa-solid fa-table"></i>
-          همین فهرست در تب <code>QC_Users</code> شیت نگهداری می‌شود: <code>name</code>، <code>password</code>، <code>role</code>،
-          <code>active</code>، <code>exts</code> (داخلی‌ها با ویرگول)، <code>agents</code> و <code>teams</code>.
-          می‌توانید دسترسی‌ها را مستقیم روی شیت هم بنویسید.
-          راه دیگر: در تب <code>Agents</code> ستون <code>qcAgents</code> ردیف هر کارشناس، نام کارشناس QC مسئولش را
-          بنویسید — همین اپ هم هنگام ذخیرهی کاربر، این ستون را پر می‌کند.</div>
+          همین فهرست در تب <code>QC_Users</code> شیت نگهداری می‌شود: <code>name</code>، <code>password</code>،
+          <code>role</code>، <code>active</code>، <code>exts</code>، <code>agents</code> و <code>teams</code>.
+          <br><b>روی شیت:</b> تب <code>Agents</code> برای هر کارشناس QC یک ستون اختصاصی با سرستون
+          <code>QC: نام</code> دارد؛ در ردیف هر کارشناس با انتخاب «✓» (لیست کشویی) مشخص کنید چه کسی او را
+          بررسی می‌کند. همین تیک‌ها در این صفحه هم دیده می‌شوند و برعکس.</div>
       </div>
     </div>`;
 
@@ -218,40 +218,47 @@ function editor(user) {
   const isOn = (a) => (a.ext != null && a.ext !== '' && extSet.has(String(a.ext))) ||
     nameSet.has(normKey(a.name)) || (!!userName && viaSheet(a));
 
-  const byTeam = new Map();
+  /* تیم‌ها یکدست می‌شوند: «Tele sales»، «telesales» و «Tele  Sales» یک تیم‌اند.
+   * فهرست هم تخت و قابل جستجو است؛ گروه‌های تودرتو باعث می‌شد کارشناس‌ها
+   * پایین چند سرستون گم شوند و نشود تیک زد. */
+  const teamKeyOf = (name) => String(name == null ? '' : name).replace(/[\s_‌\-]+/g, '').toLowerCase() || 'بدون‌تیم';
+  const teamInfo = new Map();
   state.agents.forEach((a) => {
-    const key = a.team || '—';
-    if (!byTeam.has(key)) byTeam.set(key, []);
-    byTeam.get(key).push(a);
+    const key = teamKeyOf(a.team);
+    if (!teamInfo.has(key)) teamInfo.set(key, { key, labels: new Map(), agents: [] });
+    const info = teamInfo.get(key);
+    const label = String(a.team == null ? '' : a.team).trim() || 'بدون تیم';
+    info.labels.set(label, (info.labels.get(label) || 0) + 1);
+    info.agents.push(a);
   });
-  const teamNames = [...byTeam.keys()].sort((x, y) => String(x).localeCompare(String(y), 'fa'));
-  const groups = teamNames.map((team) => {
-    const list = byTeam.get(team).slice().sort((x, y) => String(x.name).localeCompare(String(y.name), 'fa'));
-    return `
-      <div class="qc-group" data-team="${esc(team)}">
-        <div class="qc-group-head">
-          <strong>${esc(team)}</strong>
-          <span class="cell-sub" data-team-count></span>
-          <div class="spacer"></div>
-          <button type="button" class="btn ghost sm" data-team-all>همه</button>
-          <button type="button" class="btn ghost sm" data-team-none>هیچ</button>
-          <button type="button" class="btn ghost sm" data-team-scope
-            title="کل تیم به‌عنوان دسترسی ثبت شود؛ کارشناسان تازه‌ی این تیم خودکار اضافه می‌شوند">کل تیم</button>
-        </div>
-        <div class="qc-rows">
-          ${list.map((a) => {
-            const ext = a.ext == null || a.ext === '' ? '' : String(a.ext);
-            const sheet = !!userName && viaSheet(a);
-            return `<label class="qc-row${sheet ? ' from-sheet' : ''}" data-name="${esc(a.name)}" data-ext="${esc(ext)}">
-              <input type="checkbox" data-agent="${esc(a.name)}" ${isOn(a) ? 'checked' : ''}>
-              <span class="qc-row-name">${esc(a.name)}</span>
-              ${ext ? `<span class="qc-row-ext" dir="ltr">${esc(C.toFaDigits(ext))}</span>` : '<span class="qc-row-ext none">بدون داخلی</span>'}
-              ${sheet ? '<span class="qc-row-tag" title="از ستون qcAgents تب Agents">شیت</span>' : ''}
-            </label>`;
-          }).join('')}
-        </div>
-      </div>`;
-  }).join('');
+  const teamList = [...teamInfo.values()].map((info) => {
+    let label = info.agents.length ? 'بدون تیم' : '—', best = -1;
+    info.labels.forEach((count, text) => { if (count > best) { best = count; label = text; } });
+    return { key: info.key, label, agents: info.agents };
+  }).sort((x, y) => x.label.localeCompare(y.label, 'fa'));
+  const teamLabelOf = (agent) => {
+    const info = teamInfo.get(teamKeyOf(agent.team));
+    if (!info) return 'بدون تیم';
+    let label = '—', best = -1;
+    info.labels.forEach((count, text) => { if (count > best) { best = count; label = text; } });
+    return label;
+  };
+  const activeTeams = new Set(); // فیلتر تیم‌ها
+  const picked = new Set(state.agents.filter(isOn).map((a) => a.name));
+
+  function visibleAgents() {
+    const q = String($('#quSearch', m) ? $('#quSearch', m).value : '').trim().toLowerCase();
+    const digitsQ = C.faToEn(q).replace(/[^0-9]/g, '');
+    return state.agents.filter((a) => {
+      if (activeTeams.size && !activeTeams.has(teamKeyOf(a.team))) return false;
+      if (!q) return true;
+      const hay = (String(a.name || '') + ' ' + String(a.ext == null ? '' : a.ext) + ' ' + teamLabelOf(a)).toLowerCase();
+      return hay.indexOf(q) >= 0 || (!!digitsQ && String(a.ext == null ? '' : a.ext).indexOf(digitsQ) >= 0);
+    }).sort((x, y) => {
+      const t = teamLabelOf(x).localeCompare(teamLabelOf(y), 'fa');
+      return t !== 0 ? t : String(x.name).localeCompare(String(y.name), 'fa');
+    });
+  }
 
   const m = modal(`${modalHead(editing ? 'ویرایش کاربر — ' + user.name : 'کاربر QC جدید', 'fa-user-shield')}
     <div class="modal-body qc-editor">
@@ -278,17 +285,26 @@ function editor(user) {
         <label>دسترسی داده — کدام کارشناسان را ببیند و ریت کند</label>
         <div class="qc-access-bar">
           <div class="qc-search"><i class="fa-solid fa-magnifying-glass"></i>
-            <input class="input" id="quSearch" autocomplete="off" placeholder="جستجوی نام یا داخلی…"></div>
+            <input class="input" id="quSearch" autocomplete="off" placeholder="جستجوی نام، داخلی یا تیم…"></div>
           <span class="badge info" id="quCount">۰ کارشناس</span>
           <div class="spacer"></div>
           <label class="qc-all" title="همه‌ی کارشناسان، بدون استثنا"><input type="checkbox" id="quUnlimited">
             <span>همه‌ی کارشناسان</span></label>
         </div>
 
+        <div class="qc-team-filter" id="quTeams" role="group" aria-label="فیلتر تیم"></div>
         <div class="qc-picker" id="quPicker">
           <div class="qc-picked" id="quPicked"></div>
+          <div class="qc-toolbar">
+            <button type="button" class="btn ghost sm" id="quAll"><i class="fa-solid fa-check-double"></i> انتخاب همه‌ی نتایج</button>
+            <button type="button" class="btn ghost sm" id="quNone"><i class="fa-solid fa-eraser"></i> پاک‌کردن</button>
+            <button type="button" class="btn ghost sm" id="quScope" title="دسترسی کل تیم‌های فیلترشده — کارشناسان تازه‌ی همان تیم هم خودکار اضافه می‌شوند">
+              <i class="fa-solid fa-people-group"></i> کل تیم‌های فیلترشده</button>
+            <div class="spacer"></div>
+            <span class="qc-hint" id="quVisible"></span>
+          </div>
           ${state.agents.length
-            ? `<div class="qc-list" id="quList">${groups}</div>`
+            ? '<div class="qc-list" id="quList"></div>'
             : `<div class="qc-empty" id="quList"><i class="fa-solid fa-user-slash"></i> هنوز کارشناسی ثبت نشده —
                 اول از صفحه‌ی «مدیریت کارشناسان» فهرست را بسازید یا از تب <code>Agents</code> شیت پر کنید.</div>`}
         </div>
@@ -302,9 +318,9 @@ function editor(user) {
               placeholder="مثلاً: مسئول بررسی تیم MLM"></div>
         </div>
         <div class="note" id="quHint"></div>
-        <div class="note soft-note"><i class="fa-solid fa-table"></i> این تیک‌ها روی ستون <code>qcAgents</code> تب
-          <code>Agents</code> هم نوشته می‌شود؛ پس همان دسترسی را می‌توانید مستقیم روی شیت/اکسل هم ویرایش کنید
-          (نام کارشناس QC را در ردیف کارشناس بنویسید — چند نام با ویرگول).</div>
+        <div class="note soft-note"><i class="fa-solid fa-table"></i> هر تیک روی شیت در ستون اختصاصی همین
+          کارشناس QC (سرستون <code>QC: نام</code> در تب <code>Agents</code>) به‌صورت «✓» نوشته می‌شود و روی خود شیت
+          هم با همان لیست کشویی قابل تغییر است؛ دیگر نیازی به نوشتن نام‌ها با ویرگول نیست.</div>
       </div>
     </div>
     <div class="modal-foot">
@@ -312,13 +328,15 @@ function editor(user) {
       <button class="btn primary" id="quSave"><i class="fa-solid fa-floppy-disk"></i> ${editing ? 'ذخیره تغییرات' : 'ساخت کاربر'}</button>
     </div>`, { lg: true });
 
-  const roleSel = $('#quRole', m), unlimited = $('#quUnlimited', m), picker = $('#quPicker', m);
-  unlimited.checked = !!user && (user.role === 'admin' || !!user.unrestricted);
+  const roleSel = $('#quRole', m);
 
-  /* انتخاب‌شده‌ها مستقیم از خود چک‌باکس‌ها خوانده می‌شود تا تیک‌هایی که از ستون شیت
-   * آمده‌اند هم موقع ذخیره از دست نروند. */
-  function selected() {
-    const names = $$('input[data-agent]', m).filter((c) => c.checked).map((c) => c.dataset.agent);
+  const picker = $('#quPicker', m);
+  $('#quUnlimited', m).checked = !!user && (user.role === 'admin' || !!user.unrestricted);
+  const unlimitedBox = $('#quUnlimited', m);
+
+  /* انتخاب‌شده‌ها در یک Set نگه داشته می‌شوند تا فیلتر/جستجو تیک‌ها را از دست ندهد. */
+  function collect() {
+    const names = [...picked];
     const exts = [], plain = [];
     names.forEach((n) => {
       const a = state.agents.find((x) => x.name === n);
@@ -328,68 +346,114 @@ function editor(user) {
     return { names, exts: [...new Set(exts.concat(extra))], plain: [...new Set(plain)] };
   }
 
+  function rowHtml(a) {
+    const ext = a.ext == null || a.ext === '' ? '' : String(a.ext);
+    const sheet = !!userName && viaSheet(a);
+    return `<label class="qc-row${picked.has(a.name) ? ' on' : ''}${sheet ? ' from-sheet' : ''}"
+        data-name="${esc(a.name)}" data-team="${esc(teamKeyOf(a.team))}">
+      <input type="checkbox" data-agent="${esc(a.name)}" ${picked.has(a.name) ? 'checked' : ''}>
+      <span class="qc-row-name">${esc(a.name)}</span>
+      <span class="qc-row-team">${esc(teamLabelOf(a))}</span>
+      ${ext ? `<span class="qc-row-ext" dir="ltr">${esc(C.toFaDigits(ext))}</span>` : '<span class="qc-row-ext none">بدون داخلی</span>'}
+      ${sheet ? '<span class="qc-row-tag" title="از ستون QC همین کارشناس QC روی تب Agents">شیت</span>' : ''}
+    </label>`;
+  }
+
+  function renderTeams() {
+    const box = $('#quTeams', m);
+    if (!box) return;
+    box.innerHTML = `<button type="button" class="qc-team-chip${activeTeams.size ? '' : ' sel'}" data-team="">همه تیم‌ها
+        <b>${fa(state.agents.length)}</b></button>` +
+      teamList.map((t) => `<button type="button" class="qc-team-chip${activeTeams.has(t.key) ? ' sel' : ''}"
+        data-team="${esc(t.key)}">${esc(t.label)} <b>${fa(t.agents.length)}</b>
+        ${selectedTeams.has(t.label) ? '<i class="fa-solid fa-people-group" title="کل تیم"></i>' : ''}</button>`).join('');
+    $$('[data-team]', box).forEach((chip) => chip.addEventListener('click', () => {
+      const key = chip.dataset.team;
+      if (!key) activeTeams.clear();
+      else if (activeTeams.has(key)) activeTeams.delete(key); else activeTeams.add(key);
+      renderTeams(); renderList();
+    }));
+  }
+
+  function renderList() {
+    const list = $('#quList', m);
+    if (!list) return;
+    if (!state.agents.length) return;
+    const rows = visibleAgents();
+    list.innerHTML = rows.length ? rows.map(rowHtml).join('')
+      : '<div class="qc-empty"><i class="fa-solid fa-magnifying-glass"></i> کارشناسی با این فیلتر پیدا نشد.</div>';
+    $$('input[data-agent]', list).forEach((box) => box.addEventListener('change', () => {
+      if (box.checked) picked.add(box.dataset.agent); else picked.delete(box.dataset.agent);
+      box.closest('.qc-row').classList.toggle('on', box.checked);
+      refreshCount();
+    }));
+    const visible = $('#quVisible', m);
+    if (visible) visible.textContent = fa(rows.length) + ' از ' + fa(state.agents.length);
+  }
+
   function refreshCount() {
-    const sel = selected();
-    const off = unlimited.checked || roleSel.value === 'admin';
+    const off = unlimitedBox.checked || roleSel.value === 'admin';
     picker.classList.toggle('off', off);
     $('#quCount', m).textContent = off ? 'همه‌ی کارشناسان'
-      : fa(sel.names.length) + ' کارشناس' + (selectedTeams.size ? ' + ' + fa(selectedTeams.size) + ' تیم کامل' : '');
+      : fa(picked.size) + ' کارشناس' + (selectedTeams.size ? ' + ' + fa(selectedTeams.size) + ' تیم کامل' : '');
 
-    $$('.qc-picked', m).forEach((box) => {
-      box.innerHTML = off
-        ? '<span class="qc-picked-empty">دسترسی نامحدود — همه‌ی کارشناسان</span>'
-        : (sel.names.length
-          ? sel.names.map((n) => `<span class="qc-chip">${esc(n)}<button type="button" data-unpick="${esc(n)}"
-              title="برداشتن"><i class="fa-solid fa-xmark"></i></button></span>`).join('')
-          : '<span class="qc-picked-empty">هنوز کارشناسی انتخاب نشده — از فهرست زیر تیک بزنید</span>');
-    });
+    const box = $('#quPicked', m);
+    if (box) box.innerHTML = off
+      ? '<span class="qc-picked-empty">دسترسی نامحدود — همه‌ی کارشناسان</span>'
+      : (picked.size
+        ? [...picked].sort((x, y) => String(x).localeCompare(String(y), 'fa')).map((n) => `<span class="qc-chip">${esc(n)}<button type="button" data-unpick="${esc(n)}"
+            title="برداشتن"><i class="fa-solid fa-xmark"></i></button></span>`).join('')
+        : '<span class="qc-picked-empty">هنوز کارشناسی انتخاب نشده — از فهرست پایین تیک بزنید</span>');
     $$('[data-unpick]', m).forEach((b) => b.addEventListener('click', () => {
-      const box = $$('input[data-agent]', m).find((c) => c.dataset.agent === b.dataset.unpick);
-      if (box && box.checked) { box.checked = false; refreshCount(); }
+      picked.delete(b.dataset.unpick);
+      const box2 = $$('input[data-agent]', m).find((c) => c.dataset.agent === b.dataset.unpick);
+      if (box2) { box2.checked = false; box2.closest('.qc-row').classList.remove('on'); }
+      refreshCount();
     }));
 
-    $$('.qc-group', m).forEach((g) => {
-      const boxes = $$('input[data-agent]', g);
-      const on = boxes.filter((c) => c.checked).length;
-      const countEl = $('[data-team-count]', g);
-      if (countEl) countEl.textContent = fa(on) + ' از ' + fa(boxes.length);
-      g.classList.toggle('scoped', selectedTeams.has(g.dataset.team));
-      const visible = $$('.qc-row', g).filter((r) => !r.hidden).length;
-      g.hidden = visible === 0;
-    });
-
     $('#quHint', m).innerHTML = off
-      ? '<i class="fa-solid fa-circle-info"></i> این کاربر همه‌ی کارشناسان را می‌بیند؛ ستون <code>qcAgents</code> برای او خالی می‌ماند.'
-      : (sel.exts.length || sel.plain.length || selectedTeams.size)
-        ? '<i class="fa-solid fa-circle-check"></i> فقط ارزیابی‌های این کارشناسان در داشبورد، گزارش‌ها و سوابق دیده می‌شود.'
+      ? '<i class="fa-solid fa-circle-info"></i> این کاربر همه‌ی کارشناسان را می‌بیند؛ برای او ستون‌های QC خالی می‌مانند.'
+      : (picked.size || selectedTeams.size)
+        ? '<i class="fa-solid fa-circle-check"></i> فقط ارزیابی‌های همین کارشناسان در داشبورد، گزارش‌ها و سوابق دیده می‌شود.'
         : '<i class="fa-solid fa-triangle-exclamation"></i> دسترسی خالی یعنی این کارشناس هیچ داده‌ای نمی‌بیند.';
+
+    const scopeBtn = $('#quScope', m);
+    if (scopeBtn) {
+      const scopedNow = [...activeTeams].filter((key) => {
+        const t = teamList.find((x) => x.key === key);
+        return t && selectedTeams.has(t.label);
+      });
+      const allScoped = activeTeams.size > 0 && scopedNow.length === activeTeams.size;
+      scopeBtn.classList.toggle('on', allScoped);
+      scopeBtn.disabled = !activeTeams.size;
+    }
   }
+
+  renderTeams();
+  renderList();
+  refreshCount();
 
   $('#quShow', m).addEventListener('click', () => {
     const inp = $('#quPass', m);
     inp.type = inp.type === 'password' ? 'text' : 'password';
   });
-  $('#quSearch', m).addEventListener('input', debounce(() => {
-    const q = String($('#quSearch', m).value).trim().toLowerCase();
-    $$('.qc-row', m).forEach((row) => {
-      const hay = (row.dataset.name + ' ' + row.dataset.ext).toLowerCase();
-      row.hidden = !!q && hay.indexOf(q) === -1;
-    });
-    refreshCount();
-  }, 110));
+  $('#quSearch', m).addEventListener('input', debounce(renderList, 90));
   $('#quExtraExt', m).addEventListener('input', debounce(refreshCount, 150));
-  unlimited.addEventListener('change', refreshCount);
-  roleSel.addEventListener('change', () => { if (roleSel.value === 'admin') unlimited.checked = true; refreshCount(); });
-  $$('input[data-agent]', m).forEach((c) => c.addEventListener('change', refreshCount));
-  $$('.qc-group', m).forEach((g) => {
-    const boxes = () => $$('input[data-agent]', g);
-    $('[data-team-all]', g).addEventListener('click', () => { boxes().forEach((c) => { c.checked = true; }); refreshCount(); });
-    $('[data-team-none]', g).addEventListener('click', () => { boxes().forEach((c) => { c.checked = false; }); refreshCount(); });
-    $('[data-team-scope]', g).addEventListener('click', () => {
-      const team = g.dataset.team;
-      if (selectedTeams.has(team)) selectedTeams.delete(team); else selectedTeams.add(team);
-      refreshCount();
-    });
+  unlimitedBox.addEventListener('change', refreshCount);
+  roleSel.addEventListener('change', () => { if (roleSel.value === 'admin') unlimitedBox.checked = true; refreshCount(); });
+  $('#quAll', m).addEventListener('click', () => {
+    visibleAgents().forEach((a) => picked.add(a.name));
+    renderList(); refreshCount();
+  });
+  $('#quNone', m).addEventListener('click', () => {
+    visibleAgents().forEach((a) => picked.delete(a.name));
+    renderList(); refreshCount();
+  });
+  $('#quScope', m).addEventListener('click', () => {
+    const teams = [...activeTeams].map((key) => teamList.find((t) => t.key === key)).filter(Boolean);
+    const allScoped = teams.length > 0 && teams.every((t) => selectedTeams.has(t.label));
+    teams.forEach((t) => { if (allScoped) selectedTeams.delete(t.label); else selectedTeams.add(t.label); });
+    renderTeams(); refreshCount();
   });
 
   $('#quSave', m).addEventListener('click', async () => {
@@ -398,9 +462,9 @@ function editor(user) {
     if (!name) { toast.error('نام کارشناس QC الزامی است'); return; }
     if (!editing && !pass) { toast.error('رمز اولیه الزامی است'); return; }
     if (pass && pass.length < 4) { toast.error('رمز باید حداقل ۴ نویسه باشد'); return; }
-    const sel = selected();
+    const sel = collect();
     const role = roleSel.value;
-    const off = role === 'admin' || unlimited.checked;
+    const off = role === 'admin' || unlimitedBox.checked;
     const payload = {
       id: editing ? user.id : '',
       name: name,
@@ -427,7 +491,6 @@ function editor(user) {
     } catch (e) { toast.error(e.message); btn.disabled = false; }
   });
 
-  refreshCount();
 }
 
 function debounce(fn, ms) { let t; return function (...a) { clearTimeout(t); t = setTimeout(() => fn.apply(this, a), ms); }; }

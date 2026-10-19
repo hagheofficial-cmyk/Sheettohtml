@@ -5,9 +5,38 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>سامانه یکپارچه کنترل کیفیت CRM</title>
 <link href="vendor/fontawesome/css/all.min.css" rel="stylesheet">
-<link rel="icon" type="image/png" sizes="64x64" href="favicon.png?v=2">
-<link rel="shortcut icon" href="favicon.ico?v=2">
+<link rel="icon" type="image/png" sizes="64x64" href="favicon.png?v=3">
+<link rel="shortcut icon" href="favicon.ico?v=3">
 <link rel="manifest" href="manifest.webmanifest">
+<script>
+/* آیکون سربرگ مرورگر: اگر favicon.png در دسترس نباشد (صفحه‌ای که داخل بسته‌ی
+ * اکستنشن یا HtmlService باز می‌شود)، آیکون از خود لوگوی سامانه ساخته می‌شود تا
+ * آیکون پیش‌فرض مرورگر/اکستنشن روی تب نماند. */
+(function () {
+  function paint() {
+    try {
+      var src = window.APP_SCRIPT_LOGO_DATA || 'logo.png';
+      var link = document.querySelector('link[rel="icon"]');
+      if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var canvas = document.createElement('canvas');
+          canvas.width = canvas.height = 64;
+          var ctx = canvas.getContext('2d');
+          var size = Math.min(img.width || 64, img.height || 64);
+          ctx.drawImage(img, ((img.width || 64) - size) / 2, ((img.height || 64) - size) / 2, size, size, 0, 0, 64, 64);
+          link.type = 'image/png';
+          link.href = canvas.toDataURL('image/png');
+        } catch (e) {}
+      };
+      img.src = src;
+    } catch (e) {}
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', paint);
+  else paint();
+})();
+</script>
 <meta name="theme-color" content="#087bbd">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <script src="vendor/chart.umd.min.js"></script>

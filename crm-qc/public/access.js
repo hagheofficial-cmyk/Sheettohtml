@@ -140,6 +140,67 @@ function splitList(value) {
   return text(value).split(/[,،;؛|\n\r\t]+/).map((x) => text(x)).filter(Boolean);
 }
 
+/* --------------------------------- نگاشت «یک ستون برای هر کارشناس QC» روی شیت
+ * به‌جای یک ستون تکی با نام‌های جداشده با ویرگول، تب Agents برای هر کارشناس QC
+ * یک ستون اختصاصی دارد: سرستون `QC: <نام>` و سلول‌ها «✓» (یا خالی). همان تابع‌ها
+ * هم ستون‌ها را می‌سازند و هم موقع خواندن شیت، تیک‌ها را به فهرست qcAgents برمی‌گردانند.
+ * این کار ویرایش مستقیم روی شیت/اکسل را ساده و بدون خطای ویرگول می‌کند. */
+const QC_COLUMN_PREFIX = 'QC';
+const QC_TICK = '✓';
+function qcColumnHeader(name) { return QC_COLUMN_PREFIX + ': ' + text(name); }
+function qcColumnName(header) {
+  const match = text(header).match(/^qc\s*[:：]\s*(.+)$/i);
+  return match ? text(match[1]) : '';
+}
+function isQcColumn(header) { return !!qcColumnName(header); }
+function isQcTick(value) {
+  const v = digits(text(value)).toLowerCase().replace(/\s+/g, '');
+  if (!v) return false;
+  return ['✓', '✔', '☑', 'x', 'yes', 'y', 'true', '1', 'on', 'بله', 'فعال', 'دارد'].indexOf(v) !== -1;
+}
+/* فهرست نام‌های QC مسئول یک ردیف کارشناس (آرایه، رشته‌ی ویرگولی یا ردیف خام شیت) */
+function agentQcNames(row) {
+  if (row == null) return [];
+  const source = Array.isArray(row) || typeof row === 'string' ? { qcAgents: row } : row;
+  const out = [];
+  const push = (name) => {
+    const n = text(name);
+    if (!n) return;
+    if (!out.some((x) => nameKey(x) === nameKey(n))) out.push(n);
+  };
+  Object.keys(source || {}).forEach((key) => {
+    const name = qcColumnName(key);
+    if (name && isQcTick(source[key])) push(name);
+  });
+  splitList(source.qcAgents).forEach(push);
+  return out;
+}
+/* ردیف خام شیت → ردیف تمیز: ستون‌های QC حذف و در qcAgents جمع می‌شوند */
+function applyQcColumns(row) {
+  const out = Object.assign({}, row || {});
+  const names = agentQcNames(out);
+  Object.keys(out).forEach((key) => { if (isQcColumn(key)) delete out[key]; });
+  out.qcAgents = names;
+  return out;
+}
+/* مقدار سلول برای ستون یک کارشناس QC مشخص */
+function qcColumnValue(list, name) {
+  const key = nameKey(name);
+  return splitList(list).some((n) => nameKey(n) === key) ? QC_TICK : '';
+}
+/* فهرست کامل کارشناسان QC برای ساخت ستون‌ها: db.qcAgents + هر نامی که در ردیف‌ها هست */
+function qcExpertNames(db, rows) {
+  const out = [];
+  const push = (name) => {
+    const n = text(name);
+    if (!n) return;
+    if (!out.some((x) => nameKey(x) === nameKey(n))) out.push(n);
+  };
+  ((db && db.qcAgents) || []).forEach(push);
+  (rows || []).forEach((row) => agentQcNames(row).forEach(push));
+  return out;
+}
+
 function isWildcard(list) {
   return (list || []).some((x) => ['*', 'all', 'همه', 'همه‌چیز', '-'].indexOf(digits(x).toLowerCase()) !== -1);
 }
@@ -418,9 +479,14 @@ function saveUser(db, body, existing) {
   row.name = name;
   row.role = /^ad/i.test(text(body.role)) ? 'admin' : 'qc';
   row.active = body.active === undefined ? true : !!body.active;
-  row.exts = Array.isArray(body.exts) ? body.exts.map(digits).filter(Boolean).join(',') : text(body.exts);
-  row.agents = Array.isArray(body.agents) ? body.agents.map(text).filter(Boolean).join(',') : text(body.agents);
-  row.teams = Array.isArray(body.teams) ? body.teams.map(text).filter(Boolean).join(',') : text(body.teams);
+  /* اگر فیلدی در بدنه نیامده باشد (مثلاً فقط تغییر رمز یا نام)، مقدار قبلی حفظ
+   * می‌شود؛ وگرنه یک PUT ناقص می‌توانست کل دسترسی را پاک کند. */
+  const listValue = (value, key) => (Array.isArray(value)
+    ? value.map(key === 'exts' ? digits : text).filter(Boolean).join(',')
+    : text(value));
+  row.exts = body.exts === undefined ? text(existing && existing.exts) : listValue(body.exts, 'exts');
+  row.agents = body.agents === undefined ? text(existing && existing.agents) : listValue(body.agents, 'agents');
+  row.teams = body.teams === undefined ? text(existing && existing.teams) : listValue(body.teams, 'teams');
   row.note = text(body.note);
   row.updatedAt = new Date().toISOString();
   const plain = body.password == null ? '' : text(body.password);
@@ -434,10 +500,16 @@ function saveUser(db, body, existing) {
     const at = users.indexOf(existing);
     if (at >= 0) users[at] = row; else users.push(row);
   } else users.push(row);
-  /* نام کارشناس QC باید در فهرست qcAgents هم باشد تا در فرم‌ها قابل انتخاب باشد. */
+  /* نام کارشناس QC باید در فهرست qcAgents هم باشد تا در فرم‌ها و ستون‌های تب
+   * Agents دیده شود. با تغییر نام، همان جایگاه قبلی به نام تازه تبدیل می‌شود
+   * (وگرنه ستون قدیمی روی شیت برای همیشه می‌ماند). */
   if (!Array.isArray(db.qcAgents)) db.qcAgents = [];
-  if (!db.qcAgents.some((x) => nameKey(x) === key)) db.qcAgents.push(name);
-  if (previousName && nameKey(previousName) !== key) renameAgentQcColumn(db, previousName, name);
+  const previousKey = previousName ? nameKey(previousName) : '';
+  const at = previousKey && previousKey !== key
+    ? db.qcAgents.findIndex((x) => nameKey(x) === previousKey) : -1;
+  if (at >= 0) db.qcAgents[at] = name;
+  else if (!db.qcAgents.some((x) => nameKey(x) === key)) db.qcAgents.push(name);
+  if (previousName && previousKey !== key) renameAgentQcColumn(db, previousName, name);
   return clone(row);
 }
 
@@ -469,6 +541,10 @@ return {
   publicUser: publicUser, allowedAgentNames: allowedAgentNames, scopeDb: scopeDb, writeGuard: writeGuard,
   canAccessApi: canAccessApi, canAccessRoute: canAccessRoute, visibleRoutes: visibleRoutes, isAdmin: isAdmin,
   saveUser: saveUser, deleteUser: deleteUser, usersToRows: usersToRows, userMask: userMask,
+  nameKey: nameKey,
+  QC_COLUMN_PREFIX: QC_COLUMN_PREFIX, QC_TICK: QC_TICK, qcColumnHeader: qcColumnHeader,
+  qcColumnName: qcColumnName, isQcColumn: isQcColumn, isQcTick: isQcTick, agentQcNames: agentQcNames,
+  applyQcColumns: applyQcColumns, qcColumnValue: qcColumnValue, qcExpertNames: qcExpertNames,
   syncAgentQcColumn: syncAgentQcColumn, dropAgentQcColumn: dropAgentQcColumn,
   renameAgentQcColumn: renameAgentQcColumn,
   ADMIN_ROUTES: ADMIN_ROUTES, SHARED_ROUTES: SHARED_ROUTES, ADMIN_API: ADMIN_API, OPEN_API: OPEN_API

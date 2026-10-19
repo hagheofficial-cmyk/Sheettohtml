@@ -34,8 +34,13 @@ const api = {
     return Object.keys(h).length ? h : undefined;
   },
   async req(method,url,body){
+    if(method!=='GET')api._revNoted=false;
     const work=this._request(method,url,body);if(method!=='GET')this._writes.add(work);
-    try{const result=await work;if(method!=='GET'&&window.App)window.App.syncAfterWrite();return result;}
+    try{
+      const result=await work;
+      if(method!=='GET'&&window.App&&!api._revNoted)window.App.syncAfterWrite();
+      return result;
+    }
     finally{this._writes.delete(work);}
   },
   unauthorized(message) {
@@ -53,6 +58,12 @@ const api = {
           headers: api.headers(body),
           body: body ? JSON.stringify(body) : undefined
         });
+        /* سرور شماره‌ی نسخه‌ی تازه را در همان پاسخ نوشتن می‌فرستد؛ این کار یک
+         * رفت‌وبرگشت کامل به /api/revision را بعد از هر ثبت حذف می‌کند. */
+        try {
+          const rev = (res.headers && typeof res.headers.get === 'function' ? res.headers.get('x-qc-revision') : '') || res.revision || '';
+          if (rev && window.App) { window.App.noteRevision(rev); api._revNoted = true; }
+        } catch (e) {}
         let data = null;
         try { data = await res.json(); } catch (e) { /* پاسخ خالی */ }
         if (!res.ok) {
@@ -963,6 +974,26 @@ const App = {
     const chip = $('#syncChip');
     if (chip) { chip.hidden = false; chip.classList.add('pulse'); }
   },
+  /* نسخه‌ی تازه از همان پاسخ نوشتن می‌آید (هدر x-qc-revision یا فیلد revision
+   * در Apps Script) — بدون درخواست اضافه. */
+  noteRevision(rev) {
+    const n = Number(String(rev).split('-')[0]);
+    if (!n) return;
+    this.revision = n;
+    this._syncRevision = n;
+    const chip = $('#syncChip');
+    if (chip) { chip.hidden = true; chip.classList.remove('pulse'); }
+  },
+
+  /* بعد از ثبت/حذف یک ریت، فقط شمارش پاورقی اصلاح می‌شود؛ خواندن دوباره‌ی کل
+   * bootstrap (که در Apps Script یک رفت‌وبرگشت گران است) لازم نیست. */
+  applyWrite(kind, delta) {
+    const counts = this.state && this.state.counts;
+    if (!counts || counts[kind] == null) { this.refreshCounts(true); return; }
+    counts[kind] = Math.max(0, Number(counts[kind]) + (delta || 0));
+    this.paintCounts(counts);
+  },
+
   async syncAfterWrite() {
     if (!this._syncTimer) return;
     try {

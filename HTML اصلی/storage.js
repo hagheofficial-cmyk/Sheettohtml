@@ -640,7 +640,7 @@ function qcUsersRoute(method, id, body) {
       session = A.normalizeUser(row, 0); // تغییر نقش/دسترسی مدیر بلافاصله اعمال شود
     }
     /* تیک‌ها → ستون qcAgents ردیف کارشناسان (تا از شیت/اکسل هم قابل ویرایش باشد) */
-    A.syncAgentQcColumn(db, A.normalizeUser(row, 0), body && body.syncColumn ? 'sync' : 'keep');
+    A.syncAgentQcColumn(db, A.normalizeUser(row, 0), (body && body.syncColumn && (body.exts !== undefined || body.agents !== undefined || body.teams !== undefined)) ? 'sync' : 'keep');
     saveDb();
     return { ok: true, user: clone(A.userMask([A.normalizeUser(row, 0)])[0]), users: clone(A.userMask(A.normalizeUsers(db))),
       agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false,

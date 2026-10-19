@@ -282,3 +282,26 @@ test('report memoization speeds repeats up and never serves stale data after a w
   }
   assert.equal((await http('GET', '/api/data/status?' + q)).data.tickets, 1);
 });
+
+/* سرعت: شماره‌ی نسخه‌ی تازه در همان پاسخ نوشتن برمی‌گردد تا کلاینت برای فهمیدن
+ * تازگی داده یک رفت‌وبرگشت اضافه به /api/revision انجام ندهد. */
+test('write responses carry the new revision header (no extra revision round trip)', async (t) => {
+  const server = await startServer();
+  t.after(() => server.close());
+  const bootstrap = await (await fetch(server.origin + '/api/bootstrap')).json();
+  const agent = bootstrap.agents[0];
+  const response = await fetch(server.origin + '/api/tickets', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      qcAgent: bootstrap.qcAgents[0], reviewDate: '1405/06/20', ticketDate: '1405/06/20',
+      agentName: agent.name, team: agent.team, ticketCode: 'REV-1',
+      q1: '1', q2: '1', q3: '0', q4: '1', redline: '0', comment: 'revision'
+    })
+  });
+  assert.equal(response.status, 200);
+  const revision = Number(response.headers.get('x-qc-revision'));
+  assert.ok(revision > Number(bootstrap.revision || 0),
+    'revision باید جلو رفته باشد: ' + revision + ' > ' + bootstrap.revision);
+  const after = await (await fetch(server.origin + '/api/revision')).json();
+  assert.equal(Number(after.revision), revision, 'همان نسخه‌ای که در پاسخ آمد');
+});

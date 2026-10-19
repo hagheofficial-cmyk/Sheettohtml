@@ -10,6 +10,35 @@
 
 
 
+<script>
+/* آیکون سربرگ مرورگر: اگر favicon.png در دسترس نباشد (صفحه‌ای که داخل بسته‌ی
+ * اکستنشن یا HtmlService باز می‌شود)، آیکون از خود لوگوی سامانه ساخته می‌شود تا
+ * آیکون پیش‌فرض مرورگر/اکستنشن روی تب نماند. */
+(function () {
+  function paint() {
+    try {
+      var src = window.APP_SCRIPT_LOGO_DATA || 'logo.png';
+      var link = document.querySelector('link[rel="icon"]');
+      if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var canvas = document.createElement('canvas');
+          canvas.width = canvas.height = 64;
+          var ctx = canvas.getContext('2d');
+          var size = Math.min(img.width || 64, img.height || 64);
+          ctx.drawImage(img, ((img.width || 64) - size) / 2, ((img.height || 64) - size) / 2, size, size, 0, 0, 64, 64);
+          link.type = 'image/png';
+          link.href = canvas.toDataURL('image/png');
+        } catch (e) {}
+      };
+      img.src = src;
+    } catch (e) {}
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', paint);
+  else paint();
+})();
+</script>
 <meta name="theme-color" content="#087bbd">
 
 
@@ -1116,6 +1145,53 @@ body.auth-locked #app { filter: blur(2px); pointer-events: none; }
   background: rgba(52, 211, 153, .16); color: var(--good); border: 1px solid rgba(52, 211, 153, .35); }
 .qc-row:has(input:checked) { border-color: rgba(56, 189, 248, .55); background: var(--brand-soft); }
 .qc-row:has(input:checked) .qc-row-name { color: var(--brand); }
+/* فیلتر تیم و نوار ابزار انتخاب‌گر (بازطراحی ۱۴۰۵/۰۷): بدون گروه‌های تودرتو،
+   فهرست تخت و همیشه قابل تیک‌زدن؛ تیم‌های هم‌نام یکدست می‌شوند. */
+.qc-team-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 9px; max-height: 92px; overflow-y: auto; padding: 2px; }
+.qc-team-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink-2); font: 700 11.4px Vazirmatn, sans-serif;
+  cursor: pointer; white-space: nowrap; }
+.qc-team-chip b { color: var(--muted); font-size: 10.4px; font-weight: 800; }
+.qc-team-chip i { color: var(--good); font-size: 10px; }
+.qc-team-chip:hover { border-color: rgba(56, 189, 248, .5); }
+.qc-team-chip.sel { border-color: var(--brand); background: var(--brand-soft); color: var(--brand); }
+.qc-team-chip.sel b { color: var(--brand); }
+.qc-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 8px 10px;
+  border-bottom: 1px solid var(--line-soft); background: var(--panel-soft); }
+.qc-toolbar .spacer { flex: 1; }
+.qc-toolbar .btn.sm { padding: 5px 10px; font-size: 11px; }
+.qc-toolbar .btn.on { border-color: rgba(52, 211, 153, .6); background: rgba(52, 211, 153, .14); color: var(--good); }
+.qc-toolbar .btn:disabled { opacity: .45; cursor: not-allowed; }
+.qc-hint { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.qc-picker.off .qc-toolbar { pointer-events: none; opacity: .5; }
+.qc-list { gap: 6px; }
+.qc-row { padding: 7px 10px; }
+.qc-row-team { flex: 0 1 auto; margin-inline-start: auto; max-width: 40%; color: var(--muted); font-size: 10.4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qc-row-ext { margin-inline-start: 0; flex: 0 0 auto; white-space: nowrap; }
+.qc-row.on { border-color: rgba(56, 189, 248, .55); background: var(--brand-soft); }
+.qc-row.on .qc-row-name { color: var(--brand); }
+
+/* انتخاب‌گر کوچک کارشناسان QC در فهرست کارشناسان (به‌جای ورودی ویرگولی) */
+.agent-qc-cell { min-width: 170px; }
+.qc-mini { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.qc-mini-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 5px 2px 8px; border-radius: 999px;
+  background: var(--brand-soft); border: 1px solid rgba(56, 189, 248, .32); color: var(--brand);
+  font-size: 10.6px; font-weight: 700; }
+.qc-mini-chip button { border: 0; background: transparent; color: inherit; cursor: pointer; padding: 0;
+  width: 15px; height: 15px; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; opacity: .7; }
+.qc-mini-chip button:hover { opacity: 1; color: var(--bad); }
+.qc-mini-add { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
+  border-radius: 50%; border: 1px dashed var(--line); background: var(--panel); color: var(--muted);
+  cursor: pointer; font-size: 10px; }
+.qc-mini-add:hover { border-color: var(--brand); color: var(--brand); }
+.qc-pick-list { display: flex; flex-direction: column; gap: 6px; max-height: min(50vh, 420px); overflow-y: auto;
+  border: 1px solid var(--line); border-radius: 14px; padding: 9px; background: var(--bg-2); }
+.qc-pick-row { display: flex; align-items: center; gap: 10px; padding: 8px 11px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--panel); cursor: pointer; font-size: 12.4px; font-weight: 700; }
+.qc-pick-row input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--brand); margin: 0; flex: 0 0 auto; }
+.qc-pick-row.on { border-color: rgba(56, 189, 248, .55); background: var(--brand-soft); color: var(--brand); }
+
 .qc-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: 12px; margin-top: 12px; }
 .note.soft-note { color: var(--muted); }
 
@@ -1145,6 +1221,7 @@ body.auth-locked #app { filter: blur(2px); pointer-events: none; }
 
 </style>
 
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
 
 <style>/* bundled Vazirmatn fonts */
 /* vazirmatn-arabic-300-normal */
@@ -3770,6 +3847,67 @@ function splitList(value) {
   return text(value).split(/[,،;؛|\n\r\t]+/).map((x) => text(x)).filter(Boolean);
 }
 
+/* --------------------------------- نگاشت «یک ستون برای هر کارشناس QC» روی شیت
+ * به‌جای یک ستون تکی با نام‌های جداشده با ویرگول، تب Agents برای هر کارشناس QC
+ * یک ستون اختصاصی دارد: سرستون `QC: <نام>` و سلول‌ها «✓» (یا خالی). همان تابع‌ها
+ * هم ستون‌ها را می‌سازند و هم موقع خواندن شیت، تیک‌ها را به فهرست qcAgents برمی‌گردانند.
+ * این کار ویرایش مستقیم روی شیت/اکسل را ساده و بدون خطای ویرگول می‌کند. */
+const QC_COLUMN_PREFIX = 'QC';
+const QC_TICK = '✓';
+function qcColumnHeader(name) { return QC_COLUMN_PREFIX + ': ' + text(name); }
+function qcColumnName(header) {
+  const match = text(header).match(/^qc\s*[:：]\s*(.+)$/i);
+  return match ? text(match[1]) : '';
+}
+function isQcColumn(header) { return !!qcColumnName(header); }
+function isQcTick(value) {
+  const v = digits(text(value)).toLowerCase().replace(/\s+/g, '');
+  if (!v) return false;
+  return ['✓', '✔', '☑', 'x', 'yes', 'y', 'true', '1', 'on', 'بله', 'فعال', 'دارد'].indexOf(v) !== -1;
+}
+/* فهرست نام‌های QC مسئول یک ردیف کارشناس (آرایه، رشته‌ی ویرگولی یا ردیف خام شیت) */
+function agentQcNames(row) {
+  if (row == null) return [];
+  const source = Array.isArray(row) || typeof row === 'string' ? { qcAgents: row } : row;
+  const out = [];
+  const push = (name) => {
+    const n = text(name);
+    if (!n) return;
+    if (!out.some((x) => nameKey(x) === nameKey(n))) out.push(n);
+  };
+  Object.keys(source || {}).forEach((key) => {
+    const name = qcColumnName(key);
+    if (name && isQcTick(source[key])) push(name);
+  });
+  splitList(source.qcAgents).forEach(push);
+  return out;
+}
+/* ردیف خام شیت → ردیف تمیز: ستون‌های QC حذف و در qcAgents جمع می‌شوند */
+function applyQcColumns(row) {
+  const out = Object.assign({}, row || {});
+  const names = agentQcNames(out);
+  Object.keys(out).forEach((key) => { if (isQcColumn(key)) delete out[key]; });
+  out.qcAgents = names;
+  return out;
+}
+/* مقدار سلول برای ستون یک کارشناس QC مشخص */
+function qcColumnValue(list, name) {
+  const key = nameKey(name);
+  return splitList(list).some((n) => nameKey(n) === key) ? QC_TICK : '';
+}
+/* فهرست کامل کارشناسان QC برای ساخت ستون‌ها: db.qcAgents + هر نامی که در ردیف‌ها هست */
+function qcExpertNames(db, rows) {
+  const out = [];
+  const push = (name) => {
+    const n = text(name);
+    if (!n) return;
+    if (!out.some((x) => nameKey(x) === nameKey(n))) out.push(n);
+  };
+  ((db && db.qcAgents) || []).forEach(push);
+  (rows || []).forEach((row) => agentQcNames(row).forEach(push));
+  return out;
+}
+
 function isWildcard(list) {
   return (list || []).some((x) => ['*', 'all', 'همه', 'همه‌چیز', '-'].indexOf(digits(x).toLowerCase()) !== -1);
 }
@@ -4048,9 +4186,14 @@ function saveUser(db, body, existing) {
   row.name = name;
   row.role = /^ad/i.test(text(body.role)) ? 'admin' : 'qc';
   row.active = body.active === undefined ? true : !!body.active;
-  row.exts = Array.isArray(body.exts) ? body.exts.map(digits).filter(Boolean).join(',') : text(body.exts);
-  row.agents = Array.isArray(body.agents) ? body.agents.map(text).filter(Boolean).join(',') : text(body.agents);
-  row.teams = Array.isArray(body.teams) ? body.teams.map(text).filter(Boolean).join(',') : text(body.teams);
+  /* اگر فیلدی در بدنه نیامده باشد (مثلاً فقط تغییر رمز یا نام)، مقدار قبلی حفظ
+   * می‌شود؛ وگرنه یک PUT ناقص می‌توانست کل دسترسی را پاک کند. */
+  const listValue = (value, key) => (Array.isArray(value)
+    ? value.map(key === 'exts' ? digits : text).filter(Boolean).join(',')
+    : text(value));
+  row.exts = body.exts === undefined ? text(existing && existing.exts) : listValue(body.exts, 'exts');
+  row.agents = body.agents === undefined ? text(existing && existing.agents) : listValue(body.agents, 'agents');
+  row.teams = body.teams === undefined ? text(existing && existing.teams) : listValue(body.teams, 'teams');
   row.note = text(body.note);
   row.updatedAt = new Date().toISOString();
   const plain = body.password == null ? '' : text(body.password);
@@ -4064,10 +4207,16 @@ function saveUser(db, body, existing) {
     const at = users.indexOf(existing);
     if (at >= 0) users[at] = row; else users.push(row);
   } else users.push(row);
-  /* نام کارشناس QC باید در فهرست qcAgents هم باشد تا در فرم‌ها قابل انتخاب باشد. */
+  /* نام کارشناس QC باید در فهرست qcAgents هم باشد تا در فرم‌ها و ستون‌های تب
+   * Agents دیده شود. با تغییر نام، همان جایگاه قبلی به نام تازه تبدیل می‌شود
+   * (وگرنه ستون قدیمی روی شیت برای همیشه می‌ماند). */
   if (!Array.isArray(db.qcAgents)) db.qcAgents = [];
-  if (!db.qcAgents.some((x) => nameKey(x) === key)) db.qcAgents.push(name);
-  if (previousName && nameKey(previousName) !== key) renameAgentQcColumn(db, previousName, name);
+  const previousKey = previousName ? nameKey(previousName) : '';
+  const at = previousKey && previousKey !== key
+    ? db.qcAgents.findIndex((x) => nameKey(x) === previousKey) : -1;
+  if (at >= 0) db.qcAgents[at] = name;
+  else if (!db.qcAgents.some((x) => nameKey(x) === key)) db.qcAgents.push(name);
+  if (previousName && previousKey !== key) renameAgentQcColumn(db, previousName, name);
   return clone(row);
 }
 
@@ -4099,6 +4248,10 @@ return {
   publicUser: publicUser, allowedAgentNames: allowedAgentNames, scopeDb: scopeDb, writeGuard: writeGuard,
   canAccessApi: canAccessApi, canAccessRoute: canAccessRoute, visibleRoutes: visibleRoutes, isAdmin: isAdmin,
   saveUser: saveUser, deleteUser: deleteUser, usersToRows: usersToRows, userMask: userMask,
+  nameKey: nameKey,
+  QC_COLUMN_PREFIX: QC_COLUMN_PREFIX, QC_TICK: QC_TICK, qcColumnHeader: qcColumnHeader,
+  qcColumnName: qcColumnName, isQcColumn: isQcColumn, isQcTick: isQcTick, agentQcNames: agentQcNames,
+  applyQcColumns: applyQcColumns, qcColumnValue: qcColumnValue, qcExpertNames: qcExpertNames,
   syncAgentQcColumn: syncAgentQcColumn, dropAgentQcColumn: dropAgentQcColumn,
   renameAgentQcColumn: renameAgentQcColumn,
   ADMIN_ROUTES: ADMIN_ROUTES, SHARED_ROUTES: SHARED_ROUTES, ADMIN_API: ADMIN_API, OPEN_API: OPEN_API
@@ -5101,7 +5254,7 @@ function qcUsersRoute(method, id, body) {
       session = A.normalizeUser(row, 0); // تغییر نقش/دسترسی مدیر بلافاصله اعمال شود
     }
     /* تیک‌ها → ستون qcAgents ردیف کارشناسان (تا از شیت/اکسل هم قابل ویرایش باشد) */
-    A.syncAgentQcColumn(db, A.normalizeUser(row, 0), body && body.syncColumn ? 'sync' : 'keep');
+    A.syncAgentQcColumn(db, A.normalizeUser(row, 0), (body && body.syncColumn && (body.exts !== undefined || body.agents !== undefined || body.teams !== undefined)) ? 'sync' : 'keep');
     saveDb();
     return { ok: true, user: clone(A.userMask([A.normalizeUser(row, 0)])[0]), users: clone(A.userMask(A.normalizeUsers(db))),
       agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false,
@@ -5569,8 +5722,13 @@ const api = {
     return Object.keys(h).length ? h : undefined;
   },
   async req(method,url,body){
+    if(method!=='GET')api._revNoted=false;
     const work=this._request(method,url,body);if(method!=='GET')this._writes.add(work);
-    try{const result=await work;if(method!=='GET'&&window.App)window.App.syncAfterWrite();return result;}
+    try{
+      const result=await work;
+      if(method!=='GET'&&window.App&&!api._revNoted)window.App.syncAfterWrite();
+      return result;
+    }
     finally{this._writes.delete(work);}
   },
   unauthorized(message) {
@@ -5588,6 +5746,12 @@ const api = {
           headers: api.headers(body),
           body: body ? JSON.stringify(body) : undefined
         });
+        /* سرور شماره‌ی نسخه‌ی تازه را در همان پاسخ نوشتن می‌فرستد؛ این کار یک
+         * رفت‌وبرگشت کامل به /api/revision را بعد از هر ثبت حذف می‌کند. */
+        try {
+          const rev = (res.headers && typeof res.headers.get === 'function' ? res.headers.get('x-qc-revision') : '') || res.revision || '';
+          if (rev && window.App) { window.App.noteRevision(rev); api._revNoted = true; }
+        } catch (e) {}
         let data = null;
         try { data = await res.json(); } catch (e) { /* پاسخ خالی */ }
         if (!res.ok) {
@@ -6498,6 +6662,26 @@ const App = {
     const chip = $('#syncChip');
     if (chip) { chip.hidden = false; chip.classList.add('pulse'); }
   },
+  /* نسخه‌ی تازه از همان پاسخ نوشتن می‌آید (هدر x-qc-revision یا فیلد revision
+   * در Apps Script) — بدون درخواست اضافه. */
+  noteRevision(rev) {
+    const n = Number(String(rev).split('-')[0]);
+    if (!n) return;
+    this.revision = n;
+    this._syncRevision = n;
+    const chip = $('#syncChip');
+    if (chip) { chip.hidden = true; chip.classList.remove('pulse'); }
+  },
+
+  /* بعد از ثبت/حذف یک ریت، فقط شمارش پاورقی اصلاح می‌شود؛ خواندن دوباره‌ی کل
+   * bootstrap (که در Apps Script یک رفت‌وبرگشت گران است) لازم نیست. */
+  applyWrite(kind, delta) {
+    const counts = this.state && this.state.counts;
+    if (!counts || counts[kind] == null) { this.refreshCounts(true); return; }
+    counts[kind] = Math.max(0, Number(counts[kind]) + (delta || 0));
+    this.paintCounts(counts);
+  },
+
   async syncAfterWrite() {
     if (!this._syncTimer) return;
     try {
@@ -7488,7 +7672,9 @@ async function formPage(root, editId) {
     try {
       const saved = editId ? await api.put('/api/tickets/' + editId, payload) : await api.post('/api/tickets', payload);
       toast(editId ? 'تغییرات ذخیره شد — نمره: ' + fa(saved.score == null ? '—' : saved.score) : 'ارزیابی با نمره ' + fa(saved.score == null ? '—' : saved.score) + ' ثبت شد', 'success');
-      await App.boot();
+      /* بدون App.boot: شمارش همان‌جا اصلاح می‌شود و صفحه‌ی سوابق داده‌ی تازه
+       * خودش را می‌گیرد؛ این یعنی یک رفت‌وبرگشت کامل کمتر برای هر ثبت. */
+      App.applyWrite('tickets', editId ? 0 : 1);
       location.hash = '#/tickets';
     } catch (e) {
       saveBtn.disabled = false;
@@ -7619,7 +7805,7 @@ async function listPage(root) {
       if (act === 'del') {
         const tr = b.closest('tr');
         confirmDlg('حذف ارزیابی تیکت', `رکورد ${tr.children[4].textContent} (کد ${tr.children[6].textContent}) برای همیشه حذف می‌شود.`, async () => {
-          try { await api.del('/api/tickets/' + id); toast('رکورد حذف شد', 'success'); await App.boot(); load(); }
+          try { await api.del('/api/tickets/' + id); toast('رکورد حذف شد', 'success'); App.applyWrite('tickets', -1); load(); }
           catch (e) { toast(e.message, 'error'); }
         });
       }
@@ -7866,7 +8052,7 @@ async function formPage(root, editId) {
     try {
       const saved = editId ? await api.put('/api/socials/' + editId, body) : await api.post('/api/socials', body);
       toast((editId ? 'تغییرات ذخیره شد' : 'ارزیابی ثبت شد') + ' — نمره: ' + fa(saved.score == null ? '—' : saved.score), 'success');
-      await App.boot();
+      App.applyWrite('socials', editId ? 0 : 1);
       location.hash = '#/socials';
     } catch (e) {
       saveBtn.disabled = false;
@@ -8000,7 +8186,7 @@ async function listPage(root) {
       if (act === 'view') return showView(id);
       if (act === 'del') {
         confirmDlg('حذف ارزیابی سوشال', `ارزیابی «${b.closest('tr').children[1].textContent}» برای همیشه حذف می‌شود.`, async () => {
-          try { await api.del('/api/socials/' + id); toast('رکورد حذف شد', 'success'); await App.boot(); load(); }
+          try { await api.del('/api/socials/' + id); toast('رکورد حذف شد', 'success'); App.applyWrite('socials', -1); load(); }
           catch (e) { toast(e.message, 'error'); }
         });
       }
@@ -11355,6 +11541,74 @@ function qcNames(a) {
   return list.map((x) => String(x).trim()).filter(Boolean);
 }
 
+/* انتخاب کارشناسان QC یک کارشناس با تیک — بدون تایپ نام و ویرگول.
+ * هر تیک روی شیت در ستون اختصاصی همان کارشناس QC می‌نشیند. */
+function qcPicker(selectedNames, onSave) {
+  const A = window.QCAccess;
+  /* فهرست = کارشناسان QC شناخته‌شده + هر نامی که همین حالا روی این کارشناس است
+   * (مثلاً ستونی که دستی روی شیت ساخته شده) تا با ذخیره از دست نرود. */
+  const all = [...new Set([...(App.state.qcAgents || []), ...(selectedNames || [])]
+    .map((n) => String(n).trim()).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'fa'));
+  if (!all.length) {
+    toast.info('اول از بخش «کارشناسان کنترل کیفیت» یک کارشناس QC بسازید');
+    return;
+  }
+  const picked = new Set((selectedNames || []).map((n) => String(n).trim()).filter(Boolean));
+  const m = UI.modal(`${UI.modalHead('کارشناسان QC مسئول', 'fa-user-shield')}
+    <div class="modal-body">
+      <div class="note"><i class="fa-solid fa-circle-info"></i>
+        برای این کارشناس تیک بزنید کدام کارشناسان QC باید او را بررسی کنند. هر تیک روی شیت
+        در ستون همان کارشناس QC می‌نشیند؛ دیگر لازم نیست نام‌ها را با ویرگول تایپ کنید.</div>
+      <div class="qc-access-bar" style="margin-top:10px">
+        <div class="qc-search"><i class="fa-solid fa-magnifying-glass"></i>
+          <input class="input" id="qpSearch" autocomplete="off" placeholder="جستجوی نام کارشناس QC…"></div>
+        <span class="badge info" id="qpCount"></span>
+      </div>
+      <div class="qc-pick-list" id="qpList"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close>انصراف</button>
+      <button class="btn primary" id="qpSave"><i class="fa-solid fa-floppy-disk"></i> ذخیره</button>
+    </div>`);
+  const list = $('#qpList', m);
+  function paint() {
+    const q = String($('#qpSearch', m) ? $('#qpSearch', m).value : '').trim().toLowerCase();
+    const rows = all.filter((n) => !q || n.toLowerCase().indexOf(q) >= 0);
+    list.innerHTML = rows.length ? rows.map((n) => `
+      <label class="qc-pick-row${picked.has(n) ? ' on' : ''}">
+        <input type="checkbox" data-pick="${esc(n)}" ${picked.has(n) ? 'checked' : ''}>
+        <span>${esc(n)}</span>
+        <div class="spacer" style="flex:1"></div>
+      </label>`).join('') : '<div class="qc-empty">موردی پیدا نشد.</div>';
+    $$('input[data-pick]', list).forEach((box) => box.addEventListener('change', () => {
+      if (box.checked) picked.add(box.dataset.pick); else picked.delete(box.dataset.pick);
+      box.closest('.qc-pick-row').classList.toggle('on', box.checked);
+      count();
+    }));
+    count();
+  }
+  function count() {
+    const box = $('#qpCount', m);
+    if (box) box.textContent = picked.size ? fa(picked.size) + ' انتخاب‌شده' : 'هیچ‌کدام';
+  }
+  $('#qpSearch', m).addEventListener('input', debounce(paint, 80));
+  $('#qpSave', m).addEventListener('click', () => {
+    m.close();
+    onSave(all.filter((n) => picked.has(n)));
+  });
+  paint();
+}
+
+function qcCellInner(a) {
+  const names = qcNames(a);
+  return `<div class="qc-mini">
+    ${names.map((n) => `<span class="qc-mini-chip">${esc(n)}<button type="button" data-qc-remove="${esc(n)}"
+        title="حذف"><i class="fa-solid fa-xmark"></i></button></span>`).join('')}
+    ${names.length ? '' : '<span class="cell-sub">بدون کارشناس QC</span>'}
+    <button type="button" class="qc-mini-add" data-qc-edit title="انتخاب کارشناسان QC"><i class="fa-solid fa-plus"></i></button>
+  </div>`;
+}
+
 async function render(root) {
   const st = App.state;
   root.innerHTML = `
@@ -11406,6 +11660,34 @@ async function render(root) {
   let allAgents = [];
   let sel = new Set(); // id های انتخاب‌شده برای انتقال گروهی
 
+  /* یک شنونده برای همه‌ی سلول‌های QC؛ چون بعد از هر ذخیره فقط همان سلول بازسازی
+   * می‌شود، لازم نیست رویدادها دوباره بسته شوند. */
+  function saveAgentQc(a, names) {
+    api.put('/api/agents/' + a.id, { qcAgents: names }).then((saved) => {
+      a.qcAgents = saved && Array.isArray(saved.qcAgents) ? saved.qcAgents : names;
+      const cell = document.querySelector(`#agentsBody tr[data-id="${a.id}"] [data-qc-cell]`);
+      if (cell) cell.innerHTML = qcCellInner(a);
+      toast.success('کارشناسان QC ذخیره شد — ستون‌های شیت هم به‌روز شد');
+    }).catch((e) => toast.error(e.message));
+  }
+  $('#agentsBody').addEventListener('click', (e) => {
+    const tr = e.target.closest('tr[data-id]');
+    if (!tr) return;
+    const a = allAgents.find((x) => x.id === Number(tr.dataset.id));
+    if (!a) return;
+    if (e.target.closest('[data-qc-edit]')) {
+      e.preventDefault();
+      qcPicker(qcNames(a), (names) => saveAgentQc(a, names));
+      return;
+    }
+    const minus = e.target.closest('[data-qc-remove]');
+    if (minus) {
+      e.preventDefault();
+      const name = minus.dataset.qcRemove;
+      saveAgentQc(a, qcNames(a).filter((n) => n !== name));
+    }
+  });
+
   async function load(showArchived) {
     try {
       allAgents = await api.get('/api/agents');
@@ -11445,9 +11727,7 @@ async function render(root) {
         <td class="cell-main">${esc(a.name)}${a.active === false ? ' <span class="badge gray">بایگانی</span>' : ''}${sub}</td>
         <td><input type="text" class="row-ext" dir="ltr" inputmode="numeric" data-ed="1" value="${a.ext == null ? '' : esc(String(a.ext))}" style="width:74px;text-align:center;font-size:12px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px"></td>
         <td><input type="text" class="row-team" data-ed="1" value="${esc(a.team)}" list="teamsDlAll" style="flex:1;min-width:140px;font-size:12px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 8px"></td>
-        <td><input type="text" class="row-qc" data-ed="1" value="${esc(qcNames(a).join('، '))}" list="qcDlAll" dir="rtl"
-          title="نام کارشناس(های) QC که این کارشناس را ریت می‌کنند — چند نام با ویرگول"
-          placeholder="—" style="width:100%;min-width:150px;font-size:12px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 8px"></td>
+        <td class="agent-qc-cell" data-qc-cell>${qcCellInner(a)}</td>
         <td class="agent-row-edit"><button class="btn soft sm" data-act="edit"><i class="fa-solid fa-user-pen"></i> ویرایش</button> ${a.active !== false ? '<button class="btn soft sm" data-act="archive">بایگانی</button>' : '<button class="btn success-soft sm" data-act="restore">بازیابی</button>'}</td>
       </tr>`;
     }
@@ -11471,7 +11751,7 @@ async function render(root) {
         </div>
         <div class="table-wrap team-body" style="max-height:340px;overflow-y:auto">
           <table class="tbl" style="font-size:13px">
-            <thead><tr><th style="width:30px"><input type="checkbox" class="sel-all"></th><th>نام</th><th style="width:110px">داخلی</th><th>تیم</th><th style="width:200px">کارشناس QC مسئول</th><th style="width:185px">عملیات</th></tr></thead>
+            <thead><tr><th style="width:30px"><input type="checkbox" class="sel-all"></th><th>نام</th><th style="width:110px">داخلی</th><th>تیم</th><th style="width:210px">کارشناسان QC مسئول</th><th style="width:185px">عملیات</th></tr></thead>
             <tbody>${arr.map(rowHtml).join('')}</tbody>
           </table>
         </div>
@@ -11489,7 +11769,7 @@ async function render(root) {
       body.innerHTML = `<div class="card">
         <div class="table-wrap" style="max-height:600px;overflow-y:auto">
           <table class="tbl" style="font-size:13px">
-            <thead><tr><th style="width:30px"><input type="checkbox" class="sel-all"></th><th>نام</th><th style="width:110px">داخلی</th><th>تیم</th><th style="width:200px">کارشناس QC مسئول</th><th style="width:185px">عملیات</th></tr></thead>
+            <thead><tr><th style="width:30px"><input type="checkbox" class="sel-all"></th><th>نام</th><th style="width:110px">داخلی</th><th>تیم</th><th style="width:210px">کارشناسان QC مسئول</th><th style="width:185px">عملیات</th></tr></thead>
             <tbody>${flatRows}</tbody>
           </table>
         </div></div>
@@ -11510,7 +11790,7 @@ async function render(root) {
       inp.addEventListener('blur', () => { inp.style.border = '1px solid transparent'; inp.style.background = 'transparent'; saveRow(inp); });
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); });
     });
-    $$('#agentsBody input[data-ed="1"].row-team, #agentsBody input[data-ed="1"].row-qc').forEach((inp) => {
+    $$('#agentsBody input[data-ed="1"].row-team').forEach((inp) => {
       inp.addEventListener('focus', () => { inp.style.border = '1px solid var(--brand)'; inp.style.background = 'var(--panel-soft)'; });
       inp.addEventListener('blur', () => { inp.style.border = '1px solid transparent'; inp.style.background = 'transparent'; saveRow(inp); });
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); });
@@ -11523,33 +11803,26 @@ async function render(root) {
       if (!a) return;
       const newExt = tr.querySelector('.row-ext').value.trim();
       const newTeam = tr.querySelector('.row-team').value.trim();
-      const qcInput = tr.querySelector('.row-qc');
-      const newQc = qcInput ? qcInput.value.trim() : '';
-      const oldQc = qcNames(a).join('، ');
-      const payload = {};
       const oldExt = (a.ext == null) ? '' : String(a.ext);
-      if (newExt !== oldExt || newTeam !== a.team || newQc !== oldQc) {
-        const numExt = C.faToEn(newExt);
-        if (numExt && !/^\d+$/.test(numExt)) { toast.error('داخلی باید عدد صحیح باشد'); tr.querySelector('.row-ext').value = oldExt; return; }
-        if (newExt !== oldExt || newTeam !== a.team) {
-          payload.ext = newExt === '' ? '' : numExt;
-          payload.team = newTeam;
-        }
-        if (newQc !== oldQc) payload.qcAgents = newQc;
-        api.put('/api/agents/' + id, payload).then((saved) => {
-          toast.success(newQc !== oldQc ? 'به‌روز شد — دسترسی کارشناس QC هم اعمال شد' : 'به‌روز شد');
-          if (payload.ext !== undefined) a.ext = payload.ext === '' ? null : +payload.ext;
-          if (payload.qcAgents !== undefined) a.qcAgents = saved && saved.qcAgents ? saved.qcAgents : qcNames({ qcAgents: payload.qcAgents });
-          if (qcInput) qcInput.value = qcNames(a).join('، ');
-          if (payload.team) { a.team = payload.team; load(); }
-          App.boot(); // App.boot تیم‌های bootstrap را هم تازه می‌کند
-        }).catch((e) => {
-          toast.error(e.message);
-          tr.querySelector('.row-ext').value = oldExt;
-          tr.querySelector('.row-team').value = a.team;
-          if (qcInput) qcInput.value = oldQc;
-        });
-      }
+      if (newExt === oldExt && newTeam === a.team) return;
+      const numExt = C.faToEn(newExt);
+      if (numExt && !/^\d+$/.test(numExt)) { toast.error('داخلی باید عدد صحیح باشد'); tr.querySelector('.row-ext').value = oldExt; return; }
+      const payload = { ext: newExt === '' ? '' : numExt };
+      if (newTeam !== a.team) payload.team = newTeam;
+      api.put('/api/agents/' + id, payload).then((saved) => {
+        toast.success('به‌روز شد');
+        if (payload.ext !== undefined) a.ext = payload.ext === '' ? null : +payload.ext;
+        if (payload.team) { a.team = payload.team; load(); }
+        /* همان تغییر در داده‌ی bootstrap هم بنشیند تا فرم‌های دیگر بدون
+         * App.boot (و بدون یک رفت‌وبرگشت کامل) مقدار تازه را ببینند. */
+        const cached = ((App.state && App.state.agents) || []).find((x) => x.id === id);
+        if (cached) { cached.ext = a.ext; cached.team = a.team; }
+        /* بدون App.boot: تغییر یک ردیف نباید کل صفحه را دوباره بخواند (سرعت). */
+      }).catch((e) => {
+        toast.error(e.message);
+        tr.querySelector('.row-ext').value = oldExt;
+        tr.querySelector('.row-team').value = a.team;
+      });
     }
 
     /* انتخاب سطرها و انتقال گروهی */
@@ -11654,17 +11927,40 @@ async function render(root) {
           <input class="input" id="aE" dir="ltr" style="text-align:right" inputmode="numeric" value="${agent && agent.ext != null ? esc(agent.ext) : ''}" placeholder="مثلاً ۳۰۲۲"></div>
         <div class="field"><label>زیرمجموعه (واحد)</label>
           <input class="input" id="aS" value="${esc(agent && agent.subgroup ? agent.subgroup : '')}" placeholder="مثلاً Shams Team"></div>
-        <div class="field"><label>کارشناس(های) QC مسئول — چند نام با ویرگول</label>
-          <input class="input" id="aQ" value="${esc(qcNames(agent).join('، '))}" list="qcDlForm" autocomplete="off"
-            placeholder="مثلاً مبینا، هادی">
-          <datalist id="qcDlForm">${(App.state.qcAgents || []).map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
-          <div class="cell-sub" style="margin-top:6px">هر کارشناس QC که نامش اینجاست این کارشناس را می‌بیند و ریت می‌کند.
-            دقیقاً همین ستون <code>qcAgents</code> تب <code>Agents</code> شیت است.</div></div>
+        <div class="field"><label>کارشناسان QC مسئول</label>
+          <div class="qc-mini" id="aQcBox" style="min-height:36px"></div>
+          <div class="cell-sub" style="margin-top:6px">با دکمه‌ی + تیک بزنید؛ هر تیک روی شیت در ستون اختصاصی
+            همان کارشناس QC ثبت می‌شود (بدون تایپ نام و ویرگول).</div></div>
       </div></div>
       <div class="modal-foot"><button class="btn ghost" data-close>انصراف</button><button class="btn primary" id="aSave"><i class="fa-solid fa-floppy-disk"></i> ذخیره</button></div>`);
+    let chosenQc = qcNames(agent);
+    function paintQcBox() {
+      const box = $('#aQcBox', m);
+      if (!box) return;
+      box.innerHTML = chosenQc.map((n) => `<span class="qc-mini-chip">${esc(n)}<button type="button" data-qc-drop="${esc(n)}"
+          title="حذف"><i class="fa-solid fa-xmark"></i></button></span>`).join('') +
+        '<button type="button" class="qc-mini-add" id="aQcPick" title="انتخاب کارشناسان QC"><i class="fa-solid fa-plus"></i></button>';
+      const add = $('#aQcPick', m);
+      if (add) add.addEventListener('click', () => qcPicker(chosenQc, (names) => { chosenQc = names; paintQcBox(); }));
+      $$('[data-qc-drop]', box).forEach((b) => b.addEventListener('click', () => {
+        chosenQc = chosenQc.filter((n) => n !== b.dataset.qcDrop);
+        paintQcBox();
+      }));
+    }
+    paintQcBox();
     $('#aSave', m).addEventListener('click', async () => {
       const payload = { name: $('#aN', m).value.trim(), team: $('#aT', m).value.trim(), ext: $('#aE', m).value.trim() || null,
-        subgroup: $('#aS', m).value.trim(), qcAgents: $('#aQ', m).value.trim() };
+        subgroup: $('#aS', m).value.trim(), qcAgents: chosenQc };
+
+      /* در ویرایش، فقط فیلدهای عوض‌شده فرستاده می‌شوند: تغییر «داخلی» نباید
+       * خواندن/بازنویسی همه‌ی ریت‌ها را به راه بیندازد. */
+      if (!isNew && agent) {
+        if (payload.name === agent.name) delete payload.name;
+        if (payload.team === agent.team) delete payload.team;
+        if ((payload.ext == null ? '' : String(payload.ext)) === (agent.ext == null ? '' : String(agent.ext))) delete payload.ext;
+        if ((payload.subgroup || '') === (agent.subgroup || '')) delete payload.subgroup;
+        if (qcNames({ qcAgents: chosenQc }).join('|') === qcNames(agent).join('|')) delete payload.qcAgents;
+      }
       try {
         if (isNew) await api.post('/api/agents', payload);
         else await api.put('/api/agents/' + agent.id, payload);
@@ -11729,10 +12025,18 @@ async function render(root) {
       const ci = {
         sub: hdr.findIndex((c) => /زیرمجموعه|زیر\s*مجموعه|واحد|sub/i.test(c)),
         name: hdr.findIndex((c) => /کارشناس/.test(c) && !/qc|کنترل\s*کیفیت|ارزیاب/i.test(c)),
-        qc: hdr.findIndex((c) => /qc|کنترل\s*کیفیت|ارزیاب/i.test(c)),
+        /* ستون قدیمیِ متنی (نام‌ها با ویرگول) فقط برای سازگاری؛ فرمت اصلی الان
+         * یک ستون «QC: نام» برای هر کارشناس QC است. */
+        qc: hdr.findIndex((c) => /qc|کنترل\s*کیفیت|ارزیاب/i.test(c) && !/^qc\s*[:：]/i.test(String(c))),
         team: hdr.findIndex((c) => /تیم/.test(c)),
         ext: hdr.findIndex((c) => /caller|callerid|داخلی|دفتر/i.test(c))
       };
+      const A = window.QCAccess;
+      const qcCols = hdr.map((c, i) => {
+        const prefixed = A && A.qcColumnName ? A.qcColumnName(c) : '';
+        const matched = (App.state.qcAgents || []).find((n) => String(n).trim() === String(c).trim());
+        return { i, name: prefixed || matched || '' };
+      }).filter((c) => c.name && c.i !== ci.name && c.i !== ci.ext);
       if (ci.name < 0) { $('#impPreview', m).innerHTML = '<div class="note bad">ستون «کارشناس» در فایل پیدا نشد — سرستون‌ها: ' + esc(hdr.filter(Boolean).join('، ')) + '</div>'; return; }
       for (let i = hi + 1; i < rows.length; i++) {
         const r = rows[i];
@@ -11745,15 +12049,20 @@ async function render(root) {
           ext: C.faToEn(String(ci.ext >= 0 && r[ci.ext] != null ? r[ci.ext] : '')).trim(),
           subgroup: sub === '—' || sub === '-' ? '' : sub
         });
-        /* ستون کارشناس QC اختیاری است؛ اگر نباشد مقدار قبلی حفظ می‌شود */
-        if (ci.qc >= 0) pending[pending.length - 1].qcAgents = String(r[ci.qc] == null ? '' : r[ci.qc]).trim();
+        /* تیک‌های ستون‌های «QC: نام» → فهرست کارشناسان QC همان ردیف.
+         * اگر هیچ ستون QC در فایل نبود، مقدار قبلی دست‌نخورده می‌ماند. */
+        if (qcCols.length || ci.qc >= 0) {
+          const names = qcCols.filter((c) => A && A.isQcTick(r[c.i])).map((c) => c.name);
+          if (ci.qc >= 0 && A) A.splitList(String(r[ci.qc] == null ? '' : r[ci.qc])).forEach((n) => names.push(n));
+          pending[pending.length - 1].qcAgents = [...new Set(names.map((n) => String(n).trim()).filter(Boolean))].join('، ');
+        }
       }
       if (!pending.length) { $('#impPreview', m).innerHTML = '<div class="note bad">ردیفی (به‌جز سرستون) با مقدار «کارشناس» پیدا نشد.</div>'; return; }
       const shown = pending.slice(0, 12);
       $('#impPreview', m).innerHTML = `
         <div class="note" style="margin-top:10px"><i class="fa-solid fa-check"></i> ${fa(pending.length)} ردیف آماده‌ی پردازش است${pending.length > 12 ? ' — ۱۲ ردیف اول:' : ':'}</div>
         <div class="table-wrap" style="max-height:230px;overflow-y:auto;margin-top:6px"><table class="tbl" style="font-size:12px">
-          <thead><tr><th>کارشناس</th><th>تیم</th><th>CallerID</th><th>زیرمجموعه</th><th>کارشناس QC</th></tr></thead>
+          <thead><tr><th>کارشناس</th><th>تیم</th><th>CallerID</th><th>زیرمجموعه</th><th>کارشناسان QC</th></tr></thead>
           <tbody>${shown.map((x) => `<tr><td class="cell-main">${esc(x.name)}</td><td>${esc(x.team)}</td><td dir="ltr">${esc(x.ext)}</td><td>${esc(x.subgroup || '')}</td><td>${esc(x.qcAgents || '')}</td></tr>`).join('')}</tbody>
         </table></div>`;
       $('#impGo', m).disabled = false;
@@ -11773,10 +12082,26 @@ async function render(root) {
     });
   }
 
-  $('#agentTemplate').addEventListener('click', () => QCExport.sheets('نمونه کارشناسان', [
-    { name:'کارشناسان', rows:[['کارشناس','تیم','CallerID','زیرمجموعه اصلی','کارشناس QC'],['نام کارشناس اول','Telesales',3011,'واحد فروش','مبینا'],['نام کارشناس دوم','Account',3012,'واحد اکانت','مبینا، هادی'],['نام کارشناس سوم','MLM',3013,'واحد MLM','شیدا']] },
-    { name:'راهنما', rows:[['راهنما'],['نام‌های نمونه را با نام دقیق افراد واقعی جایگزین کنید.'],['داخلی یکتا، عددی و اختیاری است.'],['نام تیم و نام کارشناس الزامی است. نام در فرم QC و این فایل یکسان باشد.'],['ستون کارشناس QC اختیاری است: نام کارشناس(های) کنترل کیفیتی که این کارشناس را ریت می‌کنند؛ چند نام را با ویرگول جدا کنید.'],['این ستون دسترسی داده می‌دهد — دقیقاً معادل تیک‌زدن در صفحهٔ مدیریت QC است. خالی گذاشتنش دسترسی قبلی را پاک نمی‌کند.'],['ورودی نام موجود، تیم/داخلی/کارشناس QC را به‌روزرسانی می‌کند؛ داخلی متعلق به شخص دیگر پذیرفته نمی‌شود.']] }
-  ]));
+  $('#agentTemplate').addEventListener('click', () => {
+    const experts = (App.state.qcAgents || []).slice(0, 5);
+    const qcHeaders = experts.length ? experts.map((n) => 'QC: ' + n) : ['QC: مبینا', 'QC: هادی'];
+    const sample = (on) => qcHeaders.map((h, i) => (on.indexOf(i) >= 0 ? '✓' : ''));
+    QCExport.sheets('نمونه کارشناسان', [
+      { name: 'کارشناسان', rows: [
+        ['کارشناس', 'تیم', 'CallerID', 'زیرمجموعه اصلی'].concat(qcHeaders),
+        ['نام کارشناس اول', 'Telesales', 3011, 'واحد فروش'].concat(sample([0])),
+        ['نام کارشناس دوم', 'Account', 3012, 'واحد اکانت'].concat(sample([0, 1])),
+        ['نام کارشناس سوم', 'MLM', 3013, 'واحد MLM'].concat(sample([qcHeaders.length - 1]))
+      ] },
+      { name: 'راهنما', rows: [['راهنما'],
+        ['نام‌های نمونه را با نام دقیق افراد واقعی جایگزین کنید.'],
+        ['داخلی یکتا، عددی و اختیاری است.'],
+        ['نام تیم و نام کارشناس الزامی است.'],
+        ['هر ستون «QC: نام» یعنی همان کارشناس QC؛ با گذاشتن ✓ مشخص کنید کدام کارشناس را بررسی می‌کند.'],
+        ['دیگر لازم نیست نام کارشناسان QC را با ویرگول در یک سلول بنویسید.'],
+        ['همین ستون‌ها روی تب Agents شیت هم ساخته می‌شوند و مستقیم قابل تیک‌زدن‌اند.']] }
+    ]);
+  });
   $('#agentsDeleteAll').addEventListener('click', () => {
     const m=UI.modal(`${UI.modalHead('حذف تمام کارشناسان','fa-trash-can')}<div class="modal-body">
       <div class="note bad">تمام کارشناسان فعال و بایگانی از فهرست مدیریت حذف می‌شوند. ریت‌های تیکت، سوشال و تماس و کارشناسان QC پاک نمی‌شوند. با ورود دوباره‌ی اسامی یکسان، سوابق آنها قابل بررسی است.</div>
@@ -11932,7 +12257,7 @@ function accessSummary(user) {
   const matched = matchedAgents(user).length;
   if (!exts.length && !names.length && !teams.length) {
     return matched
-      ? { text: fa(matched) + ' کارشناس ← از ستون qcAgents شیت', cls: 'info', count: matched }
+      ? { text: fa(matched) + ' کارشناس ← از ستون‌های QC شیت', cls: 'info', count: matched }
       : { text: 'دسترسی تعریف نشده', cls: 'bad', count: 0 };
   }
   const bits = [];
@@ -12044,11 +12369,11 @@ function draw(root) {
           'اولین کاربر را بسازید؛ از همان لحظه ورود با رمز اجباری می‌شود و هر کارشناس QC فقط داده‌ی کارشناسانی را می‌بیند که شما اجازه داده‌اید.',
           '<button class="btn primary" id="qcEmptyAdd"><i class="fa-solid fa-user-plus"></i> ساخت اولین کاربر</button>')}
         <div class="note" style="margin-top:14px"><i class="fa-solid fa-table"></i>
-          همین فهرست در تب <code>QC_Users</code> شیت نگهداری می‌شود: <code>name</code>، <code>password</code>، <code>role</code>،
-          <code>active</code>، <code>exts</code> (داخلی‌ها با ویرگول)، <code>agents</code> و <code>teams</code>.
-          می‌توانید دسترسی‌ها را مستقیم روی شیت هم بنویسید.
-          راه دیگر: در تب <code>Agents</code> ستون <code>qcAgents</code> ردیف هر کارشناس، نام کارشناس QC مسئولش را
-          بنویسید — همین اپ هم هنگام ذخیرهی کاربر، این ستون را پر می‌کند.</div>
+          همین فهرست در تب <code>QC_Users</code> شیت نگهداری می‌شود: <code>name</code>، <code>password</code>،
+          <code>role</code>، <code>active</code>، <code>exts</code>، <code>agents</code> و <code>teams</code>.
+          <br><b>روی شیت:</b> تب <code>Agents</code> برای هر کارشناس QC یک ستون اختصاصی با سرستون
+          <code>QC: نام</code> دارد؛ در ردیف هر کارشناس با انتخاب «✓» (لیست کشویی) مشخص کنید چه کسی او را
+          بررسی می‌کند. همین تیک‌ها در این صفحه هم دیده می‌شوند و برعکس.</div>
       </div>
     </div>`;
 
@@ -12134,40 +12459,47 @@ function editor(user) {
   const isOn = (a) => (a.ext != null && a.ext !== '' && extSet.has(String(a.ext))) ||
     nameSet.has(normKey(a.name)) || (!!userName && viaSheet(a));
 
-  const byTeam = new Map();
+  /* تیم‌ها یکدست می‌شوند: «Tele sales»، «telesales» و «Tele  Sales» یک تیم‌اند.
+   * فهرست هم تخت و قابل جستجو است؛ گروه‌های تودرتو باعث می‌شد کارشناس‌ها
+   * پایین چند سرستون گم شوند و نشود تیک زد. */
+  const teamKeyOf = (name) => String(name == null ? '' : name).replace(/[\s_‌\-]+/g, '').toLowerCase() || 'بدون‌تیم';
+  const teamInfo = new Map();
   state.agents.forEach((a) => {
-    const key = a.team || '—';
-    if (!byTeam.has(key)) byTeam.set(key, []);
-    byTeam.get(key).push(a);
+    const key = teamKeyOf(a.team);
+    if (!teamInfo.has(key)) teamInfo.set(key, { key, labels: new Map(), agents: [] });
+    const info = teamInfo.get(key);
+    const label = String(a.team == null ? '' : a.team).trim() || 'بدون تیم';
+    info.labels.set(label, (info.labels.get(label) || 0) + 1);
+    info.agents.push(a);
   });
-  const teamNames = [...byTeam.keys()].sort((x, y) => String(x).localeCompare(String(y), 'fa'));
-  const groups = teamNames.map((team) => {
-    const list = byTeam.get(team).slice().sort((x, y) => String(x.name).localeCompare(String(y.name), 'fa'));
-    return `
-      <div class="qc-group" data-team="${esc(team)}">
-        <div class="qc-group-head">
-          <strong>${esc(team)}</strong>
-          <span class="cell-sub" data-team-count></span>
-          <div class="spacer"></div>
-          <button type="button" class="btn ghost sm" data-team-all>همه</button>
-          <button type="button" class="btn ghost sm" data-team-none>هیچ</button>
-          <button type="button" class="btn ghost sm" data-team-scope
-            title="کل تیم به‌عنوان دسترسی ثبت شود؛ کارشناسان تازه‌ی این تیم خودکار اضافه می‌شوند">کل تیم</button>
-        </div>
-        <div class="qc-rows">
-          ${list.map((a) => {
-            const ext = a.ext == null || a.ext === '' ? '' : String(a.ext);
-            const sheet = !!userName && viaSheet(a);
-            return `<label class="qc-row${sheet ? ' from-sheet' : ''}" data-name="${esc(a.name)}" data-ext="${esc(ext)}">
-              <input type="checkbox" data-agent="${esc(a.name)}" ${isOn(a) ? 'checked' : ''}>
-              <span class="qc-row-name">${esc(a.name)}</span>
-              ${ext ? `<span class="qc-row-ext" dir="ltr">${esc(C.toFaDigits(ext))}</span>` : '<span class="qc-row-ext none">بدون داخلی</span>'}
-              ${sheet ? '<span class="qc-row-tag" title="از ستون qcAgents تب Agents">شیت</span>' : ''}
-            </label>`;
-          }).join('')}
-        </div>
-      </div>`;
-  }).join('');
+  const teamList = [...teamInfo.values()].map((info) => {
+    let label = info.agents.length ? 'بدون تیم' : '—', best = -1;
+    info.labels.forEach((count, text) => { if (count > best) { best = count; label = text; } });
+    return { key: info.key, label, agents: info.agents };
+  }).sort((x, y) => x.label.localeCompare(y.label, 'fa'));
+  const teamLabelOf = (agent) => {
+    const info = teamInfo.get(teamKeyOf(agent.team));
+    if (!info) return 'بدون تیم';
+    let label = '—', best = -1;
+    info.labels.forEach((count, text) => { if (count > best) { best = count; label = text; } });
+    return label;
+  };
+  const activeTeams = new Set(); // فیلتر تیم‌ها
+  const picked = new Set(state.agents.filter(isOn).map((a) => a.name));
+
+  function visibleAgents() {
+    const q = String($('#quSearch', m) ? $('#quSearch', m).value : '').trim().toLowerCase();
+    const digitsQ = C.faToEn(q).replace(/[^0-9]/g, '');
+    return state.agents.filter((a) => {
+      if (activeTeams.size && !activeTeams.has(teamKeyOf(a.team))) return false;
+      if (!q) return true;
+      const hay = (String(a.name || '') + ' ' + String(a.ext == null ? '' : a.ext) + ' ' + teamLabelOf(a)).toLowerCase();
+      return hay.indexOf(q) >= 0 || (!!digitsQ && String(a.ext == null ? '' : a.ext).indexOf(digitsQ) >= 0);
+    }).sort((x, y) => {
+      const t = teamLabelOf(x).localeCompare(teamLabelOf(y), 'fa');
+      return t !== 0 ? t : String(x.name).localeCompare(String(y.name), 'fa');
+    });
+  }
 
   const m = modal(`${modalHead(editing ? 'ویرایش کاربر — ' + user.name : 'کاربر QC جدید', 'fa-user-shield')}
     <div class="modal-body qc-editor">
@@ -12194,17 +12526,26 @@ function editor(user) {
         <label>دسترسی داده — کدام کارشناسان را ببیند و ریت کند</label>
         <div class="qc-access-bar">
           <div class="qc-search"><i class="fa-solid fa-magnifying-glass"></i>
-            <input class="input" id="quSearch" autocomplete="off" placeholder="جستجوی نام یا داخلی…"></div>
+            <input class="input" id="quSearch" autocomplete="off" placeholder="جستجوی نام، داخلی یا تیم…"></div>
           <span class="badge info" id="quCount">۰ کارشناس</span>
           <div class="spacer"></div>
           <label class="qc-all" title="همه‌ی کارشناسان، بدون استثنا"><input type="checkbox" id="quUnlimited">
             <span>همه‌ی کارشناسان</span></label>
         </div>
 
+        <div class="qc-team-filter" id="quTeams" role="group" aria-label="فیلتر تیم"></div>
         <div class="qc-picker" id="quPicker">
           <div class="qc-picked" id="quPicked"></div>
+          <div class="qc-toolbar">
+            <button type="button" class="btn ghost sm" id="quAll"><i class="fa-solid fa-check-double"></i> انتخاب همه‌ی نتایج</button>
+            <button type="button" class="btn ghost sm" id="quNone"><i class="fa-solid fa-eraser"></i> پاک‌کردن</button>
+            <button type="button" class="btn ghost sm" id="quScope" title="دسترسی کل تیم‌های فیلترشده — کارشناسان تازه‌ی همان تیم هم خودکار اضافه می‌شوند">
+              <i class="fa-solid fa-people-group"></i> کل تیم‌های فیلترشده</button>
+            <div class="spacer"></div>
+            <span class="qc-hint" id="quVisible"></span>
+          </div>
           ${state.agents.length
-            ? `<div class="qc-list" id="quList">${groups}</div>`
+            ? '<div class="qc-list" id="quList"></div>'
             : `<div class="qc-empty" id="quList"><i class="fa-solid fa-user-slash"></i> هنوز کارشناسی ثبت نشده —
                 اول از صفحه‌ی «مدیریت کارشناسان» فهرست را بسازید یا از تب <code>Agents</code> شیت پر کنید.</div>`}
         </div>
@@ -12218,9 +12559,9 @@ function editor(user) {
               placeholder="مثلاً: مسئول بررسی تیم MLM"></div>
         </div>
         <div class="note" id="quHint"></div>
-        <div class="note soft-note"><i class="fa-solid fa-table"></i> این تیک‌ها روی ستون <code>qcAgents</code> تب
-          <code>Agents</code> هم نوشته می‌شود؛ پس همان دسترسی را می‌توانید مستقیم روی شیت/اکسل هم ویرایش کنید
-          (نام کارشناس QC را در ردیف کارشناس بنویسید — چند نام با ویرگول).</div>
+        <div class="note soft-note"><i class="fa-solid fa-table"></i> هر تیک روی شیت در ستون اختصاصی همین
+          کارشناس QC (سرستون <code>QC: نام</code> در تب <code>Agents</code>) به‌صورت «✓» نوشته می‌شود و روی خود شیت
+          هم با همان لیست کشویی قابل تغییر است؛ دیگر نیازی به نوشتن نام‌ها با ویرگول نیست.</div>
       </div>
     </div>
     <div class="modal-foot">
@@ -12228,13 +12569,15 @@ function editor(user) {
       <button class="btn primary" id="quSave"><i class="fa-solid fa-floppy-disk"></i> ${editing ? 'ذخیره تغییرات' : 'ساخت کاربر'}</button>
     </div>`, { lg: true });
 
-  const roleSel = $('#quRole', m), unlimited = $('#quUnlimited', m), picker = $('#quPicker', m);
-  unlimited.checked = !!user && (user.role === 'admin' || !!user.unrestricted);
+  const roleSel = $('#quRole', m);
 
-  /* انتخاب‌شده‌ها مستقیم از خود چک‌باکس‌ها خوانده می‌شود تا تیک‌هایی که از ستون شیت
-   * آمده‌اند هم موقع ذخیره از دست نروند. */
-  function selected() {
-    const names = $$('input[data-agent]', m).filter((c) => c.checked).map((c) => c.dataset.agent);
+  const picker = $('#quPicker', m);
+  $('#quUnlimited', m).checked = !!user && (user.role === 'admin' || !!user.unrestricted);
+  const unlimitedBox = $('#quUnlimited', m);
+
+  /* انتخاب‌شده‌ها در یک Set نگه داشته می‌شوند تا فیلتر/جستجو تیک‌ها را از دست ندهد. */
+  function collect() {
+    const names = [...picked];
     const exts = [], plain = [];
     names.forEach((n) => {
       const a = state.agents.find((x) => x.name === n);
@@ -12244,68 +12587,114 @@ function editor(user) {
     return { names, exts: [...new Set(exts.concat(extra))], plain: [...new Set(plain)] };
   }
 
+  function rowHtml(a) {
+    const ext = a.ext == null || a.ext === '' ? '' : String(a.ext);
+    const sheet = !!userName && viaSheet(a);
+    return `<label class="qc-row${picked.has(a.name) ? ' on' : ''}${sheet ? ' from-sheet' : ''}"
+        data-name="${esc(a.name)}" data-team="${esc(teamKeyOf(a.team))}">
+      <input type="checkbox" data-agent="${esc(a.name)}" ${picked.has(a.name) ? 'checked' : ''}>
+      <span class="qc-row-name">${esc(a.name)}</span>
+      <span class="qc-row-team">${esc(teamLabelOf(a))}</span>
+      ${ext ? `<span class="qc-row-ext" dir="ltr">${esc(C.toFaDigits(ext))}</span>` : '<span class="qc-row-ext none">بدون داخلی</span>'}
+      ${sheet ? '<span class="qc-row-tag" title="از ستون QC همین کارشناس QC روی تب Agents">شیت</span>' : ''}
+    </label>`;
+  }
+
+  function renderTeams() {
+    const box = $('#quTeams', m);
+    if (!box) return;
+    box.innerHTML = `<button type="button" class="qc-team-chip${activeTeams.size ? '' : ' sel'}" data-team="">همه تیم‌ها
+        <b>${fa(state.agents.length)}</b></button>` +
+      teamList.map((t) => `<button type="button" class="qc-team-chip${activeTeams.has(t.key) ? ' sel' : ''}"
+        data-team="${esc(t.key)}">${esc(t.label)} <b>${fa(t.agents.length)}</b>
+        ${selectedTeams.has(t.label) ? '<i class="fa-solid fa-people-group" title="کل تیم"></i>' : ''}</button>`).join('');
+    $$('[data-team]', box).forEach((chip) => chip.addEventListener('click', () => {
+      const key = chip.dataset.team;
+      if (!key) activeTeams.clear();
+      else if (activeTeams.has(key)) activeTeams.delete(key); else activeTeams.add(key);
+      renderTeams(); renderList();
+    }));
+  }
+
+  function renderList() {
+    const list = $('#quList', m);
+    if (!list) return;
+    if (!state.agents.length) return;
+    const rows = visibleAgents();
+    list.innerHTML = rows.length ? rows.map(rowHtml).join('')
+      : '<div class="qc-empty"><i class="fa-solid fa-magnifying-glass"></i> کارشناسی با این فیلتر پیدا نشد.</div>';
+    $$('input[data-agent]', list).forEach((box) => box.addEventListener('change', () => {
+      if (box.checked) picked.add(box.dataset.agent); else picked.delete(box.dataset.agent);
+      box.closest('.qc-row').classList.toggle('on', box.checked);
+      refreshCount();
+    }));
+    const visible = $('#quVisible', m);
+    if (visible) visible.textContent = fa(rows.length) + ' از ' + fa(state.agents.length);
+  }
+
   function refreshCount() {
-    const sel = selected();
-    const off = unlimited.checked || roleSel.value === 'admin';
+    const off = unlimitedBox.checked || roleSel.value === 'admin';
     picker.classList.toggle('off', off);
     $('#quCount', m).textContent = off ? 'همه‌ی کارشناسان'
-      : fa(sel.names.length) + ' کارشناس' + (selectedTeams.size ? ' + ' + fa(selectedTeams.size) + ' تیم کامل' : '');
+      : fa(picked.size) + ' کارشناس' + (selectedTeams.size ? ' + ' + fa(selectedTeams.size) + ' تیم کامل' : '');
 
-    $$('.qc-picked', m).forEach((box) => {
-      box.innerHTML = off
-        ? '<span class="qc-picked-empty">دسترسی نامحدود — همه‌ی کارشناسان</span>'
-        : (sel.names.length
-          ? sel.names.map((n) => `<span class="qc-chip">${esc(n)}<button type="button" data-unpick="${esc(n)}"
-              title="برداشتن"><i class="fa-solid fa-xmark"></i></button></span>`).join('')
-          : '<span class="qc-picked-empty">هنوز کارشناسی انتخاب نشده — از فهرست زیر تیک بزنید</span>');
-    });
+    const box = $('#quPicked', m);
+    if (box) box.innerHTML = off
+      ? '<span class="qc-picked-empty">دسترسی نامحدود — همه‌ی کارشناسان</span>'
+      : (picked.size
+        ? [...picked].sort((x, y) => String(x).localeCompare(String(y), 'fa')).map((n) => `<span class="qc-chip">${esc(n)}<button type="button" data-unpick="${esc(n)}"
+            title="برداشتن"><i class="fa-solid fa-xmark"></i></button></span>`).join('')
+        : '<span class="qc-picked-empty">هنوز کارشناسی انتخاب نشده — از فهرست پایین تیک بزنید</span>');
     $$('[data-unpick]', m).forEach((b) => b.addEventListener('click', () => {
-      const box = $$('input[data-agent]', m).find((c) => c.dataset.agent === b.dataset.unpick);
-      if (box && box.checked) { box.checked = false; refreshCount(); }
+      picked.delete(b.dataset.unpick);
+      const box2 = $$('input[data-agent]', m).find((c) => c.dataset.agent === b.dataset.unpick);
+      if (box2) { box2.checked = false; box2.closest('.qc-row').classList.remove('on'); }
+      refreshCount();
     }));
 
-    $$('.qc-group', m).forEach((g) => {
-      const boxes = $$('input[data-agent]', g);
-      const on = boxes.filter((c) => c.checked).length;
-      const countEl = $('[data-team-count]', g);
-      if (countEl) countEl.textContent = fa(on) + ' از ' + fa(boxes.length);
-      g.classList.toggle('scoped', selectedTeams.has(g.dataset.team));
-      const visible = $$('.qc-row', g).filter((r) => !r.hidden).length;
-      g.hidden = visible === 0;
-    });
-
     $('#quHint', m).innerHTML = off
-      ? '<i class="fa-solid fa-circle-info"></i> این کاربر همه‌ی کارشناسان را می‌بیند؛ ستون <code>qcAgents</code> برای او خالی می‌ماند.'
-      : (sel.exts.length || sel.plain.length || selectedTeams.size)
-        ? '<i class="fa-solid fa-circle-check"></i> فقط ارزیابی‌های این کارشناسان در داشبورد، گزارش‌ها و سوابق دیده می‌شود.'
+      ? '<i class="fa-solid fa-circle-info"></i> این کاربر همه‌ی کارشناسان را می‌بیند؛ برای او ستون‌های QC خالی می‌مانند.'
+      : (picked.size || selectedTeams.size)
+        ? '<i class="fa-solid fa-circle-check"></i> فقط ارزیابی‌های همین کارشناسان در داشبورد، گزارش‌ها و سوابق دیده می‌شود.'
         : '<i class="fa-solid fa-triangle-exclamation"></i> دسترسی خالی یعنی این کارشناس هیچ داده‌ای نمی‌بیند.';
+
+    const scopeBtn = $('#quScope', m);
+    if (scopeBtn) {
+      const scopedNow = [...activeTeams].filter((key) => {
+        const t = teamList.find((x) => x.key === key);
+        return t && selectedTeams.has(t.label);
+      });
+      const allScoped = activeTeams.size > 0 && scopedNow.length === activeTeams.size;
+      scopeBtn.classList.toggle('on', allScoped);
+      scopeBtn.disabled = !activeTeams.size;
+    }
   }
+
+  renderTeams();
+  renderList();
+  refreshCount();
 
   $('#quShow', m).addEventListener('click', () => {
     const inp = $('#quPass', m);
     inp.type = inp.type === 'password' ? 'text' : 'password';
   });
-  $('#quSearch', m).addEventListener('input', debounce(() => {
-    const q = String($('#quSearch', m).value).trim().toLowerCase();
-    $$('.qc-row', m).forEach((row) => {
-      const hay = (row.dataset.name + ' ' + row.dataset.ext).toLowerCase();
-      row.hidden = !!q && hay.indexOf(q) === -1;
-    });
-    refreshCount();
-  }, 110));
+  $('#quSearch', m).addEventListener('input', debounce(renderList, 90));
   $('#quExtraExt', m).addEventListener('input', debounce(refreshCount, 150));
-  unlimited.addEventListener('change', refreshCount);
-  roleSel.addEventListener('change', () => { if (roleSel.value === 'admin') unlimited.checked = true; refreshCount(); });
-  $$('input[data-agent]', m).forEach((c) => c.addEventListener('change', refreshCount));
-  $$('.qc-group', m).forEach((g) => {
-    const boxes = () => $$('input[data-agent]', g);
-    $('[data-team-all]', g).addEventListener('click', () => { boxes().forEach((c) => { c.checked = true; }); refreshCount(); });
-    $('[data-team-none]', g).addEventListener('click', () => { boxes().forEach((c) => { c.checked = false; }); refreshCount(); });
-    $('[data-team-scope]', g).addEventListener('click', () => {
-      const team = g.dataset.team;
-      if (selectedTeams.has(team)) selectedTeams.delete(team); else selectedTeams.add(team);
-      refreshCount();
-    });
+  unlimitedBox.addEventListener('change', refreshCount);
+  roleSel.addEventListener('change', () => { if (roleSel.value === 'admin') unlimitedBox.checked = true; refreshCount(); });
+  $('#quAll', m).addEventListener('click', () => {
+    visibleAgents().forEach((a) => picked.add(a.name));
+    renderList(); refreshCount();
+  });
+  $('#quNone', m).addEventListener('click', () => {
+    visibleAgents().forEach((a) => picked.delete(a.name));
+    renderList(); refreshCount();
+  });
+  $('#quScope', m).addEventListener('click', () => {
+    const teams = [...activeTeams].map((key) => teamList.find((t) => t.key === key)).filter(Boolean);
+    const allScoped = teams.length > 0 && teams.every((t) => selectedTeams.has(t.label));
+    teams.forEach((t) => { if (allScoped) selectedTeams.delete(t.label); else selectedTeams.add(t.label); });
+    renderTeams(); refreshCount();
   });
 
   $('#quSave', m).addEventListener('click', async () => {
@@ -12314,9 +12703,9 @@ function editor(user) {
     if (!name) { toast.error('نام کارشناس QC الزامی است'); return; }
     if (!editing && !pass) { toast.error('رمز اولیه الزامی است'); return; }
     if (pass && pass.length < 4) { toast.error('رمز باید حداقل ۴ نویسه باشد'); return; }
-    const sel = selected();
+    const sel = collect();
     const role = roleSel.value;
-    const off = role === 'admin' || unlimited.checked;
+    const off = role === 'admin' || unlimitedBox.checked;
     const payload = {
       id: editing ? user.id : '',
       name: name,
@@ -12343,7 +12732,6 @@ function editor(user) {
     } catch (e) { toast.error(e.message); btn.disabled = false; }
   });
 
-  refreshCount();
 }
 
 function debounce(fn, ms) { let t; return function (...a) { clearTimeout(t); t = setTimeout(() => fn.apply(this, a), ms); }; }
@@ -12367,7 +12755,9 @@ document.addEventListener('DOMContentLoaded', function () {
     packet = packet || {};
     var status = Number(packet.status) || 500;
     var payload = packet.data == null ? { error: 'پاسخ Apps Script خالی بود.' } : packet.data;
-    return { ok: status >= 200 && status < 300, status: status,
+    var revision = packet.revision == null ? '' : String(packet.revision);
+    return { ok: status >= 200 && status < 300, status: status, revision: revision,
+      headers: { get: function (name) { return String(name).toLowerCase() === 'x-qc-revision' ? revision : null; } },
       json: function () { return Promise.resolve(payload); },
       text: function () { return Promise.resolve(JSON.stringify(payload)); } };
   }

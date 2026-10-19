@@ -155,7 +155,11 @@ function makeIndex() {
   // The full Sheets app is already connected directly to the workbook, so hide
   // the optional Node-to-Sheets connector from this standalone build.
   html = html.replace(/\s*<a href="#\/sheets"[\s\S]*?<\/a>/i, '');
+  /* فایل‌های favicon در HtmlService سرو نمی‌شوند؛ آیکون تب به‌صورت data URI
+   * درون خود صفحه گذاشته می‌شود و doGet هم با setFaviconUrl آیکون را می‌گذارد. */
   html = html.replace(/<link[^>]+(?:rel=["'](?:icon|manifest|apple-touch-icon|shortcut icon)["']|href=["'][^"']*(?:favicon|manifest|apple-touch-icon)[^"']*["'])[^>]*>/gi, '');
+  const favicon = dataUri(path.join(PUBLIC, 'favicon.png'));
+  html = html.replace('</head>', `<link rel="icon" type="image/png" href="${favicon}">\n</head>`);
 
   const inlineStyles = {
     'styles.css': inlineCss(read(path.join(PUBLIC, 'styles.css')), PUBLIC),
@@ -187,7 +191,9 @@ document.addEventListener('DOMContentLoaded', function () {
     packet = packet || {};
     var status = Number(packet.status) || 500;
     var payload = packet.data == null ? { error: 'پاسخ Apps Script خالی بود.' } : packet.data;
-    return { ok: status >= 200 && status < 300, status: status,
+    var revision = packet.revision == null ? '' : String(packet.revision);
+    return { ok: status >= 200 && status < 300, status: status, revision: revision,
+      headers: { get: function (name) { return String(name).toLowerCase() === 'x-qc-revision' ? revision : null; } },
       json: function () { return Promise.resolve(payload); },
       text: function () { return Promise.resolve(JSON.stringify(payload)); } };
   }
@@ -271,6 +277,7 @@ function makeCallReport() {
   // Remove incidental challenge-platform snippets copied into this legacy page.
   html = html.replace(/<script\b[^>]*>[\s\S]*?__CF\$cv\.params[\s\S]*?<\/script>/gi, '');
   html = html.replace(/<link\b[^>]*href=["'][^"']*(?:favicon|apple-touch-icon)[^"']*["'][^>]*>/gi, '');
+  html = html.replace('</head>', `<link rel="icon" type="image/png" href="${logo}">\n</head>`);
   html = html.replace(/src=(["'])logo\.png(?:\?[^"']*)?\1/g, 'data-app-logo src=""');
   html = html.replace(/<link\b[^>]*href=["']vendor\/fontawesome\/css\/all\.min\.css["'][^>]*>/gi, fontAwesomeTag());
   html = html.replace(/<link\b[^>]*href=["']callReportTheme\.css["'][^>]*>/gi, styleTag(inlineCss(read(path.join(PUBLIC, 'callReportTheme.css')), PUBLIC), 'bundled call report theme'));

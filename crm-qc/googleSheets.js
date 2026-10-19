@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const C = require('./shared/calc.js');
+const Access = require('./shared/access.js');
 const https = require('https');
 const http = require('http');
 
@@ -181,12 +182,24 @@ function ensureSyncIds(db) {
   return changed;
 }
 
+/* تب Agents: یک ستون برای هر کارشناس QC (سرستون «QC: نام») با تیک «✓»؛
+ * همان قالبی که نسخه‌ی مستقل Apps Script می‌سازد، نه یک سلول با نام‌های ویرگولی. */
+function agentsSheetTable(db, agentRows) {
+  const headers = HEADERS.agents.concat(Access.qcExpertNames(db, agentRows || []).map(name => Access.qcColumnHeader(name)));
+  const rows = (agentRows || []).map(row => headers.map(header => {
+    const expert = Access.qcColumnName(header);
+    return cellValue(expert ? Access.qcColumnValue(row.qcAgents, expert) : row[header]);
+  }));
+  return { headers, rows };
+}
+
 function dbToSheetRows(db) {
   ensureSyncIds(db);
   const agents = (db.agents || []).map(row => Object.assign({}, row, {
     id: row.id, name: row.name || '', team: row.team || '', ext: row.ext ?? '', active: row.active === false ? '0' : '1',
     aliases: JSON.stringify(Array.isArray(row.aliases) ? row.aliases : []),
-    extra: extraFor(row, new Set(['id','name','team','ext','active','aliases']))
+    /* qcAgents در ستون‌های اختصاصی «QC: نام» نوشته می‌شود، نه در JSON ستون extra */
+    extra: extraFor(row, new Set(['id','name','team','ext','active','aliases','qcAgents']))
   }));
   const tickets = (db.tickets || []).map(row => Object.assign({}, row, {
     id: row.id, reviewDate: row.reviewDate || '', ticketDate: row.ticketDate || '', agentName: row.agentName || '',
@@ -234,7 +247,9 @@ function sheetRowsToDb(rows) {
     name: asText(r.name || r['نام']), team: asText(r.team || r['تیم']),
     ext: asText(r.ext) === '' && asText(r['داخلی']) === '' ? null : (numberOrNull(r.ext ?? r['داخلی']) ?? asText(r.ext ?? r['داخلی'])),
     active: ['0','false','no','غیرفعال'].includes(asText(r.active || r['فعال']).toLowerCase()) ? false : true,
-    aliases: parseJson(r.aliases, [])
+    aliases: parseJson(r.aliases, []),
+    /* ستون‌های «QC: نام» (و ستون قدیمی qcAgents) → فهرست کارشناسان QC همان ردیف */
+    qcAgents: Access.agentQcNames(Object.assign({}, readExtra(r.extra), r))
   })).filter(a => a.name);
   if (Array.isArray(rows.tickets)) out.tickets = rows.tickets.map(r => Object.assign(readExtra(r.extra), {
     id: validId(r.id) || undefined,
@@ -405,10 +420,11 @@ async function pushViaServiceAccount(cfg, db) {
   await ensureGoogleTabs(sheets, cfg.spreadsheetId, cfg.sheets);
   const data = dbToSheetRows(db);
   const counts = {};
+  const agentTable = agentsSheetTable(db, data.agents || []);
   const valuesData = DATA_KEYS.map(key => {
     const rows = data[key] || [];
-    const headers = HEADERS[key];
-    const values = [headers].concat(rows.map(row => headers.map(header => cellValue(row[header]))));
+    const headers = key === 'agents' ? agentTable.headers : HEADERS[key];
+    const values = [headers].concat(key === 'agents' ? agentTable.rows : rows.map(row => headers.map(header => cellValue(row[header]))));
     counts[key] = rows.length;
     return { range: quoteSheet(cfg.sheets[key]) + '!A1', values };
   });
@@ -693,7 +709,7 @@ async function pushReport(cfg, reportData) {
 }
 
 module.exports = {
-  HEADERS, DEFAULT_CONFIG, DATA_KEYS, CONFIG_FILE,
+  HEADERS, DEFAULT_CONFIG, DATA_KEYS, CONFIG_FILE, agentsSheetTable,
   loadConfig, saveConfig, safeConfig, validateConfig, status,
   pull, push, pushReport, mergePullIntoDb, dbToSheetRows, sheetRowsToDb, ensureSyncIds,
   startPolling, stopPolling, markPushed, markPullError, fetchJson

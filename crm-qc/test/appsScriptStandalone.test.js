@@ -142,7 +142,8 @@ function createAppsScriptContext() {
       })
     },
     HtmlService: {
-      createHtmlOutput: value => ({ content: value, setTitle(title) { this.title = title; return this; }, addMetaTag() { return this; } }),
+      createHtmlOutput: value => ({ content: value, setTitle(title) { this.title = title; return this; },
+        addMetaTag() { return this; }, setFaviconUrl(url) { this.favicon = url; return this; } }),
       createHtmlOutputFromFile: name => ({ getContent: () => `<html data-file="${name}"></html>` })
     }
   };
@@ -420,22 +421,22 @@ test('standalone Apps Script: ورود با رمز، دسترسی هر کارش�
   assert.equal(apiSummary.status, 200);
   assert.ok(apiSummary.data.rows.length >= 1);
 
-  /* ستون qcAgents تب Agents: از اپ نوشته و از شیت خوانده می‌شود */
-  assert.ok(sheet('Agents').head.includes('qcAgents'), 'ستون qcAgents روی تب Agents ساخته می‌شود');
+  /* یک ستون اختصاصی برای هر کارشناس QC — نه یک ستون با نام‌های ویرگولی */
+  assert.ok(!sheet('Agents').head.includes('qcAgents'), 'ستون متنی qcAgents دیگر ساخته نمی‌شود');
 
-  // الف) ذخیره‌ی کاربر QC با تیک‌ها → همان نام‌ها روی شیت می‌نشیند (متن خوانا، نه JSON)
+  // الف) ذخیره‌ی کاربر QC با تیک‌ها → ستون همان کارشناس QC تیک می‌خورد
   const synced = api('PUT', '/api/qc-users', { id: created.data.user.id, name: 'مبینا', role: 'qc', active: true,
     exts: '', agents: target.name, teams: '', syncColumn: true }, token2);
   assert.equal(synced.status, 200, JSON.stringify(synced.data));
   const written = sheet('Agents');
+  assert.ok(written.head.includes('QC: مبینا'), 'ستون «QC: مبینا» ساخته می‌شود: ' + written.head.join('، '));
   const writtenTarget = written.rows.find((row) => written.col(row, 'name') === target.name);
-  assert.equal(written.col(writtenTarget, 'qcAgents'), 'مبینا', 'ستون به‌صورت نام ساده نوشته می‌شود');
-  assert.ok(!String(written.col(writtenTarget, 'qcAgents')).includes('['), 'JSON روی شیت نمی‌نشیند');
+  assert.equal(written.col(writtenTarget, 'QC: مبینا'), '✓', 'تیک همان ردیف روی ستون کارشناس QC می‌نشیند');
   const writtenOther = written.rows.find((row) => written.col(row, 'name') === other.name);
-  assert.equal(String(written.col(writtenOther, 'qcAgents') || ''), '', 'کارشناس انتخاب‌نشده ستون خالی دارد');
+  assert.equal(String(written.col(writtenOther, 'QC: مبینا') || ''), '', 'کارشناس انتخاب‌نشده تیک ندارد');
 
-  // ب) نوشتن مستقیم روی شیت هم دسترسی می‌دهد (دوطرفه)
-  writtenOther[written.head.indexOf('qcAgents')] = 'مبینا، هادی';
+  // ب) نوشتن مستقیم روی شیت (ستون همان QC) هم دسترسی می‌دهد (دوطرفه)
+  writtenOther[written.head.indexOf('QC: مبینا')] = '✓';
   clock.advance(31000);
   context.crmqcOnSheetChange();
   const qcLogin2 = api('POST', '/api/auth/login', { name: 'مبینا', password: 'qc-1234' });
@@ -446,14 +447,14 @@ test('standalone Apps Script: ورود با رمز، دسترسی هر کارش�
 
   // پ) شیت قدیمی بدون این ستون: با اولین نوشتن، سرستون‌ها درست بازنویسی می‌شود
   const tab = spreadsheet.getSheetByName('Agents');
-  const dropped = tab.data[0].indexOf('qcAgents');
+  const dropped = tab.data[0].indexOf('QC: مبینا');
   tab.data = tab.data.map((row) => row.filter((cell, i) => i !== dropped));
   clock.advance(31000);
   context.crmqcOnSheetChange();
-  const moved = api('PUT', '/api/agents/' + target.id, { team: target.team }, token2);
+  const moved = api('PUT', '/api/agents/' + target.id, { subgroup: 'بازبینی' }, token2);
   assert.equal(moved.status, 200, JSON.stringify(moved.data));
   const healed = sheet('Agents');
-  assert.ok(healed.head.includes('qcAgents'), 'ستون از دست‌رفته دوباره ساخته می‌شود');
+  assert.ok(healed.head.includes('QC: مبینا'), 'ستون از دست‌رفته دوباره ساخته می‌شود');
   const healedRow = healed.rows.find((row) => healed.col(row, 'id') === target.id);
   assert.ok(healedRow, 'ردیف کارشناس بعد از بازنویسی سر جایش است');
   assert.equal(healed.col(healedRow, 'name'), target.name, 'ستون‌ها جابه‌جا نمی‌شوند');
@@ -467,6 +468,9 @@ test('standalone Apps Script: ورود با رمز، دسترسی هر کارش�
   const indexPage = context.doGet({ parameter: {} });
   assert.ok(indexPage.content.includes('data-file="Index"'));
   assert.ok(!indexPage.content.includes('__QC_APP_SCRIPT_URL__'), 'نشانی وب‌اپ جایگزین شد');
+  /* آیکون سربرگ مرورگر: لوگوی خود سامانه، نه آیکون پیش‌فرض Apps Script */
+  assert.ok(String(indexPage.favicon || '').includes('favicon'), 'favicon روی صفحه تنظیم می‌شود: ' + indexPage.favicon);
+  assert.ok(String(callPage.favicon || '').includes('favicon'), 'favicon صفحه‌ی گزارش تماس');
 });
 
 /* عملکرد: کش تب‌به‌تب با نسخه‌ی هر تب + خواندن جزئی. ثبت هر ریت و گزارش‌گیری
@@ -597,4 +601,87 @@ test('partial loads detect mutations of tabs they did not read', () => {
   const okChange = JSON.parse(JSON.stringify(partial));
   okChange.tickets = [{ id: 1, ticketCode: 'T-1', agentName: 'کارشناس نمونه' }];
   assert.deepEqual(missingOf(okChange), []);
+});
+
+/* یک ستون برای هر کارشناس QC روی تب Agents: ساخت، تغییر نام، حذف و بقای ستونِ
+ * دستی‌نوشته — این همان چیزی است که کاربر می‌خواهد به‌جای سلول‌های ویرگولی. */
+test('standalone Apps Script: ستون اختصاصی هر کارشناس QC ساخته، تغییر نام و حذف می‌شود', () => {
+  const { context, spreadsheet, clock } = createAppsScriptContext();
+  context.setupStandaloneApp();
+  const api = (method, url, body, token) => context.crmqcApi(method, url, body, token);
+  const tab = () => spreadsheet.getSheetByName('Agents');
+  const head = () => tab().data[0].map((cell) => String(cell));
+  const column = (name) => head().indexOf('QC: ' + name);
+  const rowOf = (name) => {
+    const nameCol = head().indexOf('name');
+    return tab().data.slice(1).find((row) => String(row[nameCol]) === name);
+  };
+  const target = api('GET', '/api/bootstrap').data.agents[0];
+  const other = api('GET', '/api/bootstrap').data.agents[1];
+
+  /* ۱) ساخت کاربر QC → ستون اختصاصی همان نام */
+  const madeAdmin = api('POST', '/api/auth/setup', { name: 'مدیر سیستم', password: 'admin-1234' });
+  assert.equal(madeAdmin.status, 200, JSON.stringify(madeAdmin.data));
+  const token = madeAdmin.data.token;
+  const created = api('POST', '/api/qc-users', { name: 'مبینا', role: 'qc', active: true, password: 'qc-1234' }, token);
+  assert.equal(created.status, 200, JSON.stringify(created.data));
+  assert.ok(column('مبینا') > 0, 'ستون «QC: مبینا» ساخته شد: ' + head().join('، '));
+  const nameCol = head().indexOf('name');
+  assert.equal(String(tab().data[0][nameCol]), 'name', 'ستون‌های پایه جابه‌جا نشدند');
+  assert.ok(!head().includes('qcAgents'), 'ستون متنی قدیمی ساخته نمی‌شود');
+
+  /* ۲) تیک زدن روی شیت (دستی) → در اپ همان کارشناس QC دیده می‌شود */
+  rowOf(target.name)[column('مبینا')] = '✓';
+  clock.advance(31000);
+  context.crmqcOnSheetChange();
+  const seen = api('GET', '/api/agents', null, token).data.find((a) => a.name === target.name);
+  assert.deepEqual([...seen.qcAgents], ['مبینا'], 'تیک ستون روی شیت به فهرست QC تبدیل شد');
+
+  /* ۳) افزودن کارشناس QC دوم → ستون دوم بدون از دست رفتن تیک‌ها */
+  const second = api('POST', '/api/qc-users', { name: 'هادی', role: 'qc', active: true, password: 'qc-5678' }, token);
+  assert.equal(second.status, 200, JSON.stringify(second.data));
+  assert.ok(column('هادی') > 0, 'ستون دوم ساخته شد');
+  assert.equal(rowOf(target.name)[column('مبینا')], '✓', 'تیک قبلی حفظ شد');
+  assert.equal(String(rowOf(target.name)[column('هادی')] || ''), '', 'ستون جدید برای این کارشناس خالی است');
+
+  /* ۴) کارشناس QC مسئول را عوض کن (تیک ها را در اپ بزن) */
+  const both = api('PUT', '/api/agents/' + target.id, { qcAgents: ['هادی'] }, token);
+  assert.equal(both.status, 200, JSON.stringify(both.data));
+  assert.equal(String(rowOf(target.name)[column('مبینا')] || ''), '', 'تیک قدیمی برداشته شد');
+  assert.equal(rowOf(target.name)[column('هادی')], '✓', 'تیک جدید نوشته شد');
+
+  /* ۵) تغییر نام کاربر QC → سرستون همان ستون عوض می‌شود و تیک‌ها می‌مانند */
+  const users = api('GET', '/api/qc-users', null, token).data.users;
+  const hadi = users.find((u) => u.name === 'هادی');
+  const renamed = api('PUT', '/api/qc-users', { id: hadi.id, name: 'هادی رضایی', role: 'qc', active: true, syncColumn: true }, token);
+  assert.equal(renamed.status, 200, JSON.stringify(renamed.data));
+  assert.ok(column('هادی رضایی') > 0, 'سرستون به نام تازه تغییر کرد');
+  assert.equal(column('هادی'), -1, 'سرستون قدیمی نمانده است');
+  assert.equal(rowOf(target.name)[column('هادی رضایی')], '✓', 'تیک بعد از تغییر نام حفظ شد');
+
+  /* ۶) ستون دست‌نوشته‌ی روی شیت (نامی خارج از فهرست) با نوشتن‌های بعدی پاک نمی‌شود */
+  const manual = tab();
+  manual.data[0].push('QC: سارا');
+  manual.data[1].push('✓');
+  clock.advance(31000);
+  context.crmqcOnSheetChange();
+  api('PUT', '/api/agents/' + other.id, { subgroup: 'واحد ویژه' }, token);
+  assert.ok(head().indexOf('QC: سارا') > 0, 'ستون دست‌نوشته حفظ شد');
+  const manualRow = rowOf(String(manual.data[1][manual.data[0].indexOf('name')]));
+  assert.equal(String(manualRow[head().indexOf('QC: سارا')] || ''), '✓', 'تیک ستون دست‌نوشته حفظ شد');
+
+  /* ۷) حذف حساب کاربر: تیک‌هایش پاک می‌شود ولی خودِ کارشناس QC (و ستونش) می‌ماند،
+   * چون فهرست کارشناسان QC از حساب‌ها جداست و ممکن است بخواهید سوابقش بماند. */
+  const beforeDelete = api('GET', '/api/qc-users', null, token).data.users;
+  const deleted = api('DELETE', '/api/qc-users/' + beforeDelete.find((u) => u.name === 'هادی رضایی').id, null, token);
+  assert.equal(deleted.status, 200, JSON.stringify(deleted.data));
+  assert.ok(column('هادی رضایی') > 0, 'ستون کارشناس QC می‌ماند');
+  assert.equal(String(rowOf(target.name)[column('هادی رضایی')] || ''), '', 'تیک‌های حساب حذف‌شده پاک شدند');
+  assert.ok(column('مبینا') > 0, 'ستون بقیه‌ی کارشناسان QC سر جایش است');
+
+  /* ۸) حذف خود کارشناس QC از فهرست → ستونش هم از شیت برداشته می‌شود */
+  const dropped = api('DELETE', '/api/qc-agents/' + encodeURIComponent('هادی رضایی'), null, token);
+  assert.equal(dropped.status, 200, JSON.stringify(dropped.data));
+  assert.equal(column('هادی رضایی'), -1, 'با حذف کارشناس QC، ستونش برداشته می‌شود');
+  assert.ok(column('مبینا') > 0, 'بقیه‌ی ستون‌ها دست‌نخورده‌اند');
 });

@@ -111,3 +111,30 @@ for(const build of ['public','offline'])test(build+': new management, popup, sch
   assert.equal($('#globalRange').classList.contains('draft'),false);assert.ok($('#gRangeState').textContent.includes('اعمال'));
   assert.deepEqual(errors,[]);
 });
+
+/* سرعت: ثبت یک ریت نباید کل bootstrap را دوباره بخواند؛ شمارش همان‌جا اصلاح
+ * می‌شود و صفحه‌ی سوابق داده‌ی خودش را می‌گیرد. این تست قرارداد را قفل می‌کند. */
+test('speed: saving a rating never triggers a full App.boot (round trips stay at 2)', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const root = path.join(__dirname, '..');
+  const source = (file) => fs.readFileSync(path.join(root, 'public', file), 'utf8');
+  const saveBlock = (file, marker) => {
+    const text = source(file);
+    const start = text.indexOf(marker);
+    assert.ok(start > 0, marker + ' پیدا نشد');
+    const end = text.indexOf('saveBtn.addEventListener', start);
+    return text.slice(start, end > start ? end : start + 2600);
+  };
+  const tickets = saveBlock('pages/tickets.js', 'const doSave = async (overwrite) => {');
+  assert.ok(!tickets.includes('App.boot()'), 'ثبت تیکت نباید boot کامل بزند');
+  assert.ok(tickets.includes("App.applyWrite('tickets'"), 'شمارش تیکت باید همان‌جا اصلاح شود');
+
+  const socials = saveBlock('pages/socials.js', 'const doSave = async');
+  assert.ok(!socials.includes('App.boot()'), 'ثبت سوشال نباید boot کامل بزند');
+  assert.ok(socials.includes("App.applyWrite('socials'"), 'شمارش سوشال باید همان‌جا اصلاح شود');
+
+  const app = source('app.js');
+  assert.ok(app.includes('applyWrite(kind, delta)'), 'کمک‌تابع به‌روزرسانی شمارش هست');
+  assert.ok(app.includes('noteRevision(rev)'), 'نسخه‌ی تازه از پاسخ نوشتن خوانده می‌شود');
+});

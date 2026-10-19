@@ -149,7 +149,9 @@ async function formPage(root, editId) {
     try {
       const saved = editId ? await api.put('/api/tickets/' + editId, payload) : await api.post('/api/tickets', payload);
       toast(editId ? 'تغییرات ذخیره شد — نمره: ' + fa(saved.score == null ? '—' : saved.score) : 'ارزیابی با نمره ' + fa(saved.score == null ? '—' : saved.score) + ' ثبت شد', 'success');
-      await App.boot();
+      /* بدون App.boot: شمارش همان‌جا اصلاح می‌شود و صفحه‌ی سوابق داده‌ی تازه
+       * خودش را می‌گیرد؛ این یعنی یک رفت‌وبرگشت کامل کمتر برای هر ثبت. */
+      App.applyWrite('tickets', editId ? 0 : 1);
       location.hash = '#/tickets';
     } catch (e) {
       saveBtn.disabled = false;
@@ -280,7 +282,7 @@ async function listPage(root) {
       if (act === 'del') {
         const tr = b.closest('tr');
         confirmDlg('حذف ارزیابی تیکت', `رکورد ${tr.children[4].textContent} (کد ${tr.children[6].textContent}) برای همیشه حذف می‌شود.`, async () => {
-          try { await api.del('/api/tickets/' + id); toast('رکورد حذف شد', 'success'); await App.boot(); load(); }
+          try { await api.del('/api/tickets/' + id); toast('رکورد حذف شد', 'success'); App.applyWrite('tickets', -1); load(); }
           catch (e) { toast(e.message, 'error'); }
         });
       }

@@ -140,3 +140,27 @@ test('Web App config validation restricts URLs and requires an API token', () =>
   assert.throws(() => Sheets.validateConfig({ enabled: true, mode: 'webapp', webAppUrl: 'https://example.com/deploy', webAppToken: 'x'.repeat(32) }), /URL امن/);
   assert.throws(() => Sheets.validateConfig({ enabled: true, mode: 'webapp', webAppUrl: 'https://script.google.com/macros/s/deployment/exec', webAppToken: 'short' }), /توکن/);
 });
+
+test('تب Agents: یک ستون اختصاصی برای هر کارشناس QC با تیک «✓» (بدون سلول ویرگولی)', () => {
+  const db = fixture();
+  db.qcAgents = ['مبینا', 'هادی'];
+  db.agents[0].qcAgents = ['هادی'];
+  const table = Sheets.agentsSheetTable(db, Sheets.dbToSheetRows(db).agents);
+  assert.ok(table.headers.includes('QC: مبینا'), table.headers.join('، '));
+  assert.ok(table.headers.includes('QC: هادی'), table.headers.join('، '));
+  assert.ok(!table.headers.includes('qcAgents'), 'ستون متنی قدیمی ساخته نمی‌شود');
+  const row = table.rows[0];
+  assert.equal(row[table.headers.indexOf('QC: هادی')], '✓');
+  assert.equal(row[table.headers.indexOf('QC: مبینا')], '');
+  /* JSON ستون extra نباید فهرست QC را هم تکرار کند */
+  assert.ok(!Sheets.dbToSheetRows(db).agents[0].extra.includes('qcAgents'),
+    'فهرست QC فقط در ستون‌های اختصاصی است');
+
+  /* خواندن: ستون‌های QC (و ستون قدیمی) به فهرست qcAgents تبدیل می‌شوند */
+  const pulled = Sheets.sheetRowsToDb({ agents: [
+    { name: 'کارشناس الف', team: 'Tele sales', 'QC: مبینا': '✓', 'QC: هادی': '' },
+    { name: 'کارشناس ب', team: 'Account', qcAgents: 'هادی' }
+  ] });
+  assert.deepEqual([...pulled.agents[0].qcAgents], ['مبینا']);
+  assert.deepEqual([...pulled.agents[1].qcAgents], ['هادی'], 'ستون قدیمی هم خوانده می‌شود');
+});

@@ -157,13 +157,18 @@ function maybePushToSheets() {
 /* --------------------------------------------------------------- helpers */
 function send(res, code, body, type) {
   const data = type === 'raw' ? body : JSON.stringify(body);
-  res.writeHead(code, {
+  /* شماره‌ی نسخه‌ی داده در هدر: کلاینت بعد از هر نوشتن بدون درخواست اضافه
+   * (/api/revision) می‌فهمد داده‌اش تازه است. */
+  const headers = {
     'Content-Type': type === 'raw' ? 'text/html; charset=utf-8' : 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
-  });
+    'Access-Control-Allow-Headers': 'Content-Type, x-qc-token',
+    'Access-Control-Expose-Headers': 'x-qc-revision'
+  };
+  if (db) headers['x-qc-revision'] = String(Number(db.revision) || 0);
+  res.writeHead(code, headers);
   res.end(data);
 }
 const ok = (res, body) => send(res, 200, body);
@@ -1091,7 +1096,7 @@ async function dispatchApi(req, res, pathname, query, body, session) {
       const before = existing ? existing.name : '';
       const row = Access.saveUser(db, body, existing);
       /* تیک‌ها روی ستون qcAgents تب Agents هم می‌نشینند تا از شیت/اکسل هم ویرایش‌پذیر باشند. */
-      Access.syncAgentQcColumn(db, Access.normalizeUser(row, 0), body && body.syncColumn ? 'sync' : 'keep');
+      Access.syncAgentQcColumn(db, Access.normalizeUser(row, 0), (body && body.syncColumn && (body.exts !== undefined || body.agents !== undefined || body.teams !== undefined)) ? 'sync' : 'keep');
       saveStore();
       if (before && before !== row.name) dropSessionsOf(before);
       return ok(res, { ok: true, user: Access.userMask([Access.normalizeUser(row, 0)])[0],

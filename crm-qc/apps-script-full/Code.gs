@@ -2306,6 +2306,67 @@ function splitList(value) {
   return text(value).split(/[,،;؛|\n\r\t]+/).map((x) => text(x)).filter(Boolean);
 }
 
+/* --------------------------------- نگاشت «یک ستون برای هر کارشناس QC» روی شیت
+ * به‌جای یک ستون تکی با نام‌های جداشده با ویرگول، تب Agents برای هر کارشناس QC
+ * یک ستون اختصاصی دارد: سرستون `QC: <نام>` و سلول‌ها «✓» (یا خالی). همان تابع‌ها
+ * هم ستون‌ها را می‌سازند و هم موقع خواندن شیت، تیک‌ها را به فهرست qcAgents برمی‌گردانند.
+ * این کار ویرایش مستقیم روی شیت/اکسل را ساده و بدون خطای ویرگول می‌کند. */
+const QC_COLUMN_PREFIX = 'QC';
+const QC_TICK = '✓';
+function qcColumnHeader(name) { return QC_COLUMN_PREFIX + ': ' + text(name); }
+function qcColumnName(header) {
+  const match = text(header).match(/^qc\s*[:：]\s*(.+)$/i);
+  return match ? text(match[1]) : '';
+}
+function isQcColumn(header) { return !!qcColumnName(header); }
+function isQcTick(value) {
+  const v = digits(text(value)).toLowerCase().replace(/\s+/g, '');
+  if (!v) return false;
+  return ['✓', '✔', '☑', 'x', 'yes', 'y', 'true', '1', 'on', 'بله', 'فعال', 'دارد'].indexOf(v) !== -1;
+}
+/* فهرست نام‌های QC مسئول یک ردیف کارشناس (آرایه، رشته‌ی ویرگولی یا ردیف خام شیت) */
+function agentQcNames(row) {
+  if (row == null) return [];
+  const source = Array.isArray(row) || typeof row === 'string' ? { qcAgents: row } : row;
+  const out = [];
+  const push = (name) => {
+    const n = text(name);
+    if (!n) return;
+    if (!out.some((x) => nameKey(x) === nameKey(n))) out.push(n);
+  };
+  Object.keys(source || {}).forEach((key) => {
+    const name = qcColumnName(key);
+    if (name && isQcTick(source[key])) push(name);
+  });
+  splitList(source.qcAgents).forEach(push);
+  return out;
+}
+/* ردیف خام شیت → ردیف تمیز: ستون‌های QC حذف و در qcAgents جمع می‌شوند */
+function applyQcColumns(row) {
+  const out = Object.assign({}, row || {});
+  const names = agentQcNames(out);
+  Object.keys(out).forEach((key) => { if (isQcColumn(key)) delete out[key]; });
+  out.qcAgents = names;
+  return out;
+}
+/* مقدار سلول برای ستون یک کارشناس QC مشخص */
+function qcColumnValue(list, name) {
+  const key = nameKey(name);
+  return splitList(list).some((n) => nameKey(n) === key) ? QC_TICK : '';
+}
+/* فهرست کامل کارشناسان QC برای ساخت ستون‌ها: db.qcAgents + هر نامی که در ردیف‌ها هست */
+function qcExpertNames(db, rows) {
+  const out = [];
+  const push = (name) => {
+    const n = text(name);
+    if (!n) return;
+    if (!out.some((x) => nameKey(x) === nameKey(n))) out.push(n);
+  };
+  ((db && db.qcAgents) || []).forEach(push);
+  (rows || []).forEach((row) => agentQcNames(row).forEach(push));
+  return out;
+}
+
 function isWildcard(list) {
   return (list || []).some((x) => ['*', 'all', 'همه', 'همه‌چیز', '-'].indexOf(digits(x).toLowerCase()) !== -1);
 }
@@ -2584,9 +2645,14 @@ function saveUser(db, body, existing) {
   row.name = name;
   row.role = /^ad/i.test(text(body.role)) ? 'admin' : 'qc';
   row.active = body.active === undefined ? true : !!body.active;
-  row.exts = Array.isArray(body.exts) ? body.exts.map(digits).filter(Boolean).join(',') : text(body.exts);
-  row.agents = Array.isArray(body.agents) ? body.agents.map(text).filter(Boolean).join(',') : text(body.agents);
-  row.teams = Array.isArray(body.teams) ? body.teams.map(text).filter(Boolean).join(',') : text(body.teams);
+  /* اگر فیلدی در بدنه نیامده باشد (مثلاً فقط تغییر رمز یا نام)، مقدار قبلی حفظ
+   * می‌شود؛ وگرنه یک PUT ناقص می‌توانست کل دسترسی را پاک کند. */
+  const listValue = (value, key) => (Array.isArray(value)
+    ? value.map(key === 'exts' ? digits : text).filter(Boolean).join(',')
+    : text(value));
+  row.exts = body.exts === undefined ? text(existing && existing.exts) : listValue(body.exts, 'exts');
+  row.agents = body.agents === undefined ? text(existing && existing.agents) : listValue(body.agents, 'agents');
+  row.teams = body.teams === undefined ? text(existing && existing.teams) : listValue(body.teams, 'teams');
   row.note = text(body.note);
   row.updatedAt = new Date().toISOString();
   const plain = body.password == null ? '' : text(body.password);
@@ -2600,10 +2666,16 @@ function saveUser(db, body, existing) {
     const at = users.indexOf(existing);
     if (at >= 0) users[at] = row; else users.push(row);
   } else users.push(row);
-  /* نام کارشناس QC باید در فهرست qcAgents هم باشد تا در فرم‌ها قابل انتخاب باشد. */
+  /* نام کارشناس QC باید در فهرست qcAgents هم باشد تا در فرم‌ها و ستون‌های تب
+   * Agents دیده شود. با تغییر نام، همان جایگاه قبلی به نام تازه تبدیل می‌شود
+   * (وگرنه ستون قدیمی روی شیت برای همیشه می‌ماند). */
   if (!Array.isArray(db.qcAgents)) db.qcAgents = [];
-  if (!db.qcAgents.some((x) => nameKey(x) === key)) db.qcAgents.push(name);
-  if (previousName && nameKey(previousName) !== key) renameAgentQcColumn(db, previousName, name);
+  const previousKey = previousName ? nameKey(previousName) : '';
+  const at = previousKey && previousKey !== key
+    ? db.qcAgents.findIndex((x) => nameKey(x) === previousKey) : -1;
+  if (at >= 0) db.qcAgents[at] = name;
+  else if (!db.qcAgents.some((x) => nameKey(x) === key)) db.qcAgents.push(name);
+  if (previousName && previousKey !== key) renameAgentQcColumn(db, previousName, name);
   return clone(row);
 }
 
@@ -2635,6 +2707,10 @@ return {
   publicUser: publicUser, allowedAgentNames: allowedAgentNames, scopeDb: scopeDb, writeGuard: writeGuard,
   canAccessApi: canAccessApi, canAccessRoute: canAccessRoute, visibleRoutes: visibleRoutes, isAdmin: isAdmin,
   saveUser: saveUser, deleteUser: deleteUser, usersToRows: usersToRows, userMask: userMask,
+  nameKey: nameKey,
+  QC_COLUMN_PREFIX: QC_COLUMN_PREFIX, QC_TICK: QC_TICK, qcColumnHeader: qcColumnHeader,
+  qcColumnName: qcColumnName, isQcColumn: isQcColumn, isQcTick: isQcTick, agentQcNames: agentQcNames,
+  applyQcColumns: applyQcColumns, qcColumnValue: qcColumnValue, qcExpertNames: qcExpertNames,
   syncAgentQcColumn: syncAgentQcColumn, dropAgentQcColumn: dropAgentQcColumn,
   renameAgentQcColumn: renameAgentQcColumn,
   ADMIN_ROUTES: ADMIN_ROUTES, SHARED_ROUTES: SHARED_ROUTES, ADMIN_API: ADMIN_API, OPEN_API: OPEN_API
@@ -3636,7 +3712,7 @@ function qcUsersRoute(method, id, body) {
       session = A.normalizeUser(row, 0); // تغییر نقش/دسترسی مدیر بلافاصله اعمال شود
     }
     /* تیک‌ها → ستون qcAgents ردیف کارشناسان (تا از شیت/اکسل هم قابل ویرایش باشد) */
-    A.syncAgentQcColumn(db, A.normalizeUser(row, 0), body && body.syncColumn ? 'sync' : 'keep');
+    A.syncAgentQcColumn(db, A.normalizeUser(row, 0), (body && body.syncColumn && (body.exts !== undefined || body.agents !== undefined || body.teams !== undefined)) ? 'sync' : 'keep');
     saveDb();
     return { ok: true, user: clone(A.userMask([A.normalizeUser(row, 0)])[0]), users: clone(A.userMask(A.normalizeUsers(db))),
       agents: clone(db.agents.map((a) => ({ id: a.id, name: a.name, ext: a.ext, team: a.team, active: a.active !== false,
@@ -3782,7 +3858,8 @@ var QC_GAS_SHEETS = {
 };
 
 var QC_GAS_SCHEMAS = {
-  Agents: ['id', 'ext', 'name', 'team', 'active', 'subgroup', 'qcAgents', 'aliases'],
+  /* ستون‌های پایه؛ ستون هر کارشناس QC با سرستون `QC: <نام>` هنگام نوشتن ساخته می‌شود */
+  Agents: ['id', 'ext', 'name', 'team', 'active', 'subgroup', 'aliases'],
   Tickets: ['id', 'qcAgent', 'reviewDate', 'ticketDate', 'agentName', 'team', 'ticketCode', 'q1', 'q2', 'q3', 'q4', 'redline', 'score', 'comment', 'createdAt', 'updatedAt', 'sourceAgentName', 'demo'],
   Socials: ['id', 'reviewDate', 'qcAgent', 'receiveDate', 'receiveWeekday', 'replyDate', 'replyWeekday', 'agentName', 'team', 'messenger', 'receiveTime', 'replyTime', 'responseStatus', 'delayReason', 'reasonVerdict', 'qSla', 'qFollow', 'qClosing', 'qTone', 'durationMin', 'durationError', 'slaStatus', 'score', 'comment', 'messageLink', 'createdAt', 'updatedAt', 'sourceAgentName', 'demo'],
   Calls: ['syncId', 'expertName', 'sourceExpertName', 'team', 'score', 'redline', 'redlineReason', 'leadName', 'leadPhone', 'listeningTime', 'callDuration', 'qcAgent', 'qcComment', 'reviewDate', 'callDate', 'formType', 'evaluationId', 'sourceFile', 'sourceRow', 'datasetId', 'criteriaVersion', 'criteriaSnapshot', 'elements', 'demo'],
@@ -3846,6 +3923,10 @@ var QC_GAS_ANALYSIS_MAX_CHARS = 900000;
 var QC_GAS_TOKEN_PREFIX = 'qctok@';
 var QC_GAS_TOKEN_EPOCH_KEY = 'QC_GAS_TOKEN_EPOCH';
 var QC_GAS_TOKEN_TTL_SEC = 21600; // ۶ ساعت؛ با هر درخواست تمدید می‌شود
+/* آیکون سربرگ مرورگر (favicon). اگر خواستید لوگوی دیگری بگذارید، این مقدار را
+ * در Script Properties با کلید QC_GAS_FAVICON_URL تنظیم کنید. */
+var QC_GAS_FAVICON_KEY = 'QC_GAS_FAVICON_URL';
+var QC_GAS_FAVICON_FALLBACK = 'https://raw.githubusercontent.com/hagheofficial-cmyk/Sheettohtml/arena/865b3375-sheettohtml/crm-qc/public/favicon.png';
 
 function onOpen() {
   try {
@@ -3963,16 +4044,32 @@ function doGet(e) {
       .replace('__QC_CALL_REPORT_STORAGE_B64__', Utilities.base64Encode(
         Utilities.newBlob(JSON.stringify(readCallReportSettings_()), 'application/json').getBytes()
       ));
-    return HtmlService.createHtmlOutput(callHtml)
+    return withFavicon_(HtmlService.createHtmlOutput(callHtml)
       .setTitle('گزارش تماس روزانه')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1'));
   }
 
   var indexHtml = HtmlService.createHtmlOutputFromFile('Index').getContent()
     .replace('__QC_APP_SCRIPT_URL__', ScriptApp.getService().getUrl());
-  return HtmlService.createHtmlOutput(indexHtml)
+  return withFavicon_(HtmlService.createHtmlOutput(indexHtml)
     .setTitle('سامانه یکپارچه کنترل کیفیت CRM')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1'));
+}
+
+/* لوگوی سامانه روی سربرگ مرورگر — به‌جای آیکون پیش‌فرض Apps Script/اکستنشن. */
+function faviconUrl_() {
+  try {
+    var custom = PropertiesService.getScriptProperties().getProperty(QC_GAS_FAVICON_KEY);
+    if (custom) return custom;
+  } catch (err) {}
+  return QC_GAS_FAVICON_FALLBACK;
+}
+
+function withFavicon_(output) {
+  try {
+    if (output && typeof output.setFaviconUrl === 'function') output.setFaviconUrl(faviconUrl_());
+  } catch (err) {}
+  return output;
 }
 
 /**
@@ -4016,7 +4113,7 @@ function crmqcApi(method, requestUrl, body, token) {
       var readInfo = {};
       /* خواندن جزئی: هر تب از کشِ خودش یا از شیت. مسیر نوشتنی فقط تب‌های موردنیاز
        * خودش را بارگذاری می‌کند، پس ثبت یک ریت دیگر کل شیت را نمی‌خواند. */
-      var wanted = (isRead || attempt > 0) ? null : wantedTabsFor_(method, pathOnly);
+      var wanted = (isRead || attempt > 0) ? null : wantedTabsFor_(method, pathOnly, body);
       var before = normalizeDatabase_(readDatabase_(ss, wanted, readInfo));
 
       /* نشست: توکن از کش، نقش و دسترسی‌ها همیشه از داده‌ی تازه‌ی شیت */
@@ -4075,8 +4172,14 @@ function crmqcApi(method, requestUrl, body, token) {
       var changedTabs = writeDatabaseDiffFp_(ss, beforeJson, live, false, readInfo.loaded);
       /* فقط همان تب‌ها نسخهٔ تازه می‌گیرند؛ بقیهٔ کش گرم می‌ماند و bootstrap
        * بعدی (که کلاینت پس از هر ذخیره می‌زند) هیچ تبی را از شیت نمی‌خواند. */
-      if (changedTabs.length) publishAfterWrite_(bumpRevision_(), changedTabs, changedTabs.db);
-      return { status: 200, data: data };
+      var responseRevision = currentRevision_();
+      if (changedTabs.length) {
+        responseRevision = bumpRevision_();
+        publishAfterWrite_(responseRevision, changedTabs, changedTabs.db);
+      }
+      /* شماره‌ی نسخه در پاسخ نوشتن برمی‌گردد تا کلاینت بدون یک رفت‌وبرگشت
+       * اضافه (/api/revision) بداند داده‌اش تازه است. */
+      return { status: 200, data: data, revision: responseRevision };
     }
   } catch (error) {
     return {
@@ -4479,7 +4582,7 @@ function markSummaryBuilt_() {
 }
 
 /* تب‌هایی که یک مسیر واقعاً لازم دارد؛ بقیه از شیت خوانده نمی‌شوند */
-function wantedTabsFor_(method, pathOnly) {
+function wantedTabsFor_(method, pathOnly, body) {
   var p = String(pathOnly || '');
   var heavy;
   if (p.indexOf('/api/tickets') === 0) heavy = ['tickets'];
@@ -4487,6 +4590,14 @@ function wantedTabsFor_(method, pathOnly) {
   else if (p.indexOf('/api/calls') === 0) heavy = ['callFeedbacks'];
   else if (p.indexOf('/api/actions') === 0) heavy = ['agentActions'];
   else if (p.indexOf('/api/reminders') === 0) heavy = ['reminders'];
+  else if (p.indexOf('/api/agents') === 0) {
+    /* ویرایش داخلی/تیک QC/بایگانی فقط تب Agents را لازم دارد؛ اما تغییر نام یا تیم،
+     * سوابق ریت و خلاصه‌ی ماهانه را هم تحت تأثیر می‌گذارد. صفحه‌ی کارشناسان فقط
+     * فیلدهای عوض‌شده را می‌فرستد، پس حالت سبک، حالت رایج است (سرعت ثبت تغییرات). */
+    var touchesRecords = !!(body && (body.name !== undefined || body.team !== undefined));
+    heavy = touchesRecords ? ['tickets', 'socials', 'callFeedbacks', 'agentActions', 'agents'] : [];
+  }
+  else if (p.indexOf('/api/qc-agents') === 0) heavy = [];
   else if (p.indexOf('/api/qc-users') === 0 || p.indexOf('/api/auth') === 0 ||
     p.indexOf('/api/fiscal-months') === 0 || p.indexOf('/api/criteria') === 0 ||
     p.indexOf('/api/settings') === 0 || p.indexOf('/api/elements') === 0) heavy = [];
@@ -4660,7 +4771,13 @@ function readDatabase_(ss, wanted, info) {
     createdAt: meta.createdAt || '',
     registryCleared: !!meta.registryCleared,
     seq: meta.seq || {},
-    agents: raw('agents', function () { return rows(QC_GAS_SHEETS.agents); }) || [],
+    agents: raw('agents', function () {
+      /* هر ستون «QC: نام» یک تیک است؛ تیک‌ها در qcAgents جمع می‌شوند تا کل اپ
+       * فقط با یک آرایه کار کند. ستون قدیمی qcAgents هم برای سازگاری خوانده می‌شود. */
+      return rows(QC_GAS_SHEETS.agents).map(function (row) {
+        return window.QCAccess.applyQcColumns(row);
+      });
+    }) || [],
     qcAgents: raw('qcAgents', function () {
       return rows(QC_GAS_SHEETS.qcAgents).map(function (row) { return String(row.name || '').trim(); }).filter(Boolean);
     }) || [],
@@ -4825,9 +4942,27 @@ function writeDatabaseDiffFp_(ss, beforeJson, after, forceAll, only) {
   var allowed = function (key) { return !only || only.indexOf(key) >= 0; };
   var units = diffUnits_(after);
   var afterJson = {}, beforeRows = {};
+  /* ستون‌های تب Agents به فهرست کارشناسان QC وابسته‌اند: با اضافه‌شدن یک کارشناس QC
+   * باید ستون تازه ساخته شود، حتی اگر هیچ ردیفی عوض نشده باشد. */
+  var agentsSignature_ = function (agentRows, names) {
+    return jsonString_({ rows: agentRows || [], experts: names || [] });
+  };
+  var qcNamesAfter = (after.qcAgents || []).map(function (name) { return String(name); });
+  var qcNamesBefore = [];
+  try {
+    qcNamesBefore = (JSON.parse(beforeJson.qcAgents || '[]') || []).map(function (row) {
+      return String((row && row.name) || '');
+    }).filter(Boolean);
+  } catch (err) { qcNamesBefore = []; }
   var changed = function (key) {
     if (!allowed(key)) return false;
     if (forceAll) return true;
+    if (key === 'agents') {
+      if (afterJson.agents === undefined) afterJson.agents = agentsSignature_(units.agents, qcNamesAfter);
+      var wasAgents = null;
+      try { wasAgents = beforeJson.agents == null ? null : JSON.parse(beforeJson.agents); } catch (err) { wasAgents = null; }
+      return agentsSignature_(wasAgents, qcNamesBefore) !== afterJson.agents;
+    }
     if (afterJson[key] === undefined) afterJson[key] = jsonString_(units[key]);
     var was = beforeJson[key] === undefined ? null : beforeJson[key];
     return was !== afterJson[key];
@@ -4847,7 +4982,9 @@ function writeDatabaseDiffFp_(ss, beforeJson, after, forceAll, only) {
   };
 
   if (changed('agents')) write('agents', function () {
-    return writeRowsSheet_(sheets[QC_GAS_SHEETS.agents], rows('agents') || [], units.agents, 'Agents');
+    var previous = rows('agents');
+    var beforeAgents = Array.isArray(previous) ? previous : (previous && previous.rows) || [];
+    return writeAgentsSheet_(sheets[QC_GAS_SHEETS.agents], beforeAgents, units.agents || [], after);
   });
   if (changed('tickets')) write('tickets', function () {
     return writeRowsSheet_(sheets[QC_GAS_SHEETS.tickets], rows('tickets') || [], units.tickets, 'Tickets');
@@ -4913,6 +5050,49 @@ function writeDatabaseDiffFp_(ss, beforeJson, after, forceAll, only) {
   return written;
 }
 
+/* ------------------------------------------------- ستون اختصاصی هر کارشناس QC
+ * تب Agents یک ستون برای هر کارشناس QC دارد (`QC: <نام>`) تا روی خود شیت/اکسل
+ * با انتخاب «✓» مشخص شود کدام کارشناس QC مسئول بررسی کدام کارشناس است. */
+function agentsSheetGrid_(rows, baseKeys, qcNames) {
+  var keys = baseKeys.concat(qcNames.map(function (name) { return window.QCAccess.qcColumnHeader(name); }));
+  var values = (rows || []).map(function (row) {
+    row = row || {};
+    return baseKeys.map(function (key) { return encodeCell_(row[key], key); }).concat(
+      qcNames.map(function (name) { return window.QCAccess.qcColumnValue(row.qcAgents, name); }));
+  });
+  return { keys: keys, values: values };
+}
+
+function applyQcValidation_(sheet, keys, rowCount, qcNames) {
+  if (!qcNames || !qcNames.length || !rowCount) return;
+  try {
+    if (typeof SpreadsheetApp === 'undefined' || typeof SpreadsheetApp.newDataValidation !== 'function') return;
+    var values = [window.QCAccess.QC_TICK];
+    qcNames.forEach(function (name) {
+      try {
+        var rule = SpreadsheetApp.newDataValidation().requireValueInList(values, true).setAllowInvalid(true).build();
+        var col = keys.indexOf(window.QCAccess.qcColumnHeader(name)) + 1;
+        if (col > 0) sheet.getRange(2, col, Math.max(1, rowCount), 1).setDataValidation(rule);
+      } catch (err) {}
+    });
+  } catch (err) { /* لیست کشویی یک کمک است، نه شرط نوشتن */ }
+}
+
+/* نوشتن تب Agents با ستون‌های پویا؛ خروجی true یعنی چیزی روی شیت عوض شد. */
+function writeAgentsSheet_(sheet, beforeRows, afterRows, db) {
+  if (!sheet) throw new Error('تب موردنیاز ایجاد نشده است: Agents');
+  var baseKeys = (QC_GAS_SCHEMAS.Agents || []).filter(function (key) { return key !== 'qcAgents'; });
+  /* مبنا فقط داده‌ی «پس از تغییر» است: نامی که از یک کارشناس QC برداشته یا
+   * تغییر نام داده شده، نباید دوباره ستون بسازد. */
+  var names = window.QCAccess.qcExpertNames(db, afterRows || []);
+  var beforeGrid = agentsSheetGrid_(beforeRows, baseKeys, names);
+  var afterGrid = agentsSheetGrid_(afterRows, baseKeys, names);
+  var changed = writeGridSheet_(sheet, beforeGrid.keys, beforeGrid.values,
+    afterGrid.keys, afterGrid.values, true);
+  applyQcValidation_(sheet, afterGrid.keys, afterGrid.values.length, names);
+  return changed;
+}
+
 function flatActions_(agentActions) {
   var flat = [];
   Object.keys(agentActions || {}).forEach(function (name) {
@@ -4932,15 +5112,21 @@ function writeRowsSheet_(sheet, beforeRows, afterRows, schemaName) {
   var schema = QC_GAS_SCHEMAS[schemaName] || [];
   var beforeKeys = columnKeys_(schema, beforeRows);
   var afterKeys = columnKeys_(schema, afterRows);
-  var beforeValues = encodeRows_(beforeRows, beforeKeys);
-  var afterValues = encodeRows_(afterRows, afterKeys);
+  return writeGridSheet_(sheet, beforeKeys, encodeRows_(beforeRows, beforeKeys),
+    afterKeys, encodeRows_(afterRows, afterKeys));
+}
+
+/* هستهٔ نوشتن: با سرستون‌ها و ردیف‌های آماده. تب Agents از همین استفاده می‌کند چون
+ * ستون‌هایش (یکی برای هر کارشناس QC) به داده بستگی دارند و ثابت نیستند. */
+function writeGridSheet_(sheet, beforeKeys, beforeValues, afterKeys, afterValues, forceHeaderCheck) {
+  if (!sheet) throw new Error('تب موردنیاز ایجاد نشده است.');
   var sameKeys = beforeKeys.length === afterKeys.length && beforeKeys.every(function (key, i) { return key === afterKeys[i]; });
 
-  /* اگر سرستون‌های فیزیکی شیت با ترتیب مورد انتظار یکی نباشد (مثلاً ستون جدید qcAgents
+  /* اگر سرستون‌های فیزیکی شیت با ترتیب مورد انتظار یکی نباشد (مثلاً ستون جدید
    * بعد از ارتقای کد هنوز اضافه نشده)، نوشتن سطری در جای خود ستون‌ها را جابه‌جا می‌کرد.
    * پس ابتدا کل تب با سرستون درست بازنویسی می‌شود. این بررسی باید قبل از
    * مقایسهٔ محتوا باشد تا تب قدیمی با دادهٔ یکسان هم ستون تازه بگیرد. */
-  if (!headerMatches_(sheet, afterKeys)) {
+  if (!headerMatches_(sheet, afterKeys, forceHeaderCheck)) {
     fullRewrite_(sheet, afterKeys, afterValues);
     styleHeader_(sheet, afterKeys.length);
     return true;
@@ -4988,11 +5174,13 @@ function writeRowsSheet_(sheet, beforeRows, afterRows, schemaName) {
   return true;
 }
 
-function headerMatches_(sheet, keys) {
+function headerMatches_(sheet, keys, forceRead) {
   try {
     /* ابتدا فقط پهنای تب سنجیده می‌شود (بدون خواندن اضافه): اگر برابر بود،
-     * سرستون‌ها همان هستند که نوشته شده‌اند و مسیر سریع (اضافه‌کردن ردیف) تغییر نمی‌کند. */
-    if (sheet.getLastColumn() === keys.length) return true;
+     * سرستون‌ها همان هستند که نوشته شده‌اند و مسیر سریع (اضافه‌کردن ردیف) تغییر نمی‌کند.
+     * برای تب Agents همیشه خوانده می‌شود، چون ممکن است نام یک کارشناس QC عوض شود
+     * بدون آنکه تعداد ستون‌ها تغییر کند. */
+    if (!forceRead && sheet.getLastColumn() === keys.length) return true;
     var width = Math.max(sheet.getLastColumn(), keys.length, 1);
     var row = sheet.getRange(1, 1, 1, width).getValues()[0] || [];
     var header = [];
