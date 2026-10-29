@@ -30,6 +30,8 @@ function freezeCanvases(source, copy) {
     const rect = canvas.getBoundingClientRect();
     const image = document.createElement('img');
     image.src = url;
+    // Reserve the chart's aspect ratio before its data URL has loaded.
+    if (rect.width && rect.height) { image.width = Math.round(rect.width); image.height = Math.round(rect.height); }
     image.style.cssText = 'display:block;max-width:100%;height:auto;' +
       (rect.width ? `width:${Math.round(rect.width)}px;` : 'width:100%;');
     target.replaceWith(image);
@@ -52,7 +54,9 @@ function buildHost(source, prepare) {
    * همین عرض است که از جابه‌جایی ستون‌ها در خروجی جلوگیری می‌کند. */
   const width = Math.min(1600, Math.max(1200, Math.round(rect.width || source.scrollWidth || 1200)));
   host.style.width = width + 'px';
-  copy.style.width = width + 'px';
+  host.style.boxSizing = 'border-box';
+  host.style.padding = '0';
+  copy.style.width = '100%';
   document.body.appendChild(host);
   return { host, copy, width };
 }
@@ -60,15 +64,17 @@ function buildHost(source, prepare) {
 async function toCanvas(source, prepare) {
   if (!source || !source.isConnected) throw new Error('پرونده‌ی آماده‌ای برای خروجی وجود ندارد');
   if (typeof window.html2canvas !== 'function') throw new Error('کتابخانه‌ی عکس بارگذاری نشده است');
-  const { host, width } = buildHost(source, prepare);
+  const { host } = buildHost(source, prepare);
   try {
     if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    const width = Math.ceil(Math.max(host.clientWidth, host.scrollWidth, parseFloat(host.style.width) || 0));
+    host.style.width = width + 'px';
     const height = Math.max(host.scrollHeight, 200);
-    const scale = Math.max(0.3, Math.min(1.6, 30000 / height, 4000 / width, Math.sqrt(24000000 / (width * height))));
+    const scale = Math.min(1.6, 30000 / height, 4000 / width, Math.sqrt(24000000 / (width * height)));
     if (scale < 0.45) UI.toast.info('این بازه سوابق زیادی دارد؛ تصویر کامل طولانی است. برای بررسی ریز مقادیر، خروجی اکسل هم قابل دانلود است.', 6000);
     return await html2canvas(host, {
       backgroundColor: themeBackground(), scale, useCORS: true, logging: false,
-      width, height, windowWidth: width + 80, windowHeight: Math.max(1000, height)
+      width, height, windowWidth: window.innerWidth, windowHeight: window.innerHeight
     });
   } finally { host.remove(); }
 }
@@ -91,37 +97,43 @@ async function download(source, filename, prepare) {
   return { width: canvas.width, height: canvas.height };
 }
 
-/* PDF از همان تصویر ساخته می‌شود: متن فارسی به‌صورت گرافیکی می‌ماند و نیازی
- * به فونت فارسی داخل jsPDF نیست. تصویر بلند به صفحه‌های A4 بریده می‌شود. */
+/* PDF به صورت تکه‌های مستقل ساخته می‌شود تا محدودیت اندازهٔ canvas
+ * مرورگر باعث حذف انتهای پرونده‌های بلند نشود. */
 async function downloadPdf(source, filename, prepare) {
+  if (!source || !source.isConnected) throw new Error('پرونده‌ی آماده‌ای برای خروجی وجود ندارد');
+  if (typeof window.html2canvas !== 'function') throw new Error('کتابخانه‌ی عکس بارگذاری نشده است');
   const lib = window.jspdf && (window.jspdf.jsPDF || window.jspdf);
   if (!lib) throw new Error('کتابخانه‌ی PDF بارگذاری نشده است');
-  const canvas = await toCanvas(source, prepare);
-  const pdf = new lib({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 18;
-  const imageWidth = pageWidth - margin * 2;
-  const ratio = imageWidth / canvas.width;
-  const sliceHeight = Math.max(200, Math.floor((pageHeight - margin * 2) / ratio));
-  const background = themeBackground();
-  let offset = 0, page = 0;
-  while (offset < canvas.height) {
-    const height = Math.min(sliceHeight, canvas.height - offset);
-    const slice = document.createElement('canvas');
-    slice.width = canvas.width;
-    slice.height = height;
-    const context = slice.getContext('2d');
-    context.fillStyle = background;
-    context.fillRect(0, 0, slice.width, slice.height);
-    context.drawImage(canvas, 0, offset, canvas.width, height, 0, 0, canvas.width, height);
-    if (page) pdf.addPage();
-    pdf.addImage(slice.toDataURL('image/jpeg', 0.94), 'JPEG', margin, margin, imageWidth, height * ratio);
-    page++;
-    offset += height;
-  }
-  pdf.save(fileName(filename, 'pdf'));
-  return { pages: page, width: canvas.width, height: canvas.height };
+  const { host } = buildHost(source, prepare);
+  try {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    // Include any remaining overflow in the capture, rather than cutting it off.
+    const width = Math.ceil(Math.max(host.clientWidth, host.scrollWidth, parseFloat(host.style.width) || 0));
+    host.style.width = width + 'px';
+    const height = Math.ceil(Math.max(host.scrollHeight, host.getBoundingClientRect().height));
+    if (!width || !height) throw new Error('ابعاد محتوای PDF قابل محاسبه نیست');
+    const pdf = new lib({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
+    const pageWidth = pdf.internal.pageSize.getWidth(), pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 18, imageWidth = pageWidth - margin * 2;
+    const sliceHeight = Math.max(1, Math.floor(width * (pageHeight - margin * 2) / imageWidth));
+    let offset = 0, page = 0;
+    while (offset < height) {
+      const tileHeight = Math.min(sliceHeight, height - offset);
+      const scale = Math.min(1.5, 3000 / width, 4000 / tileHeight, Math.sqrt(12000000 / (width * tileHeight)));
+      const canvas = await window.html2canvas(host, {
+        backgroundColor: themeBackground(), scale, useCORS: true, logging: false,
+        width, height: tileHeight, x: 0, y: offset,
+        windowWidth: window.innerWidth, windowHeight: window.innerHeight, scrollX: 0, scrollY: 0
+      });
+      if (!canvas.width || !canvas.height) throw new Error('تصویر یکی از صفحه‌های PDF ساخته نشد');
+      if (page) pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.94), 'JPEG', margin, margin, imageWidth, tileHeight * imageWidth / width);
+      canvas.width = canvas.height = 0;
+      offset += tileHeight; page++;
+    }
+    pdf.save(fileName(filename, 'pdf'));
+    return { pages: page, width, height };
+  } finally { host.remove(); }
 }
 
 window.QCCapture = { download, downloadPdf, toCanvas };

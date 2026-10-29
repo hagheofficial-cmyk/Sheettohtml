@@ -247,28 +247,30 @@ async function render(root, arg) {
       const aj = C.parseDate(a.reviewDate), bj = C.parseDate(b.reviewDate);
       return aj && bj ? C.jalaliCmp(bj, aj) : (bj ? 1 : aj ? -1 : 0);
     });
-    /* هر تماس یک بلوک کامل: سربرگ (لید/نمره/ردلاین) + جدول معیارها، همه باز. */
-    return `<div class="call-log" id="pCallHistory">${historyCalls.map((r, index) => `
-      <div class="call-log-item">
-        <div class="call-log-head">
-          <span class="call-log-lead">${esc(r.leadName || '—')}</span>
-          <span class="call-log-meta" dir="ltr">${esc(fa(r.reviewDate || ''))}</span>
-          <span class="call-log-tags">${FORM_TYPE_FA[r.formType] ? `<span class="tag-team">${esc(FORM_TYPE_FA[r.formType])}</span>` : ''}
-            ${scorePill(r.score)} ${callRedlineBadge(r, index)}</span>
-        </div>
-        <div class="call-log-body" id="pCallDetails-${index}">${callDetail(r, index)}</div>
-      </div>`).join('')}</div>`;
-  }
-  function callDetail(row, index) {
-    const keys = [...new Set(QCReports.criteriaKeys([row], row.formType, QCParse).concat(Object.keys(row.elements||{})))];
-    return `<div class="cell-sub" style="margin-bottom:8px">فرم: ${esc(FORM_TYPE_FA[row.formType] || row.formType)} · نمره‌ها عین فرم: 1 / 0 / -</div>
-      <div class="table-wrap"><table class="tbl call-detail-table"><thead><tr><th>لید</th><th>شماره تماس</th>
-        ${keys.map((key) => `<th>${esc((QCParse.definitionsFor(row.formType,row.team || curData && curData.agent.team).find(d=>d.key===key)||{}).label || (row.criteriaSnapshot||[]).find(d=>d.key===key)?.label || QCParse.labelOf(row.formType,key))}</th>`).join('')}
-        <th>ردلاین</th><th>تایم مکالمه</th><th>تاریخ بررسی</th></tr></thead><tbody><tr>
-          <td class="cell-main">${esc(row.leadName || '—')}</td><td dir="ltr">${esc(row.leadPhone || '—')}</td>
-          ${keys.map((key) => `<td>${triValue(QCParse.elementValue(row,key))}</td>`).join('')}
-          <td>${callRedlineBadge(row, index)}</td><td>${callTimeCell(row)}</td><td dir="ltr">${esc(fa(row.reviewDate))}</td>
-        </tr></tbody></table></div>${row.qcComment||row.redlineReason?`<div class="detail-row" style="margin-top:8px;white-space:pre-wrap">${row.redlineReason?'علت ردلاین: '+esc(row.redlineReason):''}${row.qcComment?'<br>نظر QC: '+esc(row.qcComment):''}</div>`:''}`;
+    return `<table class="tbl profile-call-table" id="pCallHistory">
+      <thead><tr><th>تاریخ بررسی</th><th>لید و شماره تماس</th><th>فرم</th><th>کارشناس QC</th><th>نمره</th><th>المان‌ها</th><th>ردلاین</th><th>زمان تماس</th><th>کامنت QC</th></tr></thead>
+      <tbody>${historyCalls.map((row, index) => {
+        const team = row.criteriaTeam || row.team || (curData && curData.agent.team);
+        const definitions = QCParse.definitionsFor(row.formType, team);
+        const snapshotKeys = (row.criteriaSnapshot || []).filter(d => d.active !== false).map(d => d.key);
+        const keys = [...new Set((snapshotKeys.length ? snapshotKeys : QCReports.criteriaKeys([row], row.formType, QCParse)).concat(Object.keys(row.elements || {})))];
+        const elements = keys.map(key => {
+          const snapshot = (row.criteriaSnapshot || []).find(d => d.key === key);
+          const definition = definitions.find(d => d.key === key);
+          const label = (snapshot && snapshot.label) || (definition && definition.label) || QCParse.labelOf(row.formType, key, team);
+          return `<span class="profile-element">${esc(label)}: ${triValue(QCParse.elementValue(Object.assign({}, row, { team }), key))}</span>`;
+        }).join('');
+        return `<tr id="pCallDetails-${index}" class="profile-call-row">
+          <td dir="ltr">${esc(fa(row.reviewDate || '—'))}</td>
+          <td class="cell-main">${esc(row.leadName || '—')}<div class="cell-sub" dir="ltr">${esc(row.leadPhone || '—')}</div></td>
+          <td>${esc(FORM_TYPE_FA[row.formType] || row.formType || '—')}</td>
+          <td>${esc(row.qcAgent || '—')}</td><td>${scorePill(row.score)}</td>
+          <td><div class="profile-elements">${elements || '—'}</div></td>
+          <td>${callRedlineBadge(row, index)}${row.redlineReason ? `<div class="profile-redline-reason">${esc(row.redlineReason)}</div>` : ''}</td>
+          <td>${callTimeCell(row)}</td>
+          <td class="profile-call-comment">${esc(row.qcComment || '—')}</td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
   }
 
   /* ---------- کارت نرخ موفقیت معیارهای تماس (پرتفوی) ---------- */
@@ -435,7 +437,7 @@ async function render(root, arg) {
       <div class="capture-title no-capture"></div>
       <div class="profile-system-brand"><img src="${esc(window.APP_SCRIPT_MODE && window.APP_SCRIPT_LOGO_DATA ? window.APP_SCRIPT_LOGO_DATA : 'logo.png')}" width="30" height="30" alt="لوگوی سامانه"><span>سامانه کنترل کیفیت CRM · گزارش عملکرد</span></div>
       <!-- شناسنامه -->
-      <div class="card" style="margin-bottom:16px">
+      <div class="card profile-identity" style="margin-bottom:16px">
         <div class="card-pad" style="display:flex;flex-wrap:wrap;gap:14px;align-items:center">
           <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--brand),var(--violet));display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff;flex-shrink:0">
             <i class="fa-solid fa-user"></i>
@@ -458,7 +460,7 @@ async function render(root, arg) {
         <div class="summary-block"><small>ردلاین‌ها؛ تیکت / سوشال / تماس</small><strong>${fa(T.redlineZero)} / ${fa(S.rows.filter(r=>QCReports.hasRedline(r,'social')).length)} / ${fa(Ph.redlineCount)}</strong></div></div>
 
       ${scorecard(d)}
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:16px">
+      <div class="grid profile-source-kpis" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:16px">
         ${kpi('fa-ticket', 'ارزیابی تیکت', `${fa(T.count)}`,
           T.avgScore === '' ? '' : `میانگین ${scorePill(T.avgScore)}`, T.redlineZero > 0 ? 'warn' : '')}
         ${kpi('fa-comments', 'ارزیابی سوشال', `${fa(S.count)}`,
@@ -492,7 +494,7 @@ async function render(root, arg) {
         </div>
         <div class="card full-row">
           <div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-headset"></i></div>
-            <div><h3>سوابق ریت تماس (${fa(Ph.count)})</h3><div class="sub">همه‌ی تماس‌ها با معیارهای همان فرم، بدون باز کردن جداگانه</div></div></div>
+            <div><h3>سوابق ریت تماس (${fa(Ph.count)})</h3><div class="sub">همهٔ تماس‌ها در یک جدول؛ المان‌ها و کامنت هر ریت در همان ردیف</div></div></div>
           <div class="card-pad history-types">${typeRows}</div>
           <div class="table-wrap history-wrap">${callTable(Ph.rows)}</div>
         </div>
@@ -618,8 +620,8 @@ async function render(root, arg) {
   async function exportPdf() {
     if (!curData || !profileBody) return;
     const button = $('#pPdf');
-    if (button) { button.disabled = true; button.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> ساخت PDF…'; }
     const label = button ? button.innerHTML : '';
+    if (button) { button.disabled = true; button.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> ساخت PDF…'; }
     try {
       App.charts.forEach((chart) => { if (chart.update) chart.update('none'); });
       const name = `${curData.agent.name} — کارنامه ${curData.scope.from || 'ابتدا'} تا ${curData.scope.to || 'انتها'}`;

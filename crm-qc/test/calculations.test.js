@@ -182,3 +182,27 @@ test('فرم اکانت کارشناس تیم Tele روی تیم Account حسا�
   assert.equal(R.filterCalls(data, { ...DAY, team: 'Account' }).length, 1);
   assert.equal(R.filterCalls(data, { ...DAY, team: 'Tele sales' }).length, 1);
 });
+
+test('analysis comments keep only explicit weaknesses with the correct historical or team label', () => {
+  const data = fixture();
+  const defs = (label) => [
+    { key: 'shared', label, excelKey: 'shared', active: true },
+    { key: 'na', label: 'نامربوط', excelKey: 'na', active: true },
+    { key: 'missing', label: 'خالی', excelKey: 'missing', active: true }
+  ];
+  data.settings.callCriteria = { version: 2, forms: {}, teams: {
+    [P.teamKey('Tele Sales')]: { team: 'Tele Sales', form: 'tele', elements: defs('نام جدید') },
+    [P.teamKey('Account')]: { team: 'Account', form: 'account', elements: defs('نام اکانت') }
+  } };
+  data.callFeedbacks = [
+    { expertName: 'کارشناس الف', team: 'Tele Sales', formType: 'tele', reviewDate: DAY.from, leadName: 'قديم', qcComment: 'توضیح',
+      criteriaSnapshot: defs('نام قدیمی'), elements: { shared: '"۰"', na: '-', missing: '' } },
+    { expertName: 'کارشناس ب', team: 'Account', formType: 'account', reviewDate: DAY.from, leadName: 'بدون کامنت', elements: { shared: 0, na: '-', missing: '' } },
+    { expertName: 'کارشناس الف', team: 'Tele Sales', formType: 'tele', reviewDate: DAY.from, leadName: 'خوب', qcComment: 'خوب', elements: { shared: 1, na: '-', missing: '' } }
+  ];
+  const result = R.callAnalysis(data, DAY, P.resolver(data.settings.callCriteria));
+  assert.deepEqual(result.comments.find(r => r.leadName === 'قديم').weaknesses, [{ key: 'shared', label: 'نام قدیمی' }]);
+  assert.deepEqual(result.comments.find(r => r.leadName === 'بدون کامنت').weaknesses, [{ key: 'shared', label: 'نام اکانت' }]);
+  assert.deepEqual(result.comments.find(r => r.leadName === 'خوب').weaknesses, []);
+  assert.equal(result.kpis.withComment, 2);
+});

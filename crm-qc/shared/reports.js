@@ -580,11 +580,21 @@
         score: r.score, reason: r.redlineReason || '', date: r.reviewDate, sourceFile: r.sourceFile };
     }).sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
 
-    /* کامنت‌های QC */
-    var comments = Ph.filter(function (r) { return (r.qcComment || '').trim(); }).map(function (r) {
-      return { expertName: r.expertName, leadName: r.leadName, leadPhone: r.leadPhone, formType: r.formType,
-        score: r.score, comment: r.qcComment, date: r.reviewDate };
-    }).sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); }).slice(0, 60);
+    /* Keep each weakness tied to the same evaluation as its QC comment. A
+     * zero is a weakness; missing and not-applicable marks are not. */
+    var comments = Ph.slice().sort(function (a, b) { return (b.reviewDate || '').localeCompare(a.reviewDate || ''); })
+      .map(function (r) {
+        var snapshot = Array.isArray(r.criteriaSnapshot) ? r.criteriaSnapshot : [];
+        var keys = snapshot.length ? snapshot.filter(function (d) { return d.active !== false; }).map(function (d) { return d.key; }) : criteriaKeys([r], r.formType, crit);
+        var weaknesses = Array.from(new Set(keys)).filter(function (key) {
+          return crit.elementValue ? crit.elementValue(r, key) === 0 : C.normalizeTri((r.elements || {})[key]) === 0;
+        }).map(function (key) {
+          var old = snapshot.find(function (d) { return d.key === key; });
+          return { key: key, label: old && old.label || criterionLabel([r], r.formType, key, crit) };
+        });
+        return { expertName: r.expertName, leadName: r.leadName, leadPhone: r.leadPhone, formType: r.formType,
+          score: r.score, comment: r.qcComment || '', date: r.reviewDate, weaknesses: weaknesses };
+      }).filter(function (r) { return r.comment.trim() || r.weaknesses.length; }).slice(0, 60);
 
     /* روند ماهانه — فقط در درخواست کامل (خروجی اکسل) */
     var byMonth = {};

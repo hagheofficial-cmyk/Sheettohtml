@@ -104,7 +104,7 @@ for(const build of ['public','offline'])test(build+': new management, popup, sch
   assert.equal($('#pFrom').value,DAY.from);assert.equal($('#pTo').value,DAY.to);assert.ok($('#pImage'));assert.ok($('#pXls'));
   const snapshots=[];w.QCCapture.download=async(source,name,prepare)=>{const copy=source.cloneNode(true);if(prepare)prepare(copy);snapshots.push({copy,name});};
   $('#pImage').click();await settle();assert.ok(snapshots[0].name.includes('1405/06/20'));assert.equal(snapshots[0].copy.querySelectorAll('.call-detail-row[hidden]').length,0);
-  assert.equal(snapshots[0].copy.querySelectorAll('.call-detail-table tbody tr').length,4);
+  assert.equal(snapshots[0].copy.querySelectorAll('#pCallHistory tbody > tr').length,4);
   $('.profile-modal .x').click();assert.equal($('.profile-modal'),null);
   await go(w,'dashboard');$('#gFrom').value='۱۴۰۵/۶/۲۱';$('#gTo').value='۱۴۰۵/۶/۲۱';$('#gTo').dispatchEvent(new w.Event('input',{bubbles:true}));
   await new Promise(resolve=>setTimeout(resolve,700));assert.equal(w.App.dateRange.from,'1405/06/21');assert.equal($('#cntC').textContent,'۱');

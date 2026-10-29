@@ -24,7 +24,7 @@ const ROOT=path.resolve(__dirname,'..');const output=path.join(ROOT,'node_module
   const templatePromise=page.waitForEvent('download');await page.click('#agentTemplate');const template=await templatePromise;await template.saveAs(path.join(output,'agents-template.xlsx'));
   assert.ok(await page.locator('[data-act="edit"]').count());await page.click('[data-act="edit"] >> nth=0');await page.waitForSelector('#aSave');await page.locator('.modal-back:last-child .x').click();
   await page.click('a[data-route="portfolio"]');await page.waitForSelector('#pAll tr[data-name="الهه عسگری"]');await page.click('#pAll tr[data-name="الهه عسگری"]');
-  await page.waitForSelector('.profile-modal #pCallHistory');assert.equal(await page.locator('#content #pBody').count(),0);assert.equal(await page.locator('#pCallHistory [data-call-detail]').count(),6);
+  await page.waitForSelector('.profile-modal #pCallHistory');assert.equal(await page.locator('#content #pBody').count(),0);assert.equal(await page.locator('#pCallHistory tbody > tr').count(),6);
   await page.screenshot({path:path.join(output,'profile-popup.png')});
   const pngPromise=page.waitForEvent('download',{timeout:120000});await page.click('#pImage');const png=await pngPromise;await png.saveAs(path.join(output,'expert-report.png'));
   const bytes=fs.readFileSync(path.join(output,'expert-report.png'));assert.equal(bytes.slice(1,4).toString(),'PNG');

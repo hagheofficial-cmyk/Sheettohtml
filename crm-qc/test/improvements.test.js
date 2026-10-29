@@ -102,8 +102,8 @@ for (const build of ['public', 'offline']) {
       assert.ok($('.scorecard'), 'کارنامه ساخته می‌شود');
       assert.deepEqual($$('.scorecard .sc-col b').map((b) => b.textContent), ['نقاط قوت', 'نقاط ضعف', 'پیشنهاد بهبود']);
       assert.ok(text('.scorecard').includes('ردلاین') || text('.scorecard').includes('معیار'));
-      assert.equal($$('#pCallHistory .call-log-item').length, 5, 'همه‌ی تماس‌ها یک‌جا هستند');
-      assert.equal($$('#pCallHistory .call-detail-table').length, 5, 'جزئیات هر تماس باز است');
+      assert.equal($$('table#pCallHistory').length, 1, 'همه‌ی تماس‌ها در یک جدول هستند');
+      assert.equal($$('#pCallHistory tbody > tr').length, 5, 'برای هر تماس یک ردیف هست');
       assert.equal(text('#pCallHistory').includes('جزئیات بیشتر'), false);
       assert.ok($('#pPdf') && $('#pImage') && $('#pXls'), 'سه خروجی: اکسل، PDF، تصویر');
       let pdfCalled = null;

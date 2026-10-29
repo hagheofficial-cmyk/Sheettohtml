@@ -627,3 +627,34 @@ body.auth-locked #app { filter: blur(2px); pointer-events: none; }
 }
 [data-theme="light"] .auth-gate { background: radial-gradient(1100px 560px at 82% -10%, rgba(56,189,248,.14), transparent 62%), var(--bg-2); }
 [data-theme="light"] .auth-card { box-shadow: 0 22px 50px rgba(28,52,88,.2); }
+
+/* Compact profile and one row per call evaluation. */
+.profile-content { padding:14px; }
+.profile-content .profile-identity { margin-bottom:10px !important; }
+.profile-content .profile-identity .card-pad { padding:12px 15px; gap:10px !important; }
+.profile-summary { gap:8px; margin-bottom:10px; }
+.profile-summary .summary-block { padding:9px 12px; }
+.profile-summary strong { font-size:18px; }
+.profile-content .profile-source-kpis { gap:10px; margin-bottom:10px !important; }
+.profile-content .profile-source-kpis .card-pad { padding:10px 14px; }
+.profile-content .card-head { padding:11px 14px; }
+.profile-content .history-stack { gap:10px; }
+.profile-call-table { min-width:1050px; }
+.profile-call-table th, .profile-call-table td { white-space:normal !important; vertical-align:top !important; padding:8px !important; overflow-wrap:anywhere; }
+.profile-call-table .profile-elements { display:flex; flex-wrap:wrap; gap:4px; min-width:250px; }
+.profile-element { display:inline-flex; align-items:center; gap:4px; padding:2px 5px; border:1px solid var(--line-soft); border-radius:6px; font-size:10.5px; }
+.profile-call-comment { min-width:130px; white-space:pre-wrap !important; }
+.profile-redline-reason { margin-top:4px; min-width:90px; white-space:pre-wrap; font-size:10px; }
+.qc-weaknesses { display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin-top:7px; color:var(--bad); font-size:11px; }
+.qc-weakness-tag { background:var(--bad-soft); border-radius:6px; padding:2px 6px; }
+.qc-weakness-none, .qc-comment-empty { color:var(--muted); }
+.qc-comment-empty { margin-top:4px; font-size:11px; }
+/* A capture must expand scrollers and wrap every table, not just call details. */
+.capture-host .history-wrap, .capture-host .table-wrap, .capture-host .table-responsive, .capture-host #pActionsWrap { height:auto !important; max-height:none !important; overflow:visible !important; }
+.capture-host .tbl { width:100%; min-width:0 !important; table-layout:fixed; }
+.capture-host .tbl th, .capture-host .tbl td { min-width:0 !important; white-space:normal !important; overflow-wrap:anywhere; word-break:break-word; }
+.capture-host .profile-call-table th:nth-child(6), .capture-host .profile-call-table td:nth-child(6) { width:27%; }
+.capture-host .profile-call-table th:nth-child(9), .capture-host .profile-call-table td:nth-child(9) { width:16%; }
+.capture-host .profile-call-table .profile-elements, .capture-host .profile-call-comment, .capture-host .profile-redline-reason { min-width:0; }
+.capture-host .profile-call-comment, .capture-host .profile-redline-reason { white-space:pre-wrap !important; }
+.capture-host * { animation:none !important; transition:none !important; }

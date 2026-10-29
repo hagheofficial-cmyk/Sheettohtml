@@ -1368,6 +1368,37 @@ body.auth-locked #app { filter: blur(2px); pointer-events: none; }
 [data-theme="light"] .auth-gate { background: radial-gradient(1100px 560px at 82% -10%, rgba(56,189,248,.14), transparent 62%), var(--bg-2); }
 [data-theme="light"] .auth-card { box-shadow: 0 22px 50px rgba(28,52,88,.2); }
 
+/* Compact profile and one row per call evaluation. */
+.profile-content { padding:14px; }
+.profile-content .profile-identity { margin-bottom:10px !important; }
+.profile-content .profile-identity .card-pad { padding:12px 15px; gap:10px !important; }
+.profile-summary { gap:8px; margin-bottom:10px; }
+.profile-summary .summary-block { padding:9px 12px; }
+.profile-summary strong { font-size:18px; }
+.profile-content .profile-source-kpis { gap:10px; margin-bottom:10px !important; }
+.profile-content .profile-source-kpis .card-pad { padding:10px 14px; }
+.profile-content .card-head { padding:11px 14px; }
+.profile-content .history-stack { gap:10px; }
+.profile-call-table { min-width:1050px; }
+.profile-call-table th, .profile-call-table td { white-space:normal !important; vertical-align:top !important; padding:8px !important; overflow-wrap:anywhere; }
+.profile-call-table .profile-elements { display:flex; flex-wrap:wrap; gap:4px; min-width:250px; }
+.profile-element { display:inline-flex; align-items:center; gap:4px; padding:2px 5px; border:1px solid var(--line-soft); border-radius:6px; font-size:10.5px; }
+.profile-call-comment { min-width:130px; white-space:pre-wrap !important; }
+.profile-redline-reason { margin-top:4px; min-width:90px; white-space:pre-wrap; font-size:10px; }
+.qc-weaknesses { display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin-top:7px; color:var(--bad); font-size:11px; }
+.qc-weakness-tag { background:var(--bad-soft); border-radius:6px; padding:2px 6px; }
+.qc-weakness-none, .qc-comment-empty { color:var(--muted); }
+.qc-comment-empty { margin-top:4px; font-size:11px; }
+/* A capture must expand scrollers and wrap every table, not just call details. */
+.capture-host .history-wrap, .capture-host .table-wrap, .capture-host .table-responsive, .capture-host #pActionsWrap { height:auto !important; max-height:none !important; overflow:visible !important; }
+.capture-host .tbl { width:100%; min-width:0 !important; table-layout:fixed; }
+.capture-host .tbl th, .capture-host .tbl td { min-width:0 !important; white-space:normal !important; overflow-wrap:anywhere; word-break:break-word; }
+.capture-host .profile-call-table th:nth-child(6), .capture-host .profile-call-table td:nth-child(6) { width:27%; }
+.capture-host .profile-call-table th:nth-child(9), .capture-host .profile-call-table td:nth-child(9) { width:16%; }
+.capture-host .profile-call-table .profile-elements, .capture-host .profile-call-comment, .capture-host .profile-redline-reason { min-width:0; }
+.capture-host .profile-call-comment, .capture-host .profile-redline-reason { white-space:pre-wrap !important; }
+.capture-host * { animation:none !important; transition:none !important; }
+
 </style>
 
 <link rel="icon" type="image/png" href="data:image/png;base64,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">
@@ -3045,11 +3076,21 @@ window.QC_SEED = {"version":2,"agents":[{"id":1,"ext":3073,"name":"مبینا س
         score: r.score, reason: r.redlineReason || '', date: r.reviewDate, sourceFile: r.sourceFile };
     }).sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
 
-    /* کامنت‌های QC */
-    var comments = Ph.filter(function (r) { return (r.qcComment || '').trim(); }).map(function (r) {
-      return { expertName: r.expertName, leadName: r.leadName, leadPhone: r.leadPhone, formType: r.formType,
-        score: r.score, comment: r.qcComment, date: r.reviewDate };
-    }).sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); }).slice(0, 60);
+    /* Keep each weakness tied to the same evaluation as its QC comment. A
+     * zero is a weakness; missing and not-applicable marks are not. */
+    var comments = Ph.slice().sort(function (a, b) { return (b.reviewDate || '').localeCompare(a.reviewDate || ''); })
+      .map(function (r) {
+        var snapshot = Array.isArray(r.criteriaSnapshot) ? r.criteriaSnapshot : [];
+        var keys = snapshot.length ? snapshot.filter(function (d) { return d.active !== false; }).map(function (d) { return d.key; }) : criteriaKeys([r], r.formType, crit);
+        var weaknesses = Array.from(new Set(keys)).filter(function (key) {
+          return crit.elementValue ? crit.elementValue(r, key) === 0 : C.normalizeTri((r.elements || {})[key]) === 0;
+        }).map(function (key) {
+          var old = snapshot.find(function (d) { return d.key === key; });
+          return { key: key, label: old && old.label || criterionLabel([r], r.formType, key, crit) };
+        });
+        return { expertName: r.expertName, leadName: r.leadName, leadPhone: r.leadPhone, formType: r.formType,
+          score: r.score, comment: r.qcComment || '', date: r.reviewDate, weaknesses: weaknesses };
+      }).filter(function (r) { return r.comment.trim() || r.weaknesses.length; }).slice(0, 60);
 
     /* روند ماهانه — فقط در درخواست کامل (خروجی اکسل) */
     var byMonth = {};
@@ -7857,6 +7898,8 @@ function freezeCanvases(source, copy) {
     const rect = canvas.getBoundingClientRect();
     const image = document.createElement('img');
     image.src = url;
+    // Reserve the chart's aspect ratio before its data URL has loaded.
+    if (rect.width && rect.height) { image.width = Math.round(rect.width); image.height = Math.round(rect.height); }
     image.style.cssText = 'display:block;max-width:100%;height:auto;' +
       (rect.width ? `width:${Math.round(rect.width)}px;` : 'width:100%;');
     target.replaceWith(image);
@@ -7879,7 +7922,9 @@ function buildHost(source, prepare) {
    * همین عرض است که از جابه‌جایی ستون‌ها در خروجی جلوگیری می‌کند. */
   const width = Math.min(1600, Math.max(1200, Math.round(rect.width || source.scrollWidth || 1200)));
   host.style.width = width + 'px';
-  copy.style.width = width + 'px';
+  host.style.boxSizing = 'border-box';
+  host.style.padding = '0';
+  copy.style.width = '100%';
   document.body.appendChild(host);
   return { host, copy, width };
 }
@@ -7887,15 +7932,17 @@ function buildHost(source, prepare) {
 async function toCanvas(source, prepare) {
   if (!source || !source.isConnected) throw new Error('پرونده‌ی آماده‌ای برای خروجی وجود ندارد');
   if (typeof window.html2canvas !== 'function') throw new Error('کتابخانه‌ی عکس بارگذاری نشده است');
-  const { host, width } = buildHost(source, prepare);
+  const { host } = buildHost(source, prepare);
   try {
     if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    const width = Math.ceil(Math.max(host.clientWidth, host.scrollWidth, parseFloat(host.style.width) || 0));
+    host.style.width = width + 'px';
     const height = Math.max(host.scrollHeight, 200);
-    const scale = Math.max(0.3, Math.min(1.6, 30000 / height, 4000 / width, Math.sqrt(24000000 / (width * height))));
+    const scale = Math.min(1.6, 30000 / height, 4000 / width, Math.sqrt(24000000 / (width * height)));
     if (scale < 0.45) UI.toast.info('این بازه سوابق زیادی دارد؛ تصویر کامل طولانی است. برای بررسی ریز مقادیر، خروجی اکسل هم قابل دانلود است.', 6000);
     return await html2canvas(host, {
       backgroundColor: themeBackground(), scale, useCORS: true, logging: false,
-      width, height, windowWidth: width + 80, windowHeight: Math.max(1000, height)
+      width, height, windowWidth: window.innerWidth, windowHeight: window.innerHeight
     });
   } finally { host.remove(); }
 }
@@ -7918,37 +7965,43 @@ async function download(source, filename, prepare) {
   return { width: canvas.width, height: canvas.height };
 }
 
-/* PDF از همان تصویر ساخته می‌شود: متن فارسی به‌صورت گرافیکی می‌ماند و نیازی
- * به فونت فارسی داخل jsPDF نیست. تصویر بلند به صفحه‌های A4 بریده می‌شود. */
+/* PDF به صورت تکه‌های مستقل ساخته می‌شود تا محدودیت اندازهٔ canvas
+ * مرورگر باعث حذف انتهای پرونده‌های بلند نشود. */
 async function downloadPdf(source, filename, prepare) {
+  if (!source || !source.isConnected) throw new Error('پرونده‌ی آماده‌ای برای خروجی وجود ندارد');
+  if (typeof window.html2canvas !== 'function') throw new Error('کتابخانه‌ی عکس بارگذاری نشده است');
   const lib = window.jspdf && (window.jspdf.jsPDF || window.jspdf);
   if (!lib) throw new Error('کتابخانه‌ی PDF بارگذاری نشده است');
-  const canvas = await toCanvas(source, prepare);
-  const pdf = new lib({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 18;
-  const imageWidth = pageWidth - margin * 2;
-  const ratio = imageWidth / canvas.width;
-  const sliceHeight = Math.max(200, Math.floor((pageHeight - margin * 2) / ratio));
-  const background = themeBackground();
-  let offset = 0, page = 0;
-  while (offset < canvas.height) {
-    const height = Math.min(sliceHeight, canvas.height - offset);
-    const slice = document.createElement('canvas');
-    slice.width = canvas.width;
-    slice.height = height;
-    const context = slice.getContext('2d');
-    context.fillStyle = background;
-    context.fillRect(0, 0, slice.width, slice.height);
-    context.drawImage(canvas, 0, offset, canvas.width, height, 0, 0, canvas.width, height);
-    if (page) pdf.addPage();
-    pdf.addImage(slice.toDataURL('image/jpeg', 0.94), 'JPEG', margin, margin, imageWidth, height * ratio);
-    page++;
-    offset += height;
-  }
-  pdf.save(fileName(filename, 'pdf'));
-  return { pages: page, width: canvas.width, height: canvas.height };
+  const { host } = buildHost(source, prepare);
+  try {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    // Include any remaining overflow in the capture, rather than cutting it off.
+    const width = Math.ceil(Math.max(host.clientWidth, host.scrollWidth, parseFloat(host.style.width) || 0));
+    host.style.width = width + 'px';
+    const height = Math.ceil(Math.max(host.scrollHeight, host.getBoundingClientRect().height));
+    if (!width || !height) throw new Error('ابعاد محتوای PDF قابل محاسبه نیست');
+    const pdf = new lib({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
+    const pageWidth = pdf.internal.pageSize.getWidth(), pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 18, imageWidth = pageWidth - margin * 2;
+    const sliceHeight = Math.max(1, Math.floor(width * (pageHeight - margin * 2) / imageWidth));
+    let offset = 0, page = 0;
+    while (offset < height) {
+      const tileHeight = Math.min(sliceHeight, height - offset);
+      const scale = Math.min(1.5, 3000 / width, 4000 / tileHeight, Math.sqrt(12000000 / (width * tileHeight)));
+      const canvas = await window.html2canvas(host, {
+        backgroundColor: themeBackground(), scale, useCORS: true, logging: false,
+        width, height: tileHeight, x: 0, y: offset,
+        windowWidth: window.innerWidth, windowHeight: window.innerHeight, scrollX: 0, scrollY: 0
+      });
+      if (!canvas.width || !canvas.height) throw new Error('تصویر یکی از صفحه‌های PDF ساخته نشد');
+      if (page) pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.94), 'JPEG', margin, margin, imageWidth, tileHeight * imageWidth / width);
+      canvas.width = canvas.height = 0;
+      offset += tileHeight; page++;
+    }
+    pdf.save(fileName(filename, 'pdf'));
+    return { pages: page, width, height };
+  } finally { host.remove(); }
 }
 
 window.QCCapture = { download, downloadPdf, toCanvas };
@@ -10892,28 +10945,30 @@ async function render(root, arg) {
       const aj = C.parseDate(a.reviewDate), bj = C.parseDate(b.reviewDate);
       return aj && bj ? C.jalaliCmp(bj, aj) : (bj ? 1 : aj ? -1 : 0);
     });
-    /* هر تماس یک بلوک کامل: سربرگ (لید/نمره/ردلاین) + جدول معیارها، همه باز. */
-    return `<div class="call-log" id="pCallHistory">${historyCalls.map((r, index) => `
-      <div class="call-log-item">
-        <div class="call-log-head">
-          <span class="call-log-lead">${esc(r.leadName || '—')}</span>
-          <span class="call-log-meta" dir="ltr">${esc(fa(r.reviewDate || ''))}</span>
-          <span class="call-log-tags">${FORM_TYPE_FA[r.formType] ? `<span class="tag-team">${esc(FORM_TYPE_FA[r.formType])}</span>` : ''}
-            ${scorePill(r.score)} ${callRedlineBadge(r, index)}</span>
-        </div>
-        <div class="call-log-body" id="pCallDetails-${index}">${callDetail(r, index)}</div>
-      </div>`).join('')}</div>`;
-  }
-  function callDetail(row, index) {
-    const keys = [...new Set(QCReports.criteriaKeys([row], row.formType, QCParse).concat(Object.keys(row.elements||{})))];
-    return `<div class="cell-sub" style="margin-bottom:8px">فرم: ${esc(FORM_TYPE_FA[row.formType] || row.formType)} · نمره‌ها عین فرم: 1 / 0 / -</div>
-      <div class="table-wrap"><table class="tbl call-detail-table"><thead><tr><th>لید</th><th>شماره تماس</th>
-        ${keys.map((key) => `<th>${esc((QCParse.definitionsFor(row.formType,row.team || curData && curData.agent.team).find(d=>d.key===key)||{}).label || (row.criteriaSnapshot||[]).find(d=>d.key===key)?.label || QCParse.labelOf(row.formType,key))}</th>`).join('')}
-        <th>ردلاین</th><th>تایم مکالمه</th><th>تاریخ بررسی</th></tr></thead><tbody><tr>
-          <td class="cell-main">${esc(row.leadName || '—')}</td><td dir="ltr">${esc(row.leadPhone || '—')}</td>
-          ${keys.map((key) => `<td>${triValue(QCParse.elementValue(row,key))}</td>`).join('')}
-          <td>${callRedlineBadge(row, index)}</td><td>${callTimeCell(row)}</td><td dir="ltr">${esc(fa(row.reviewDate))}</td>
-        </tr></tbody></table></div>${row.qcComment||row.redlineReason?`<div class="detail-row" style="margin-top:8px;white-space:pre-wrap">${row.redlineReason?'علت ردلاین: '+esc(row.redlineReason):''}${row.qcComment?'<br>نظر QC: '+esc(row.qcComment):''}</div>`:''}`;
+    return `<table class="tbl profile-call-table" id="pCallHistory">
+      <thead><tr><th>تاریخ بررسی</th><th>لید و شماره تماس</th><th>فرم</th><th>کارشناس QC</th><th>نمره</th><th>المان‌ها</th><th>ردلاین</th><th>زمان تماس</th><th>کامنت QC</th></tr></thead>
+      <tbody>${historyCalls.map((row, index) => {
+        const team = row.criteriaTeam || row.team || (curData && curData.agent.team);
+        const definitions = QCParse.definitionsFor(row.formType, team);
+        const snapshotKeys = (row.criteriaSnapshot || []).filter(d => d.active !== false).map(d => d.key);
+        const keys = [...new Set((snapshotKeys.length ? snapshotKeys : QCReports.criteriaKeys([row], row.formType, QCParse)).concat(Object.keys(row.elements || {})))];
+        const elements = keys.map(key => {
+          const snapshot = (row.criteriaSnapshot || []).find(d => d.key === key);
+          const definition = definitions.find(d => d.key === key);
+          const label = (snapshot && snapshot.label) || (definition && definition.label) || QCParse.labelOf(row.formType, key, team);
+          return `<span class="profile-element">${esc(label)}: ${triValue(QCParse.elementValue(Object.assign({}, row, { team }), key))}</span>`;
+        }).join('');
+        return `<tr id="pCallDetails-${index}" class="profile-call-row">
+          <td dir="ltr">${esc(fa(row.reviewDate || '—'))}</td>
+          <td class="cell-main">${esc(row.leadName || '—')}<div class="cell-sub" dir="ltr">${esc(row.leadPhone || '—')}</div></td>
+          <td>${esc(FORM_TYPE_FA[row.formType] || row.formType || '—')}</td>
+          <td>${esc(row.qcAgent || '—')}</td><td>${scorePill(row.score)}</td>
+          <td><div class="profile-elements">${elements || '—'}</div></td>
+          <td>${callRedlineBadge(row, index)}${row.redlineReason ? `<div class="profile-redline-reason">${esc(row.redlineReason)}</div>` : ''}</td>
+          <td>${callTimeCell(row)}</td>
+          <td class="profile-call-comment">${esc(row.qcComment || '—')}</td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
   }
 
   /* ---------- کارت نرخ موفقیت معیارهای تماس (پرتفوی) ---------- */
@@ -11080,7 +11135,7 @@ async function render(root, arg) {
       <div class="capture-title no-capture"></div>
       <div class="profile-system-brand"><img src="${esc(window.APP_SCRIPT_MODE && window.APP_SCRIPT_LOGO_DATA ? window.APP_SCRIPT_LOGO_DATA : 'logo.png')}" width="30" height="30" alt="لوگوی سامانه"><span>سامانه کنترل کیفیت CRM · گزارش عملکرد</span></div>
       <!-- شناسنامه -->
-      <div class="card" style="margin-bottom:16px">
+      <div class="card profile-identity" style="margin-bottom:16px">
         <div class="card-pad" style="display:flex;flex-wrap:wrap;gap:14px;align-items:center">
           <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--brand),var(--violet));display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff;flex-shrink:0">
             <i class="fa-solid fa-user"></i>
@@ -11103,7 +11158,7 @@ async function render(root, arg) {
         <div class="summary-block"><small>ردلاین‌ها؛ تیکت / سوشال / تماس</small><strong>${fa(T.redlineZero)} / ${fa(S.rows.filter(r=>QCReports.hasRedline(r,'social')).length)} / ${fa(Ph.redlineCount)}</strong></div></div>
 
       ${scorecard(d)}
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:16px">
+      <div class="grid profile-source-kpis" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:16px">
         ${kpi('fa-ticket', 'ارزیابی تیکت', `${fa(T.count)}`,
           T.avgScore === '' ? '' : `میانگین ${scorePill(T.avgScore)}`, T.redlineZero > 0 ? 'warn' : '')}
         ${kpi('fa-comments', 'ارزیابی سوشال', `${fa(S.count)}`,
@@ -11137,7 +11192,7 @@ async function render(root, arg) {
         </div>
         <div class="card full-row">
           <div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-headset"></i></div>
-            <div><h3>سوابق ریت تماس (${fa(Ph.count)})</h3><div class="sub">همه‌ی تماس‌ها با معیارهای همان فرم، بدون باز کردن جداگانه</div></div></div>
+            <div><h3>سوابق ریت تماس (${fa(Ph.count)})</h3><div class="sub">همهٔ تماس‌ها در یک جدول؛ المان‌ها و کامنت هر ریت در همان ردیف</div></div></div>
           <div class="card-pad history-types">${typeRows}</div>
           <div class="table-wrap history-wrap">${callTable(Ph.rows)}</div>
         </div>
@@ -11263,8 +11318,8 @@ async function render(root, arg) {
   async function exportPdf() {
     if (!curData || !profileBody) return;
     const button = $('#pPdf');
-    if (button) { button.disabled = true; button.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> ساخت PDF…'; }
     const label = button ? button.innerHTML : '';
+    if (button) { button.disabled = true; button.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i> ساخت PDF…'; }
     try {
       App.charts.forEach((chart) => { if (chart.update) chart.update('none'); });
       const name = `${curData.agent.name} — کارنامه ${curData.scope.from || 'ابتدا'} تا ${curData.scope.to || 'انتها'}`;
@@ -11906,7 +11961,7 @@ async function render(root) {
               <span class="badge bad" style="margin-top:2px">ردلاین</span>
               <div style="flex:1;font-size:12px">
                 <b class="agent-row" data-agent="${esc(r.expertName)}" style="cursor:pointer;color:var(--brand)">${esc(r.expertName)}</b>
-                <span style="color:var(--muted)"> · ${FORM_FA[r.formType] || r.formType} · نمره ${r.score != null ? fa(r.score) : '—'}</span>
+                <span style="color:var(--muted)"> · ${esc(FORM_FA[r.formType] || r.formType || '—')} · نمره ${r.score != null ? esc(fa(r.score)) : '—'}</span>
                 <div style="color:#fca5a5;margin-top:4px">${esc(r.reason || '(علت ثبت نشده)')}</div>
                 <div style="font-size:10px;color:var(--muted);margin-top:4px">لید: ${esc(r.leadName || '—')}${r.leadPhone ? ' (' + esc(r.leadPhone) + ')' : ''} · ${esc(r.date || '—')}</div>
               </div>
@@ -11921,18 +11976,19 @@ async function render(root) {
     const commentSection = `
       <div class="card">
         <div class="card-head"><div class="head-icon" style="background:rgba(251,191,36,.12);color:#fbbf24"><i class="fa-solid fa-comment-dots"></i></div>
-          <div><h3>کامنت‌های کارشناس QC</h3><div class="sub">${fa(cmts.length)} مورد — آخرین ۶۰ مورد</div></div></div>
+          <div><h3>کامنت‌های کارشناس QC</h3><div class="sub">${fa(cmts.length)} مورد دارای کامنت یا المان ضعیف — نمایش آخرین ۲۵ مورد</div></div></div>
         <div class="card-pad">
           ${cmts.length ? `<div style="display:flex;flex-direction:column;gap:8px">${cmts.slice(0, 25).map((r) => `
             <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid rgba(148,163,184,.15);border-radius:10px;">
               <div style="flex:1;font-size:12px">
                 <b class="agent-row" data-agent="${esc(r.expertName)}" style="cursor:pointer;color:var(--brand)">${esc(r.expertName)}</b>
-                <span style="color:var(--muted)"> · ${FORM_FA[r.formType] || r.formType} · نمره ${r.score != null ? fa(r.score) : '—'}</span>
-                <div style="margin-top:4px">${esc(r.comment)}</div>
+                <span style="color:var(--muted)"> · ${esc(FORM_FA[r.formType] || r.formType || '—')} · نمره ${r.score != null ? esc(fa(r.score)) : '—'}</span>
+                ${r.comment ? `<div style="margin-top:4px;white-space:pre-wrap">${esc(r.comment)}</div>` : '<div class="qc-comment-empty">کامنتی ثبت نشده است</div>'}
+                <div class="qc-weaknesses"><span>المان‌های نقطه‌ضعف:</span> ${(r.weaknesses || []).length ? r.weaknesses.map(w => `<span class="qc-weakness-tag">${esc(w.label)}</span>`).join(' ') : '<span class="qc-weakness-none">موردی ثبت نشده</span>'}</div>
                 <div style="font-size:10px;color:var(--muted);margin-top:4px">لید: ${esc(r.leadName || '—')} · ${esc(r.date || '—')}</div>
               </div>
             </div>`).join('')}</div>`
-          : `<div style="color:var(--muted);text-align:center;padding:16px">هنوز کامنتی نیست</div>`}
+          : `<div style="color:var(--muted);text-align:center;padding:16px">کامنت یا المان ضعیفی ثبت نشده است</div>`}
         </div>
       </div>`;
 
@@ -11997,8 +12053,8 @@ async function render(root) {
         ...(an.redlines || []).map((r) => [r.expertName, r.formType, r.score, r.reason, r.leadName, r.leadPhone, r.date, r.sourceFile || ''])
       ]});
       sheets.push({ name: 'کامنت‌های QC', rows: [
-        ['کارشناس', 'تیم', 'نمره', 'کامنت', 'لید', 'تلفن لید', 'تاریخ'],
-        ...(an.comments || []).map((r) => [r.expertName, r.formType, r.score, r.comment, r.leadName, r.leadPhone, r.date])
+        ['کارشناس', 'تیم', 'نمره', 'کامنت', 'المان‌های نقطه‌ضعف', 'لید', 'تلفن لید', 'تاریخ'],
+        ...(an.comments || []).map((r) => [r.expertName, r.formType, r.score, r.comment, (r.weaknesses || []).map(w => w.label).join('، '), r.leadName, r.leadPhone, r.date])
       ]});
       sheets.push({ name: 'ماهانه', rows: [
         ['ماه', 'تعداد ریت', 'میانگین', 'ردلاین'],

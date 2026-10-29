@@ -93,14 +93,12 @@ for (const build of ['public', 'offline']) {
       assert.ok(text('#pBody').includes('ردلاین‌ها'));
       assert.equal(text('#pBody').includes('تفکیک به‌ازای هر تاریخ'), false);
       assert.equal(text('#pBody').includes('تفکیک به‌ازای هر فایل'), false);
-      /* جزئیات کامل همه‌ی تماس‌ها همیشه باز است؛ دکمه‌ی «جزئیات بیشتر» وجود ندارد. */
-      assert.equal($$('#pCallHistory .call-log-item').length, 4);
-      assert.equal($$('#pCallHistory .call-detail-table').length, 4);
+      /* همه‌ی ریت‌ها در یک جدول با یک ردیف مستقل برای هر تماس. */
+      assert.equal($$('table#pCallHistory').length, 1);
+      assert.equal($$('#pCallHistory tbody > tr').length, 4);
       assert.equal(text('#pCallHistory').includes('جزئیات بیشتر'), false);
-      assert.equal($('#pCallDetails-0').hidden, false);
-      const headings = $$('#pCallDetails-0 th').map((node) => node.textContent);
-      assert.deepEqual(headings.slice(0, 2), ['لید', 'شماره تماس']);
-      assert.deepEqual(headings.slice(-3), ['ردلاین', 'تایم مکالمه', 'تاریخ بررسی']);
+      const headings = $$('#pCallHistory thead th').map((node) => node.textContent);
+      assert.deepEqual(headings, ['تاریخ بررسی', 'لید و شماره تماس', 'فرم', 'کارشناس QC', 'نمره', 'المان‌ها', 'ردلاین', 'زمان تماس', 'کامنت QC']);
       assert.ok(text('#pCallDetails-0').includes('۹۰ ثانیه'));
       assert.ok(text('#pCallDetails-1').includes('زمان شنود: ۴۰ ثانیه'));
       $('#pCallDetails-1 [data-call-redline]').click();

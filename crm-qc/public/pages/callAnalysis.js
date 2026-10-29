@@ -202,7 +202,7 @@ async function render(root) {
               <span class="badge bad" style="margin-top:2px">ردلاین</span>
               <div style="flex:1;font-size:12px">
                 <b class="agent-row" data-agent="${esc(r.expertName)}" style="cursor:pointer;color:var(--brand)">${esc(r.expertName)}</b>
-                <span style="color:var(--muted)"> · ${FORM_FA[r.formType] || r.formType} · نمره ${r.score != null ? fa(r.score) : '—'}</span>
+                <span style="color:var(--muted)"> · ${esc(FORM_FA[r.formType] || r.formType || '—')} · نمره ${r.score != null ? esc(fa(r.score)) : '—'}</span>
                 <div style="color:#fca5a5;margin-top:4px">${esc(r.reason || '(علت ثبت نشده)')}</div>
                 <div style="font-size:10px;color:var(--muted);margin-top:4px">لید: ${esc(r.leadName || '—')}${r.leadPhone ? ' (' + esc(r.leadPhone) + ')' : ''} · ${esc(r.date || '—')}</div>
               </div>
@@ -217,18 +217,19 @@ async function render(root) {
     const commentSection = `
       <div class="card">
         <div class="card-head"><div class="head-icon" style="background:rgba(251,191,36,.12);color:#fbbf24"><i class="fa-solid fa-comment-dots"></i></div>
-          <div><h3>کامنت‌های کارشناس QC</h3><div class="sub">${fa(cmts.length)} مورد — آخرین ۶۰ مورد</div></div></div>
+          <div><h3>کامنت‌های کارشناس QC</h3><div class="sub">${fa(cmts.length)} مورد دارای کامنت یا المان ضعیف — نمایش آخرین ۲۵ مورد</div></div></div>
         <div class="card-pad">
           ${cmts.length ? `<div style="display:flex;flex-direction:column;gap:8px">${cmts.slice(0, 25).map((r) => `
             <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid rgba(148,163,184,.15);border-radius:10px;">
               <div style="flex:1;font-size:12px">
                 <b class="agent-row" data-agent="${esc(r.expertName)}" style="cursor:pointer;color:var(--brand)">${esc(r.expertName)}</b>
-                <span style="color:var(--muted)"> · ${FORM_FA[r.formType] || r.formType} · نمره ${r.score != null ? fa(r.score) : '—'}</span>
-                <div style="margin-top:4px">${esc(r.comment)}</div>
+                <span style="color:var(--muted)"> · ${esc(FORM_FA[r.formType] || r.formType || '—')} · نمره ${r.score != null ? esc(fa(r.score)) : '—'}</span>
+                ${r.comment ? `<div style="margin-top:4px;white-space:pre-wrap">${esc(r.comment)}</div>` : '<div class="qc-comment-empty">کامنتی ثبت نشده است</div>'}
+                <div class="qc-weaknesses"><span>المان‌های نقطه‌ضعف:</span> ${(r.weaknesses || []).length ? r.weaknesses.map(w => `<span class="qc-weakness-tag">${esc(w.label)}</span>`).join(' ') : '<span class="qc-weakness-none">موردی ثبت نشده</span>'}</div>
                 <div style="font-size:10px;color:var(--muted);margin-top:4px">لید: ${esc(r.leadName || '—')} · ${esc(r.date || '—')}</div>
               </div>
             </div>`).join('')}</div>`
-          : `<div style="color:var(--muted);text-align:center;padding:16px">هنوز کامنتی نیست</div>`}
+          : `<div style="color:var(--muted);text-align:center;padding:16px">کامنت یا المان ضعیفی ثبت نشده است</div>`}
         </div>
       </div>`;
 
@@ -293,8 +294,8 @@ async function render(root) {
         ...(an.redlines || []).map((r) => [r.expertName, r.formType, r.score, r.reason, r.leadName, r.leadPhone, r.date, r.sourceFile || ''])
       ]});
       sheets.push({ name: 'کامنت‌های QC', rows: [
-        ['کارشناس', 'تیم', 'نمره', 'کامنت', 'لید', 'تلفن لید', 'تاریخ'],
-        ...(an.comments || []).map((r) => [r.expertName, r.formType, r.score, r.comment, r.leadName, r.leadPhone, r.date])
+        ['کارشناس', 'تیم', 'نمره', 'کامنت', 'المان‌های نقطه‌ضعف', 'لید', 'تلفن لید', 'تاریخ'],
+        ...(an.comments || []).map((r) => [r.expertName, r.formType, r.score, r.comment, (r.weaknesses || []).map(w => w.label).join('، '), r.leadName, r.leadPhone, r.date])
       ]});
       sheets.push({ name: 'ماهانه', rows: [
         ['ماه', 'تعداد ریت', 'میانگین', 'ردلاین'],
