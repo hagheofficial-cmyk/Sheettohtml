@@ -1379,23 +1379,36 @@ body.auth-locked #app { filter: blur(2px); pointer-events: none; }
 .profile-content .profile-source-kpis .card-pad { padding:10px 14px; }
 .profile-content .card-head { padding:11px 14px; }
 .profile-content .history-stack { gap:10px; }
-.profile-call-table { min-width:1050px; }
-.profile-call-table th, .profile-call-table td { white-space:normal !important; vertical-align:top !important; padding:8px !important; overflow-wrap:anywhere; }
-.profile-call-table .profile-elements { display:flex; flex-wrap:wrap; gap:4px; min-width:250px; }
-.profile-element { display:inline-flex; align-items:center; gap:4px; padding:2px 5px; border:1px solid var(--line-soft); border-radius:6px; font-size:10.5px; }
-.profile-call-comment { min-width:130px; white-space:pre-wrap !important; }
-.profile-redline-reason { margin-top:4px; min-width:90px; white-space:pre-wrap; font-size:10px; }
+/* Every criterion is a column in the same viewport-width table. */
+.profile-call-wrap { max-height:none; overflow:visible; }
+table.profile-call-table { width:100%; min-width:0; table-layout:fixed; font-size:clamp(7px, .75vw, 10px); }
+.profile-call-table th, .profile-call-table td { white-space:normal !important; vertical-align:top !important; padding:3px 1px !important; overflow-wrap:anywhere; word-break:break-word; line-height:1.45; font-size:inherit; }
+.profile-call-table th, .profile-call-table td { border-inline-start:1px solid var(--line-soft); }
+.profile-call-table th { position:static; }
+.profile-call-table .profile-criterion-head { text-align:center; }
+.profile-call-table th.profile-legend-head { padding:8px !important; text-align:right; }
+.profile-criterion-legend { display:flex; flex-wrap:wrap; gap:6px 14px; }
+.profile-legend-item { color:var(--ink-2); font-size:10px; line-height:1.8; }
+.profile-legend-item b { color:var(--brand); margin-inline-end:3px; }
+.profile-legend-item small { color:var(--muted); }
+.profile-visually-hidden { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.profile-criterion-value { text-align:center; }
+.profile-call-table .tri-value, .profile-call-table .pill-score { min-width:0; padding:1px; font-size:inherit; }
+.profile-call-table .badge { max-width:100%; padding:1px; font-size:inherit; }
+.profile-call-table .cell-sub, .profile-call-table .profile-redline-reason { font-size:inherit; }
+.profile-call-comment, .profile-redline-reason { white-space:pre-wrap !important; }
+.profile-redline-reason { margin-top:4px; }
 .qc-weaknesses { display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin-top:7px; color:var(--bad); font-size:11px; }
 .qc-weakness-tag { background:var(--bad-soft); border-radius:6px; padding:2px 6px; }
 .qc-weakness-none, .qc-comment-empty { color:var(--muted); }
 .qc-comment-empty { margin-top:4px; font-size:11px; }
 /* A capture must expand scrollers and wrap every table, not just call details. */
 .capture-host .history-wrap, .capture-host .table-wrap, .capture-host .table-responsive, .capture-host #pActionsWrap { height:auto !important; max-height:none !important; overflow:visible !important; }
-.capture-host .tbl { width:100%; min-width:0 !important; table-layout:fixed; }
+.capture-host .tbl { width:100%; min-width:0 !important; table-layout:auto; }
 .capture-host .tbl th, .capture-host .tbl td { min-width:0 !important; white-space:normal !important; overflow-wrap:anywhere; word-break:break-word; }
-.capture-host .profile-call-table th:nth-child(6), .capture-host .profile-call-table td:nth-child(6) { width:27%; }
-.capture-host .profile-call-table th:nth-child(9), .capture-host .profile-call-table td:nth-child(9) { width:16%; }
-.capture-host .profile-call-table .profile-elements, .capture-host .profile-call-comment, .capture-host .profile-redline-reason { min-width:0; }
+.capture-host .tbl thead th { position:static; }
+.capture-host .action-row > * { min-width:0; max-width:100%; overflow-wrap:anywhere; }
+.capture-host table.profile-call-table { table-layout:fixed; font-size:10px; }
 .capture-host .profile-call-comment, .capture-host .profile-redline-reason { white-space:pre-wrap !important; }
 .capture-host * { animation:none !important; transition:none !important; }
 
@@ -7965,6 +7978,24 @@ async function download(source, filename, prepare) {
   return { width: canvas.width, height: canvas.height };
 }
 
+/* Choose breaks before a row or compact block when possible, so that a
+ * page boundary does not cut text in half. A block taller than one page is
+ * split as a last resort rather than hiding any of its content. */
+function pageBreaks(host) {
+  const top = host.getBoundingClientRect().top;
+  return [...host.querySelectorAll('tr, .card-head, .summary-block, .action-row, .chart-box, .profile-system-brand')]
+    .map(node => { const r = node.getBoundingClientRect(); return { top: Math.floor(r.top - top), bottom: Math.ceil(r.bottom - top) }; })
+    .filter(r => r.bottom > r.top).sort((a, b) => b.top - a.top);
+}
+function tileEnd(offset, proposed, pageSize, blocks) {
+  let end = proposed;
+  const min = offset + Math.max(1, Math.floor(pageSize * 0.2));
+  blocks.forEach(block => {
+    if (block.bottom - block.top <= pageSize && block.top >= min && block.top < end && block.bottom > end) end = block.top;
+  });
+  return end;
+}
+
 /* PDF به صورت تکه‌های مستقل ساخته می‌شود تا محدودیت اندازهٔ canvas
  * مرورگر باعث حذف انتهای پرونده‌های بلند نشود. */
 async function downloadPdf(source, filename, prepare) {
@@ -7980,27 +8011,57 @@ async function downloadPdf(source, filename, prepare) {
     host.style.width = width + 'px';
     const height = Math.ceil(Math.max(host.scrollHeight, host.getBoundingClientRect().height));
     if (!width || !height) throw new Error('ابعاد محتوای PDF قابل محاسبه نیست');
-    const pdf = new lib({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
+    const pdf = new lib({ unit: 'pt', format: 'a4', orientation: 'landscape', compress: true });
     const pageWidth = pdf.internal.pageSize.getWidth(), pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 18, imageWidth = pageWidth - margin * 2;
     const sliceHeight = Math.max(1, Math.floor(width * (pageHeight - margin * 2) / imageWidth));
-    let offset = 0, page = 0;
+    const blocks = pageBreaks(host), pages = [];
+    let offset = 0;
     while (offset < height) {
-      const tileHeight = Math.min(sliceHeight, height - offset);
-      const scale = Math.min(1.5, 3000 / width, 4000 / tileHeight, Math.sqrt(12000000 / (width * tileHeight)));
+      const proposed = Math.min(offset + sliceHeight, height);
+      const end = proposed < height ? tileEnd(offset, proposed, sliceHeight, blocks) : proposed;
+      pages.push({ y: offset, height: end - offset });
+      offset = end;
+    }
+    // Capture several pages at a time. Re-cloning the entire app for every
+    // page is extremely slow, but one canvas for an unlimited profile would
+    // exceed browser limits. Batch size and pixel area remain bounded.
+    const batchLimit = 6000;
+    for (let first = 0; first < pages.length;) {
+      let last = first + 1;
+      while (last < pages.length && pages[last].y + pages[last].height - pages[first].y <= batchLimit) last++;
+      const y = pages[first].y, batchHeight = pages[last - 1].y + pages[last - 1].height - y;
+      const scale = Math.min(1.2, 3000 / width, 6000 / batchHeight, Math.sqrt(12000000 / (width * batchHeight)));
       const canvas = await window.html2canvas(host, {
         backgroundColor: themeBackground(), scale, useCORS: true, logging: false,
-        width, height: tileHeight, x: 0, y: offset,
-        windowWidth: window.innerWidth, windowHeight: window.innerHeight, scrollX: 0, scrollY: 0
+        width, height: batchHeight, x: 0, y,
+        windowWidth: window.innerWidth, windowHeight: window.innerHeight, scrollX: 0, scrollY: 0,
+        onclone: (doc, clonedHost) => {
+          if (clonedHost && clonedHost.parentNode === doc.body) {
+            [...doc.body.children].forEach(node => { if (node !== clonedHost && node.tagName !== 'STYLE') node.remove(); });
+          }
+        }
       });
       if (!canvas.width || !canvas.height) throw new Error('تصویر یکی از صفحه‌های PDF ساخته نشد');
-      if (page) pdf.addPage();
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.94), 'JPEG', margin, margin, imageWidth, tileHeight * imageWidth / width);
+      for (let index = first; index < last; index++) {
+        const page = pages[index];
+        const from = Math.round((page.y - y) * canvas.height / batchHeight);
+        const to = Math.round((page.y + page.height - y) * canvas.height / batchHeight);
+        const slice = document.createElement('canvas');
+        slice.width = canvas.width; slice.height = Math.max(1, to - from);
+        const context = slice.getContext('2d');
+        if (!context) throw new Error('ساخت تصویر PDF ممکن نشد');
+        context.fillStyle = themeBackground(); context.fillRect(0, 0, slice.width, slice.height);
+        context.drawImage(canvas, 0, from, canvas.width, slice.height, 0, 0, slice.width, slice.height);
+        if (index) pdf.addPage();
+        pdf.addImage(slice.toDataURL('image/jpeg', 0.94), 'JPEG', margin, margin, imageWidth, page.height * imageWidth / width);
+        slice.width = slice.height = 0;
+      }
       canvas.width = canvas.height = 0;
-      offset += tileHeight; page++;
+      first = last;
     }
     pdf.save(fileName(filename, 'pdf'));
-    return { pages: page, width, height };
+    return { pages: pages.length, width, height };
   } finally { host.remove(); }
 }
 
@@ -10945,30 +11006,47 @@ async function render(root, arg) {
       const aj = C.parseDate(a.reviewDate), bj = C.parseDate(b.reviewDate);
       return aj && bj ? C.jalaliCmp(bj, aj) : (bj ? 1 : aj ? -1 : 0);
     });
+    // Build a single matrix, preserving form/team and historical labels. Two
+    // different versions of the same key must never be silently conflated.
+    const columns = [], positions = new Map();
+    const matrix = historyCalls.map(row => {
+      const team = row.criteriaTeam || row.team || (curData && curData.agent.team) || '';
+      const definitions = QCParse.definitionsFor(row.formType, team);
+      const snapshot = Array.isArray(row.criteriaSnapshot) ? row.criteriaSnapshot : [];
+      const snapshotKeys = snapshot.filter(d => d.active !== false).map(d => d.key);
+      const keys = [...new Set((snapshotKeys.length ? snapshotKeys : QCReports.criteriaKeys([row], row.formType, QCParse)).concat(Object.keys(row.elements || {})))];
+      const values = new Map();
+      keys.forEach(key => {
+        const old = snapshot.find(d => d.key === key), def = definitions.find(d => d.key === key);
+        const label = (old && old.label) || (def && def.label) || QCParse.labelOf(row.formType, key, team);
+        const identity = JSON.stringify([row.formType || '', team, key, label]);
+        if (!positions.has(identity)) {
+          positions.set(identity, columns.length);
+          columns.push({ identity, label, form: FORM_TYPE_FA[row.formType] || row.formType || '—', team });
+        }
+        values.set(identity, QCParse.elementValue(Object.assign({}, row, { team }), key));
+      });
+      return values;
+    });
+    // Use proportional widths instead of a hard minimum: all columns remain
+    // within the profile viewport, including when a form has many criteria.
+    const weights = [3, 5, 3, 3, 2].concat(columns.map(() => 1), [3, 3, 7]);
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+    const multipleGroups = new Set(columns.map(c => c.form + '|' + c.team)).size > 1;
     return `<table class="tbl profile-call-table" id="pCallHistory">
-      <thead><tr><th>تاریخ بررسی</th><th>لید و شماره تماس</th><th>فرم</th><th>کارشناس QC</th><th>نمره</th><th>المان‌ها</th><th>ردلاین</th><th>زمان تماس</th><th>کامنت QC</th></tr></thead>
-      <tbody>${historyCalls.map((row, index) => {
-        const team = row.criteriaTeam || row.team || (curData && curData.agent.team);
-        const definitions = QCParse.definitionsFor(row.formType, team);
-        const snapshotKeys = (row.criteriaSnapshot || []).filter(d => d.active !== false).map(d => d.key);
-        const keys = [...new Set((snapshotKeys.length ? snapshotKeys : QCReports.criteriaKeys([row], row.formType, QCParse)).concat(Object.keys(row.elements || {})))];
-        const elements = keys.map(key => {
-          const snapshot = (row.criteriaSnapshot || []).find(d => d.key === key);
-          const definition = definitions.find(d => d.key === key);
-          const label = (snapshot && snapshot.label) || (definition && definition.label) || QCParse.labelOf(row.formType, key, team);
-          return `<span class="profile-element">${esc(label)}: ${triValue(QCParse.elementValue(Object.assign({}, row, { team }), key))}</span>`;
-        }).join('');
-        return `<tr id="pCallDetails-${index}" class="profile-call-row">
+      <colgroup>${weights.map(w => `<col style="width:${w * 100 / totalWeight}%">`).join('')}</colgroup>
+      <thead>${columns.length ? `<tr><th class="profile-legend-head" colspan="${weights.length}"><div class="profile-criterion-legend">${columns.map((col, i) => `<span class="profile-legend-item"><b>${fa(i + 1)}</b> ${esc(col.label)}${multipleGroups ? ` <small>(${esc(col.form)}${col.team ? ' · ' + esc(QCParse.displayTeam(col.team)) : ''})</small>` : ''}</span>`).join('')}</div></th></tr>` : ''}
+      <tr><th>تاریخ بررسی</th><th>لید و شماره تماس</th><th>فرم</th><th>کارشناس QC</th><th>نمره</th>${columns.map((col, i) => `<th class="profile-criterion-head" title="${esc(col.label)} — ${esc(col.form)}${col.team ? ' · ' + esc(QCParse.displayTeam(col.team)) : ''}"><span aria-hidden="true">${fa(i + 1)}</span><span class="profile-visually-hidden"> ${esc(col.label)} (${esc(col.form)}${col.team ? ' · ' + esc(QCParse.displayTeam(col.team)) : ''})</span></th>`).join('')}<th>ردلاین</th><th>زمان تماس</th><th>کامنت QC</th></tr></thead>
+      <tbody>${historyCalls.map((row, index) => `<tr id="pCallDetails-${index}" class="profile-call-row">
           <td dir="ltr">${esc(fa(row.reviewDate || '—'))}</td>
           <td class="cell-main">${esc(row.leadName || '—')}<div class="cell-sub" dir="ltr">${esc(row.leadPhone || '—')}</div></td>
           <td>${esc(FORM_TYPE_FA[row.formType] || row.formType || '—')}</td>
           <td>${esc(row.qcAgent || '—')}</td><td>${scorePill(row.score)}</td>
-          <td><div class="profile-elements">${elements || '—'}</div></td>
+          ${columns.map(col => `<td class="profile-criterion-value">${matrix[index].has(col.identity) ? triValue(matrix[index].get(col.identity)) : '<span title="این المان برای این فرم نیست">·</span>'}</td>`).join('')}
           <td>${callRedlineBadge(row, index)}${row.redlineReason ? `<div class="profile-redline-reason">${esc(row.redlineReason)}</div>` : ''}</td>
           <td>${callTimeCell(row)}</td>
           <td class="profile-call-comment">${esc(row.qcComment || '—')}</td>
-        </tr>`;
-      }).join('')}</tbody></table>`;
+        </tr>`).join('')}</tbody></table>`;
   }
 
   /* ---------- کارت نرخ موفقیت معیارهای تماس (پرتفوی) ---------- */
@@ -11192,9 +11270,9 @@ async function render(root, arg) {
         </div>
         <div class="card full-row">
           <div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-headset"></i></div>
-            <div><h3>سوابق ریت تماس (${fa(Ph.count)})</h3><div class="sub">همهٔ تماس‌ها در یک جدول؛ المان‌ها و کامنت هر ریت در همان ردیف</div></div></div>
+            <div><h3>سوابق ریت تماس (${fa(Ph.count)})</h3><div class="sub">همهٔ تماس‌ها در یک جدول؛ شمارهٔ هر ستون با نام المان بالای جدول مطابقت دارد. نقطه یعنی آن المان برای این ریت نیست.</div></div></div>
           <div class="card-pad history-types">${typeRows}</div>
-          <div class="table-wrap history-wrap">${callTable(Ph.rows)}</div>
+          <div class="table-wrap history-wrap profile-call-wrap">${callTable(Ph.rows)}</div>
         </div>
       </div>
 

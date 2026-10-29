@@ -97,8 +97,11 @@ for (const build of ['public', 'offline']) {
       assert.equal($$('table#pCallHistory').length, 1);
       assert.equal($$('#pCallHistory tbody > tr').length, 4);
       assert.equal(text('#pCallHistory').includes('جزئیات بیشتر'), false);
-      const headings = $$('#pCallHistory thead th').map((node) => node.textContent);
-      assert.deepEqual(headings, ['تاریخ بررسی', 'لید و شماره تماس', 'فرم', 'کارشناس QC', 'نمره', 'المان‌ها', 'ردلاین', 'زمان تماس', 'کامنت QC']);
+      const headings = $$('#pCallHistory thead tr:last-child th').map((node) => node.textContent);
+      assert.deepEqual(headings.slice(0, 5), ['تاریخ بررسی', 'لید و شماره تماس', 'فرم', 'کارشناس QC', 'نمره']);
+      assert.deepEqual(headings.slice(-3), ['ردلاین', 'زمان تماس', 'کامنت QC']);
+      assert.ok(headings.length > 8, 'معیارها ستون‌های مستقل دارند');
+      assert.equal($$('#pCallHistory .profile-elements, #pCallHistory table').length, 0);
       assert.ok(text('#pCallDetails-0').includes('۹۰ ثانیه'));
       assert.ok(text('#pCallDetails-1').includes('زمان شنود: ۴۰ ثانیه'));
       $('#pCallDetails-1 [data-call-redline]').click();

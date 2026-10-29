@@ -97,6 +97,24 @@ async function download(source, filename, prepare) {
   return { width: canvas.width, height: canvas.height };
 }
 
+/* Choose breaks before a row or compact block when possible, so that a
+ * page boundary does not cut text in half. A block taller than one page is
+ * split as a last resort rather than hiding any of its content. */
+function pageBreaks(host) {
+  const top = host.getBoundingClientRect().top;
+  return [...host.querySelectorAll('tr, .card-head, .summary-block, .action-row, .chart-box, .profile-system-brand')]
+    .map(node => { const r = node.getBoundingClientRect(); return { top: Math.floor(r.top - top), bottom: Math.ceil(r.bottom - top) }; })
+    .filter(r => r.bottom > r.top).sort((a, b) => b.top - a.top);
+}
+function tileEnd(offset, proposed, pageSize, blocks) {
+  let end = proposed;
+  const min = offset + Math.max(1, Math.floor(pageSize * 0.2));
+  blocks.forEach(block => {
+    if (block.bottom - block.top <= pageSize && block.top >= min && block.top < end && block.bottom > end) end = block.top;
+  });
+  return end;
+}
+
 /* PDF به صورت تکه‌های مستقل ساخته می‌شود تا محدودیت اندازهٔ canvas
  * مرورگر باعث حذف انتهای پرونده‌های بلند نشود. */
 async function downloadPdf(source, filename, prepare) {
@@ -112,27 +130,57 @@ async function downloadPdf(source, filename, prepare) {
     host.style.width = width + 'px';
     const height = Math.ceil(Math.max(host.scrollHeight, host.getBoundingClientRect().height));
     if (!width || !height) throw new Error('ابعاد محتوای PDF قابل محاسبه نیست');
-    const pdf = new lib({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
+    const pdf = new lib({ unit: 'pt', format: 'a4', orientation: 'landscape', compress: true });
     const pageWidth = pdf.internal.pageSize.getWidth(), pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 18, imageWidth = pageWidth - margin * 2;
     const sliceHeight = Math.max(1, Math.floor(width * (pageHeight - margin * 2) / imageWidth));
-    let offset = 0, page = 0;
+    const blocks = pageBreaks(host), pages = [];
+    let offset = 0;
     while (offset < height) {
-      const tileHeight = Math.min(sliceHeight, height - offset);
-      const scale = Math.min(1.5, 3000 / width, 4000 / tileHeight, Math.sqrt(12000000 / (width * tileHeight)));
+      const proposed = Math.min(offset + sliceHeight, height);
+      const end = proposed < height ? tileEnd(offset, proposed, sliceHeight, blocks) : proposed;
+      pages.push({ y: offset, height: end - offset });
+      offset = end;
+    }
+    // Capture several pages at a time. Re-cloning the entire app for every
+    // page is extremely slow, but one canvas for an unlimited profile would
+    // exceed browser limits. Batch size and pixel area remain bounded.
+    const batchLimit = 6000;
+    for (let first = 0; first < pages.length;) {
+      let last = first + 1;
+      while (last < pages.length && pages[last].y + pages[last].height - pages[first].y <= batchLimit) last++;
+      const y = pages[first].y, batchHeight = pages[last - 1].y + pages[last - 1].height - y;
+      const scale = Math.min(1.2, 3000 / width, 6000 / batchHeight, Math.sqrt(12000000 / (width * batchHeight)));
       const canvas = await window.html2canvas(host, {
         backgroundColor: themeBackground(), scale, useCORS: true, logging: false,
-        width, height: tileHeight, x: 0, y: offset,
-        windowWidth: window.innerWidth, windowHeight: window.innerHeight, scrollX: 0, scrollY: 0
+        width, height: batchHeight, x: 0, y,
+        windowWidth: window.innerWidth, windowHeight: window.innerHeight, scrollX: 0, scrollY: 0,
+        onclone: (doc, clonedHost) => {
+          if (clonedHost && clonedHost.parentNode === doc.body) {
+            [...doc.body.children].forEach(node => { if (node !== clonedHost && node.tagName !== 'STYLE') node.remove(); });
+          }
+        }
       });
       if (!canvas.width || !canvas.height) throw new Error('تصویر یکی از صفحه‌های PDF ساخته نشد');
-      if (page) pdf.addPage();
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.94), 'JPEG', margin, margin, imageWidth, tileHeight * imageWidth / width);
+      for (let index = first; index < last; index++) {
+        const page = pages[index];
+        const from = Math.round((page.y - y) * canvas.height / batchHeight);
+        const to = Math.round((page.y + page.height - y) * canvas.height / batchHeight);
+        const slice = document.createElement('canvas');
+        slice.width = canvas.width; slice.height = Math.max(1, to - from);
+        const context = slice.getContext('2d');
+        if (!context) throw new Error('ساخت تصویر PDF ممکن نشد');
+        context.fillStyle = themeBackground(); context.fillRect(0, 0, slice.width, slice.height);
+        context.drawImage(canvas, 0, from, canvas.width, slice.height, 0, 0, slice.width, slice.height);
+        if (index) pdf.addPage();
+        pdf.addImage(slice.toDataURL('image/jpeg', 0.94), 'JPEG', margin, margin, imageWidth, page.height * imageWidth / width);
+        slice.width = slice.height = 0;
+      }
       canvas.width = canvas.height = 0;
-      offset += tileHeight; page++;
+      first = last;
     }
     pdf.save(fileName(filename, 'pdf'));
-    return { pages: page, width, height };
+    return { pages: pages.length, width, height };
   } finally { host.remove(); }
 }
 

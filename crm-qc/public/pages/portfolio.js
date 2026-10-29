@@ -247,30 +247,47 @@ async function render(root, arg) {
       const aj = C.parseDate(a.reviewDate), bj = C.parseDate(b.reviewDate);
       return aj && bj ? C.jalaliCmp(bj, aj) : (bj ? 1 : aj ? -1 : 0);
     });
+    // Build a single matrix, preserving form/team and historical labels. Two
+    // different versions of the same key must never be silently conflated.
+    const columns = [], positions = new Map();
+    const matrix = historyCalls.map(row => {
+      const team = row.criteriaTeam || row.team || (curData && curData.agent.team) || '';
+      const definitions = QCParse.definitionsFor(row.formType, team);
+      const snapshot = Array.isArray(row.criteriaSnapshot) ? row.criteriaSnapshot : [];
+      const snapshotKeys = snapshot.filter(d => d.active !== false).map(d => d.key);
+      const keys = [...new Set((snapshotKeys.length ? snapshotKeys : QCReports.criteriaKeys([row], row.formType, QCParse)).concat(Object.keys(row.elements || {})))];
+      const values = new Map();
+      keys.forEach(key => {
+        const old = snapshot.find(d => d.key === key), def = definitions.find(d => d.key === key);
+        const label = (old && old.label) || (def && def.label) || QCParse.labelOf(row.formType, key, team);
+        const identity = JSON.stringify([row.formType || '', team, key, label]);
+        if (!positions.has(identity)) {
+          positions.set(identity, columns.length);
+          columns.push({ identity, label, form: FORM_TYPE_FA[row.formType] || row.formType || '—', team });
+        }
+        values.set(identity, QCParse.elementValue(Object.assign({}, row, { team }), key));
+      });
+      return values;
+    });
+    // Use proportional widths instead of a hard minimum: all columns remain
+    // within the profile viewport, including when a form has many criteria.
+    const weights = [3, 5, 3, 3, 2].concat(columns.map(() => 1), [3, 3, 7]);
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+    const multipleGroups = new Set(columns.map(c => c.form + '|' + c.team)).size > 1;
     return `<table class="tbl profile-call-table" id="pCallHistory">
-      <thead><tr><th>تاریخ بررسی</th><th>لید و شماره تماس</th><th>فرم</th><th>کارشناس QC</th><th>نمره</th><th>المان‌ها</th><th>ردلاین</th><th>زمان تماس</th><th>کامنت QC</th></tr></thead>
-      <tbody>${historyCalls.map((row, index) => {
-        const team = row.criteriaTeam || row.team || (curData && curData.agent.team);
-        const definitions = QCParse.definitionsFor(row.formType, team);
-        const snapshotKeys = (row.criteriaSnapshot || []).filter(d => d.active !== false).map(d => d.key);
-        const keys = [...new Set((snapshotKeys.length ? snapshotKeys : QCReports.criteriaKeys([row], row.formType, QCParse)).concat(Object.keys(row.elements || {})))];
-        const elements = keys.map(key => {
-          const snapshot = (row.criteriaSnapshot || []).find(d => d.key === key);
-          const definition = definitions.find(d => d.key === key);
-          const label = (snapshot && snapshot.label) || (definition && definition.label) || QCParse.labelOf(row.formType, key, team);
-          return `<span class="profile-element">${esc(label)}: ${triValue(QCParse.elementValue(Object.assign({}, row, { team }), key))}</span>`;
-        }).join('');
-        return `<tr id="pCallDetails-${index}" class="profile-call-row">
+      <colgroup>${weights.map(w => `<col style="width:${w * 100 / totalWeight}%">`).join('')}</colgroup>
+      <thead>${columns.length ? `<tr><th class="profile-legend-head" colspan="${weights.length}"><div class="profile-criterion-legend">${columns.map((col, i) => `<span class="profile-legend-item"><b>${fa(i + 1)}</b> ${esc(col.label)}${multipleGroups ? ` <small>(${esc(col.form)}${col.team ? ' · ' + esc(QCParse.displayTeam(col.team)) : ''})</small>` : ''}</span>`).join('')}</div></th></tr>` : ''}
+      <tr><th>تاریخ بررسی</th><th>لید و شماره تماس</th><th>فرم</th><th>کارشناس QC</th><th>نمره</th>${columns.map((col, i) => `<th class="profile-criterion-head" title="${esc(col.label)} — ${esc(col.form)}${col.team ? ' · ' + esc(QCParse.displayTeam(col.team)) : ''}"><span aria-hidden="true">${fa(i + 1)}</span><span class="profile-visually-hidden"> ${esc(col.label)} (${esc(col.form)}${col.team ? ' · ' + esc(QCParse.displayTeam(col.team)) : ''})</span></th>`).join('')}<th>ردلاین</th><th>زمان تماس</th><th>کامنت QC</th></tr></thead>
+      <tbody>${historyCalls.map((row, index) => `<tr id="pCallDetails-${index}" class="profile-call-row">
           <td dir="ltr">${esc(fa(row.reviewDate || '—'))}</td>
           <td class="cell-main">${esc(row.leadName || '—')}<div class="cell-sub" dir="ltr">${esc(row.leadPhone || '—')}</div></td>
           <td>${esc(FORM_TYPE_FA[row.formType] || row.formType || '—')}</td>
           <td>${esc(row.qcAgent || '—')}</td><td>${scorePill(row.score)}</td>
-          <td><div class="profile-elements">${elements || '—'}</div></td>
+          ${columns.map(col => `<td class="profile-criterion-value">${matrix[index].has(col.identity) ? triValue(matrix[index].get(col.identity)) : '<span title="این المان برای این فرم نیست">·</span>'}</td>`).join('')}
           <td>${callRedlineBadge(row, index)}${row.redlineReason ? `<div class="profile-redline-reason">${esc(row.redlineReason)}</div>` : ''}</td>
           <td>${callTimeCell(row)}</td>
           <td class="profile-call-comment">${esc(row.qcComment || '—')}</td>
-        </tr>`;
-      }).join('')}</tbody></table>`;
+        </tr>`).join('')}</tbody></table>`;
   }
 
   /* ---------- کارت نرخ موفقیت معیارهای تماس (پرتفوی) ---------- */
@@ -494,9 +511,9 @@ async function render(root, arg) {
         </div>
         <div class="card full-row">
           <div class="card-head violet"><div class="head-icon"><i class="fa-solid fa-headset"></i></div>
-            <div><h3>سوابق ریت تماس (${fa(Ph.count)})</h3><div class="sub">همهٔ تماس‌ها در یک جدول؛ المان‌ها و کامنت هر ریت در همان ردیف</div></div></div>
+            <div><h3>سوابق ریت تماس (${fa(Ph.count)})</h3><div class="sub">همهٔ تماس‌ها در یک جدول؛ شمارهٔ هر ستون با نام المان بالای جدول مطابقت دارد. نقطه یعنی آن المان برای این ریت نیست.</div></div></div>
           <div class="card-pad history-types">${typeRows}</div>
-          <div class="table-wrap history-wrap">${callTable(Ph.rows)}</div>
+          <div class="table-wrap history-wrap profile-call-wrap">${callTable(Ph.rows)}</div>
         </div>
       </div>
 
