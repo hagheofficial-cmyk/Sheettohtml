@@ -1,0 +1,6 @@
+# Only the generated deployable files. Server.gs is a source template.
+**/**
+!Code.gs
+!Index.html
+!CallReport.html
+!appsscript.json

@@ -137,7 +137,8 @@ function createAppsScriptContext() {
       deleteTrigger: trigger => { const at = triggers.indexOf(trigger); if (at >= 0) triggers.splice(at, 1); },
       newTrigger: handler => ({
         forSpreadsheet: () => ({
-          onChange: () => ({ create: () => triggers.push({ handler, getHandlerFunction: () => handler }) })
+          onChange: () => ({ create: () => triggers.push({ handler, getHandlerFunction: () => handler }) }),
+          onEdit: () => ({ create: () => triggers.push({ handler, getHandlerFunction: () => handler }) })
         })
       })
     },
@@ -153,19 +154,29 @@ function createAppsScriptContext() {
   return { context, spreadsheet, cache, clock, triggers, properties };
 }
 
+function useTestAdmin(context) {
+  context.createFirstAdmin_('مدیر سیستم', 'admin-1234-long');
+  const raw = context.crmqcApi;
+  const login = raw('POST', '/api/auth/login', { name: 'مدیر سیستم', password: 'admin-1234-long' });
+  assert.equal(login.status, 200, JSON.stringify(login.data));
+  context.crmqcApi = (method, url, body, token) => raw(method, url, body, token === undefined ? login.data.token : token);
+  return login.data.token;
+}
+
 test('standalone Apps Script creates per-dataset tabs and uses them as the live API database', () => {
   const { context, spreadsheet, cache, clock, triggers, properties } = createAppsScriptContext();
-  const setup = context.setupStandaloneApp();
+  const setup = context.setupStandaloneApp_();
   assert.equal(setup.ok, true);
   assert.equal(setup.seeded, true);
   for (const name of ['Agents', 'Tickets', 'Socials', 'Calls', 'QC_Agents', 'Actions', 'Reminders', 'Settings', 'Lists', 'Meta']) {
     assert.ok(spreadsheet.getSheetByName(name), `missing ${name} tab`);
   }
   // Setup installs exactly one onChange trigger that keeps cached reads honest.
-  assert.deepEqual(triggers.map(trigger => trigger.handler), ['crmqcOnSheetChange']);
-  context.setupStandaloneApp();
-  assert.deepEqual(triggers.map(trigger => trigger.handler), ['crmqcOnSheetChange'], 'trigger must not be duplicated');
+  assert.deepEqual(triggers.map(trigger => trigger.handler), ['crmqcOnSheetChange', 'crmqcOnSheetChange']);
+  context.setupStandaloneApp_();
+  assert.deepEqual(triggers.map(trigger => trigger.handler), ['crmqcOnSheetChange', 'crmqcOnSheetChange'], 'trigger must not be duplicated');
 
+  useTestAdmin(context);
   const bootstrap = context.crmqcApi('GET', '/api/bootstrap', {});
   assert.equal(bootstrap.status, 200, bootstrap.data && bootstrap.data.error);
   assert.equal(bootstrap.data.agents.length, setup.counts.agents);
@@ -219,7 +230,7 @@ test('standalone Apps Script creates per-dataset tabs and uses them as the live 
   manual[headers.indexOf('active')] = true;
   agentsSheet.data.push(manual);
   clock.advance(31000); // the app's own "self write" marker has expired by now
-  context.crmqcOnSheetChange();
+  context.crmqcOnSheetChange_();
   assert.notEqual(properties.get('QC_GAS_REV'), before0, 'external edit must bump the revision');
   const afterEdit = context.crmqcApi('GET', '/api/agents', {});
   assert.equal(afterEdit.status, 200);
@@ -234,7 +245,7 @@ test('standalone Apps Script creates per-dataset tabs and uses them as the live 
   agentsSheet.data.push(stale);
   const cachedRead = context.crmqcApi('GET', '/api/agents', {});
   assert.ok(!cachedRead.data.some(row => row.name === 'Refreshed Sheet Agent'), 'unchanged revision serves the snapshot');
-  const refreshed = context.refreshFromSheet();
+  const refreshed = context.refreshFromSheet_();
   assert.equal(refreshed.ok, true);
   const afterRefresh = context.crmqcApi('GET', '/api/agents', {});
   assert.ok(afterRefresh.data.some(row => row.name === 'Refreshed Sheet Agent'));
@@ -265,7 +276,7 @@ test('standalone Apps Script creates per-dataset tabs and uses them as the live 
 /* همان قابلیت‌های جدید، اما روی باندل مستقل Apps Script (بدون سرور Node). */
 test('standalone Apps Script: ورود با رمز، دسترسی هر کارشناس QC، ماه مالی، تب المان‌ها و صفحه‌ی گزارش تماس', () => {
   const { context, spreadsheet, properties, cache, clock } = createAppsScriptContext();
-  const setup = context.setupStandaloneApp();
+  const setup = context.setupStandaloneApp_();
   assert.equal(setup.ok, true);
   const api = (method, url, body, token) => context.crmqcApi(method, url, body || {}, token);
   const C = require('../shared/calc');
@@ -276,7 +287,7 @@ test('standalone Apps Script: ورود با رمز، دسترسی هر کارش�
     { name: 'دوره جاری', from: C.formatJalali(cur.from), to: C.formatJalali(cur.to) }
   ];
   const ticketFor = (agentName, team, code, qcAgent) => ({
-    qcAgent: qcAgent, reviewDate: '1405/06/01', ticketDate: '1405/06/01',
+    qcAgent: qcAgent, reviewDate: C.formatJalali(cur.from), ticketDate: C.formatJalali(cur.from),
     agentName: agentName, team: team, ticketCode: code,
     q1: '1', q2: '1', q3: '0', q4: '1', redline: '0', comment: 'gas'
   });
@@ -286,28 +297,26 @@ test('standalone Apps Script: ورود با رمز، دسترسی هر کارش�
     return { tab: found, head: found.data[0], rows: found.data.slice(1), col: (row, key) => row[found.data[0].indexOf(key)] };
   };
 
-  /* ۱) تا وقتی کاربر رمزدار نیست، ورود خاموش است */
+  /* No unauthenticated access or public first-admin setup. */
   const openBoot = api('GET', '/api/bootstrap');
   assert.equal(openBoot.status, 200);
-  assert.equal(openBoot.data.auth.required, false);
-  assert.equal(openBoot.data.auth.mode, 'auto');
-  const agents = openBoot.data.agents;
-  assert.ok(agents.length > 5, 'دیتای نمونه با کارشناسان بالا می‌آید');
-  const target = agents[0], other = agents[1];
-  assert.notEqual(target.ext, other.ext);
-
-  /* ۲) ساخت اولین مدیر → توکن نشست */
-  const made = api('POST', '/api/auth/setup', { name: 'مدیر سیستم', password: 'admin-1234' });
+  assert.equal(openBoot.data.auth.required, true);
+  assert.equal(openBoot.data.agents.length, 0);
+  assert.equal(api('POST', '/api/auth/setup', { name: 'intruder', password: 'intruder-long-password' }).status, 403);
+  context.createFirstAdmin_('مدیر سیستم', 'admin-1234-long');
+  const made = api('POST', '/api/auth/login', { name: 'مدیر سیستم', password: 'admin-1234-long' });
   assert.equal(made.status, 200, JSON.stringify(made.data));
   const adminToken = made.data.token;
-  assert.ok(adminToken && adminToken.length >= 24, 'نشست با توکن برگردانده می‌شود');
-  assert.equal(made.data.user.role, 'admin');
+  const agents = api('GET', '/api/bootstrap', {}, adminToken).data.agents;
+  assert.ok(agents.length > 5);
+  const target = agents[0], other = agents[1];
+  assert.notEqual(target.ext, other.ext);
 
   const lockedBoot = api('GET', '/api/bootstrap');
   assert.equal(lockedBoot.data.auth.required, true);
   assert.equal(lockedBoot.data.agents.length, 0, 'پیش از ورود داده‌ای از شیت لو نمی‌رود');
   assert.equal(lockedBoot.data.counts.tickets, 0);
-  assert.deepEqual([...lockedBoot.data.auth.accounts].map((a) => a.name), ['مدیر سیستم']);
+  assert.deepEqual([...lockedBoot.data.auth.accounts], []);
   assert.equal(api('POST', '/api/auth/login', { name: 'مدیر سیستم', password: 'wrong' }).status, 401);
   assert.equal(api('GET', '/api/settings', {}, 'not-a-token').status, 401);
 
@@ -324,13 +333,13 @@ test('standalone Apps Script: ورود با رمز، دسترسی هر کارش�
 
   /* ۴) تعریف کارشناس QC با داخلی یک کارشناس مشخص */
   const created = api('POST', '/api/qc-users',
-    { name: 'مبینا', password: 'qc-1234', role: 'qc', active: true, exts: String(target.ext) }, adminToken);
+    { name: 'مبینا', password: 'qc-1234-longer', role: 'qc', active: true, exts: String(target.ext) }, adminToken);
   assert.equal(created.status, 200, JSON.stringify(created.data));
   assert.deepEqual([...created.data.user.exts], [String(target.ext)]);
   assert.equal(sheet('QC_Users').rows.length, 2, 'کاربر دوم روی تب نوشته شد');
 
   /* ۵) ورود کارشناس QC → داده‌ی محدودشده و APIهای مدیریتی بسته */
-  const qcLogin = api('POST', '/api/auth/login', { name: 'مبینا', password: 'qc-1234' });
+  const qcLogin = api('POST', '/api/auth/login', { name: 'مبینا', password: 'qc-1234-longer' });
   assert.equal(qcLogin.status, 200);
   const qcToken = qcLogin.data.token;
   const qcBoot = api('GET', '/api/bootstrap', {}, qcToken);
@@ -363,10 +372,10 @@ test('standalone Apps Script: ورود با رمز، دسترسی هر کارش�
   assert.equal(api('POST', '/api/auth/logout', { token: qcToken }, qcToken).status, 200);
   assert.equal(api('GET', '/api/bootstrap', {}, qcToken).data.auth.user, null);
   const epochBefore = properties.get('QC_GAS_TOKEN_EPOCH');
-  assert.equal(context.clearSessions().ok, true);
+  assert.equal(context.clearSessions_().ok, true);
   assert.notEqual(properties.get('QC_GAS_TOKEN_EPOCH'), epochBefore, 'شماره‌ی نشست‌ها بالا می‌رود');
   assert.equal(api('GET', '/api/bootstrap', {}, adminToken).data.auth.user, null, 'توکن مدیر هم باطل شد');
-  const relogin = api('POST', '/api/auth/login', { name: 'مدیر سیستم', password: 'admin-1234' });
+  const relogin = api('POST', '/api/auth/login', { name: 'مدیر سیستم', password: 'admin-1234-long' });
   const token2 = relogin.data.token;
 
   /* ۸) بازه‌های ماه مالی روی تب Fiscal_Months */
@@ -395,7 +404,7 @@ test('standalone Apps Script: ورود با رمز، دسترسی هر کارش�
   q1[elements.head.indexOf('label')] = 'سلام (ویرایش روی شیت)';
   q1[elements.head.indexOf('excelKey')] = 'Q1_SHEET';
   clock.advance(31000);
-  context.crmqcOnSheetChange();
+  context.crmqcOnSheetChange_();
   const afterEdit = api('GET', '/api/criteria', {}, token2);
   const def = afterEdit.data.config.forms.tele.find((d) => d.key === 'q1');
   assert.equal(def.label, 'سلام (ویرایش روی شیت)');
@@ -405,7 +414,7 @@ test('standalone Apps Script: ورود با رمز، دسترسی هر کارش�
   assert.ok(flat.data.rows.some((row) => row.key === 'q1' && row.excelKey === 'Q1_SHEET'));
 
   /* ۱۰) خلاصه‌ی ماهانه روی تب Monthly_Summary */
-  const rebuilt = context.rebuildMonthlySummary();
+  const rebuilt = context.rebuildMonthlySummary_();
   assert.equal(rebuilt.ok, true);
   assert.ok(rebuilt.rows >= 1);
   const summary = sheet('Monthly_Summary');
@@ -414,7 +423,7 @@ test('standalone Apps Script: ورود با رمز، دسترسی هر کارش�
   assert.ok(summary.rows.some((row) => summary.col(row, 'agent') === target.name));
   /* رکورد نمونه در ۱۴۰۵/۰۶ است؛ نام ماه مالی همان بازه‌ی نوشته‌شده روی شیت می‌شود */
   const ticketRow = summary.rows.find((row) => summary.col(row, 'agent') === target.name);
-  assert.equal(String(summary.col(ticketRow, 'month')), '1405/06');
+  assert.equal(String(summary.col(ticketRow, 'month')), C.formatJalali(cur.from).slice(0, 7));
   assert.ok(months.some((m) => String(summary.col(ticketRow, 'fiscal')) === m.name),
     'ستون fiscal از تب Fiscal_Months پر می‌شود: ' + summary.col(ticketRow, 'fiscal'));
   const apiSummary = api('GET', '/api/monthly-summary', {}, token2);
@@ -438,8 +447,8 @@ test('standalone Apps Script: ورود با رمز، دسترسی هر کارش�
   // ب) نوشتن مستقیم روی شیت (ستون همان QC) هم دسترسی می‌دهد (دوطرفه)
   writtenOther[written.head.indexOf('QC: مبینا')] = '✓';
   clock.advance(31000);
-  context.crmqcOnSheetChange();
-  const qcLogin2 = api('POST', '/api/auth/login', { name: 'مبینا', password: 'qc-1234' });
+  context.crmqcOnSheetChange_();
+  const qcLogin2 = api('POST', '/api/auth/login', { name: 'مبینا', password: 'qc-1234-longer' });
   assert.equal(qcLogin2.status, 200, JSON.stringify(qcLogin2.data));
   const qcBoot2 = api('GET', '/api/bootstrap', {}, qcLogin2.data.token);
   assert.deepEqual([...qcBoot2.data.agents].map((a) => a.name).sort(), [target.name, other.name].sort(),
@@ -450,7 +459,7 @@ test('standalone Apps Script: ورود با رمز، دسترسی هر کارش�
   const dropped = tab.data[0].indexOf('QC: مبینا');
   tab.data = tab.data.map((row) => row.filter((cell, i) => i !== dropped));
   clock.advance(31000);
-  context.crmqcOnSheetChange();
+  context.crmqcOnSheetChange_();
   const moved = api('PUT', '/api/agents/' + target.id, { subgroup: 'بازبینی' }, token2);
   assert.equal(moved.status, 200, JSON.stringify(moved.data));
   const healed = sheet('Agents');
@@ -460,24 +469,21 @@ test('standalone Apps Script: ورود با رمز، دسترسی هر کارش�
   assert.equal(healed.col(healedRow, 'name'), target.name, 'ستون‌ها جابه‌جا نمی‌شوند');
   assert.equal(healed.col(healedRow, 'ext'), target.ext, 'داخلی هم در ستون خودش می‌ماند');
 
-  /* ۱۱) صفحه‌ی گزارش تماس مستقل سرو می‌شود (بدون فریم تودرتو) */
+  /* Direct report URL never exposes settings; admin RPC requires a token. */
   const callPage = context.doGet({ parameter: { page: 'call-report' } });
-  assert.ok(callPage.content.includes('data-file="CallReport"'), 'فایل CallReport سرو می‌شود');
-  assert.equal(callPage.title, 'گزارش تماس روزانه');
-  assert.ok(!callPage.content.includes('__QC_CALL_REPORT_STORAGE_B64__'), 'placeholder با داده‌ی شیت جایگزین شد');
+  assert.ok(callPage.content.includes('data-file="Index"'));
+  assert.throws(() => context.getCallReportHtml(''));
+  assert.ok(context.getCallReportHtml(token2).includes('data-file="CallReport"'));
   const indexPage = context.doGet({ parameter: {} });
   assert.ok(indexPage.content.includes('data-file="Index"'));
-  assert.ok(!indexPage.content.includes('__QC_APP_SCRIPT_URL__'), 'نشانی وب‌اپ جایگزین شد');
-  /* آیکون سربرگ مرورگر: لوگوی خود سامانه، نه آیکون پیش‌فرض Apps Script */
-  assert.ok(String(indexPage.favicon || '').includes('favicon'), 'favicon روی صفحه تنظیم می‌شود: ' + indexPage.favicon);
-  assert.ok(String(callPage.favicon || '').includes('favicon'), 'favicon صفحه‌ی گزارش تماس');
 });
 
 /* عملکرد: کش تب‌به‌تب با نسخه‌ی هر تب + خواندن جزئی. ثبت هر ریت و گزارش‌گیری
  * نباید کل شیت را بخواند، و نوشتنِ یک تب هرگز نباید تب‌های دیگر را پاک کند. */
 test('standalone Apps Script: کش تب‌به‌تب — ثبت ریت و گزارش بدون خواندن کل شیت', () => {
   const { context, spreadsheet, cache, clock, properties } = createAppsScriptContext();
-  context.setupStandaloneApp();
+  context.setupStandaloneApp_();
+  useTestAdmin(context);
   const sheet = (name) => spreadsheet.getSheetByName(name);
   const counters = () => { const o = {}; spreadsheet.getSheets().forEach((s) => { o[s.getName()] = s.calls; }); return o; };
   const delta = (a, b) => Object.keys(b).filter((k) => b[k] !== a[k]).map((k) => k + ':' + (b[k] - a[k]));
@@ -494,7 +500,7 @@ test('standalone Apps Script: کش تب‌به‌تب — ثبت ریت و گز�
     }));
   }
   clock.advance(31000);
-  context.crmqcOnSheetChange();
+  context.crmqcOnSheetChange_();
 
   const bootstrap = context.crmqcApi('GET', '/api/bootstrap', {});
   assert.equal(bootstrap.status, 200, bootstrap.data && bootstrap.data.error);
@@ -563,7 +569,7 @@ test('standalone Apps Script: کش تب‌به‌تب — ثبت ریت و گز�
   manual[head.indexOf('active')] = true;
   agentsSheet.data.push(manual);
   clock.advance(31000);
-  context.crmqcOnSheetChange();
+  context.crmqcOnSheetChange_();
   c0 = counters();
   const agents = context.crmqcApi('GET', '/api/agents', {});
   assert.equal(agents.status, 200);
@@ -571,7 +577,7 @@ test('standalone Apps Script: کش تب‌به‌تب — ثبت ریت و گز�
   assert.ok(delta(c0, counters()).length > 0, 'پس از ویرایش بیرونی، خواندن باید از شیت انجام شود');
 
   // ۸) بازخوانی دستی هم کش را دور می‌زند و داده‌ی کامل را برمی‌گرداند
-  const refreshed = context.refreshFromSheet();
+  const refreshed = context.refreshFromSheet_();
   assert.equal(refreshed.ok, true);
   assert.equal(refreshed.counts.tickets, 3);
   assert.equal(refreshed.counts.calls, 40);
@@ -581,7 +587,7 @@ test('standalone Apps Script: کش تب‌به‌تب — ثبت ریت و گز�
  * تشخیص داده شود تا درخواست با خواندن کامل تکرار شود (نه نوشتنِ تب خالی). */
 test('partial loads detect mutations of tabs they did not read', () => {
   const { context, spreadsheet } = createAppsScriptContext();
-  context.setupStandaloneApp();
+  context.setupStandaloneApp_();
   const partial = context.normalizeDatabase_(context.readDatabase_(spreadsheet, ['meta', 'settings', 'lists', 'tickets']));
   const loaded = ['meta', 'settings', 'lists', 'tickets'];
   const beforeJson = context.diffFingerprints_(partial);
@@ -607,7 +613,8 @@ test('partial loads detect mutations of tabs they did not read', () => {
  * دستی‌نوشته — این همان چیزی است که کاربر می‌خواهد به‌جای سلول‌های ویرگولی. */
 test('standalone Apps Script: ستون اختصاصی هر کارشناس QC ساخته، تغییر نام و حذف می‌شود', () => {
   const { context, spreadsheet, clock } = createAppsScriptContext();
-  context.setupStandaloneApp();
+  context.setupStandaloneApp_();
+  const token = useTestAdmin(context);
   const api = (method, url, body, token) => context.crmqcApi(method, url, body, token);
   const tab = () => spreadsheet.getSheetByName('Agents');
   const head = () => tab().data[0].map((cell) => String(cell));
@@ -620,10 +627,7 @@ test('standalone Apps Script: ستون اختصاصی هر کارشناس QC س�
   const other = api('GET', '/api/bootstrap').data.agents[1];
 
   /* ۱) ساخت کاربر QC → ستون اختصاصی همان نام */
-  const madeAdmin = api('POST', '/api/auth/setup', { name: 'مدیر سیستم', password: 'admin-1234' });
-  assert.equal(madeAdmin.status, 200, JSON.stringify(madeAdmin.data));
-  const token = madeAdmin.data.token;
-  const created = api('POST', '/api/qc-users', { name: 'مبینا', role: 'qc', active: true, password: 'qc-1234' }, token);
+  const created = api('POST', '/api/qc-users', { name: 'مبینا', role: 'qc', active: true, password: 'qc-1234-longer' }, token);
   assert.equal(created.status, 200, JSON.stringify(created.data));
   assert.ok(column('مبینا') > 0, 'ستون «QC: مبینا» ساخته شد: ' + head().join('، '));
   const nameCol = head().indexOf('name');
@@ -633,12 +637,12 @@ test('standalone Apps Script: ستون اختصاصی هر کارشناس QC س�
   /* ۲) تیک زدن روی شیت (دستی) → در اپ همان کارشناس QC دیده می‌شود */
   rowOf(target.name)[column('مبینا')] = '✓';
   clock.advance(31000);
-  context.crmqcOnSheetChange();
+  context.crmqcOnSheetChange_();
   const seen = api('GET', '/api/agents', null, token).data.find((a) => a.name === target.name);
   assert.deepEqual([...seen.qcAgents], ['مبینا'], 'تیک ستون روی شیت به فهرست QC تبدیل شد');
 
   /* ۳) افزودن کارشناس QC دوم → ستون دوم بدون از دست رفتن تیک‌ها */
-  const second = api('POST', '/api/qc-users', { name: 'هادی', role: 'qc', active: true, password: 'qc-5678' }, token);
+  const second = api('POST', '/api/qc-users', { name: 'هادی', role: 'qc', active: true, password: 'qc-5678-longer' }, token);
   assert.equal(second.status, 200, JSON.stringify(second.data));
   assert.ok(column('هادی') > 0, 'ستون دوم ساخته شد');
   assert.equal(rowOf(target.name)[column('مبینا')], '✓', 'تیک قبلی حفظ شد');
@@ -664,7 +668,7 @@ test('standalone Apps Script: ستون اختصاصی هر کارشناس QC س�
   manual.data[0].push('QC: سارا');
   manual.data[1].push('✓');
   clock.advance(31000);
-  context.crmqcOnSheetChange();
+  context.crmqcOnSheetChange_();
   api('PUT', '/api/agents/' + other.id, { subgroup: 'واحد ویژه' }, token);
   assert.ok(head().indexOf('QC: سارا') > 0, 'ستون دست‌نوشته حفظ شد');
   const manualRow = rowOf(String(manual.data[1][manual.data[0].indexOf('name')]));
@@ -684,4 +688,143 @@ test('standalone Apps Script: ستون اختصاصی هر کارشناس QC س�
   assert.equal(dropped.status, 200, JSON.stringify(dropped.data));
   assert.equal(column('هادی رضایی'), -1, 'با حذف کارشناس QC، ستونش برداشته می‌شود');
   assert.ok(column('مبینا') > 0, 'بقیه‌ی ستون‌ها دست‌نخورده‌اند');
+});
+
+test('anonymous web app fails closed and does not expose sheet or legacy report settings', () => {
+  const { context } = createAppsScriptContext();
+  context.setupStandaloneApp_();
+  const api = (method, path, body, token) => context.crmqcApi(method, path, body || {}, token);
+  assert.equal(api('GET', '/api/agents').status, 401);
+  assert.equal(api('GET', '/api/tickets').status, 401);
+  assert.equal(api('GET', '/api/session-snapshot').status, 403);
+  assert.equal(api('POST', '/api/auth/setup', { name: 'attacker', password: 'attacker-long-password' }).status, 403);
+  assert.equal(api('POST', '/api/auth/setup/extra', { name: 'attacker', password: 'attacker-long-password' }).status, 404);
+  assert.equal(api('POST', '/api/auth/login/extra', { name: 'attacker', password: 'attacker-long-password' }).status, 404);
+  assert.deepEqual([...api('GET', '/api/bootstrap').data.agents], []);
+  assert.equal(api('GET', '/api/bootstrap').data.counts.tickets, 0);
+  assert.deepEqual(Object.keys(api('GET', '/api/bootstrap').data.lists), []);
+  assert.throws(() => context.getCallReportHtml(''));
+  assert.throws(() => context.getCallReportSettings(''));
+  assert.throws(() => context.saveCallReportSetting('bimeh_bazar_experts_v2', '[]', ''));
+  assert.ok(context.doGet({ parameter: { page: 'call-report' } }).content.includes('data-file="Index"'));
+  assert.throws(() => context.createFirstAdmin_('مدیر', 'short'));
+  context.createFirstAdmin_('مدیر', 'strong-password-123');
+  assert.throws(() => context.createFirstAdmin_('attacker', 'another-strong-password'));
+  const login = api('POST', '/api/auth/login', { name: 'مدیر', password: 'strong-password-123' });
+  assert.equal(login.status, 200);
+  const admin = login.data.token;
+  assert.ok(context.getCallReportHtml(admin).includes('data-file="CallReport"'));
+  assert.equal(context.saveCallReportSetting('bimeh_bazar_experts_v2', '[]', admin).ok, true);
+  assert.equal(api('GET', '/api/session-snapshot', {}, admin).status, 403);
+  assert.equal(api('PUT', '/api/settings', { authMode: 'off' }, admin).status, 403);
+  assert.equal(api('POST', '/api/qc-users', { name: 'short', role: 'qc', password: 'short' }, admin).status, 400);
+  const qc = api('POST', '/api/qc-users', { name: 'QC', role: 'qc', exts: '*', password: 'strong-qc-password' }, admin);
+  assert.equal(qc.status, 200, JSON.stringify(qc.data));
+  const qcLogin = api('POST', '/api/auth/login', { name: 'QC', password: 'strong-qc-password' });
+  const qcToken = qcLogin.data.token;
+  assert.equal(qcLogin.data.user.role, 'qc');
+  for (const path of ['/api/qc-users', '/api/settings', '/api/backup', '/api/criteria'])
+    assert.equal(api('GET', path, {}, qcToken).status, 403, path);
+  assert.equal(api('PUT', '/api/settings', { orgName: 'intrusion' }, qcToken).status, 403);
+  assert.throws(() => context.getCallReportHtml(qcToken));
+  assert.throws(() => context.saveCallReportSetting('bimeh_bazar_experts_v2', '[]', qcToken));
+  const id = qc.data.user.id;
+  assert.equal(api('PUT', '/api/qc-users/' + id, { id, name: 'QC', role: 'qc', exts: '*', password: 'new-qc-password-456' }, admin).status, 200);
+  assert.equal(api('GET', '/api/tickets', {}, qcToken).status, 401, 'old token must expire when password changes');
+  assert.equal(api('POST', '/api/auth/login', { name: 'QC', password: 'new-qc-password-456' }).status, 200);
+});
+
+test('anonymous login is throttled and error messages do not enumerate users', () => {
+  const { context } = createAppsScriptContext();
+  context.setupStandaloneApp_();
+  context.createFirstAdmin_('مدیر', 'strong-password-123');
+  const login = (name, password) => context.crmqcApi('POST', '/api/auth/login', { name, password });
+  assert.equal(login('missing', 'bad').data.error, login('مدیر', 'bad').data.error);
+  for (let i = 0; i < 4; i++) assert.equal(login('مدیر', 'bad').status, 401);
+  assert.equal(login('مدیر', 'strong-password-123').status, 429);
+});
+
+test('generated server has no public administrative RPC functions', () => {
+  const { context } = createAppsScriptContext();
+  const exposed = Object.keys(context).filter(name => typeof context[name] === 'function' && !name.endsWith('_'));
+  assert.deepEqual(exposed.sort(), ['URLSearchParams', 'crmqcApi', 'doGet', 'getCallReportHtml', 'getCallReportSettings', 'onOpen', 'saveCallReportSetting', 'setupStandaloneApp', 'createFirstAdminFromSheet', 'resetAdminFromSheet', 'refreshFromSheet', 'rebuildMonthlySummary', 'clearSessions', 'crmqcOnSheetChange'].sort());
+});
+
+
+test('owner-only menu functions fail in a web-app context', () => {
+  const { context, properties } = createAppsScriptContext();
+  context.setupStandaloneApp();
+  const epoch = properties.get('QC_GAS_TOKEN_EPOCH');
+  context.SpreadsheetApp.getActiveSpreadsheet = () => null;
+  for (const name of ['setupStandaloneApp', 'createFirstAdminFromSheet', 'resetAdminFromSheet', 'refreshFromSheet', 'rebuildMonthlySummary', 'clearSessions', 'crmqcOnSheetChange'])
+    assert.throws(() => context[name](), undefined, name);
+  assert.equal(properties.get('QC_GAS_TOKEN_EPOCH'), epoch);
+});
+
+test('owner can upgrade an old short admin password without exposing setup to the web', () => {
+  const { context, spreadsheet } = createAppsScriptContext();
+  context.setupStandaloneApp_();
+  context.createFirstAdmin_('مدیر', 'strong-password-123');
+  const before = context.crmqcApi('POST', '/api/auth/login', { name: 'مدیر', password: 'strong-password-123' });
+  assert.equal(before.status, 200);
+  context.resetAdmin_('مدیر', 'new-strong-password-456');
+  assert.equal(context.crmqcApi('GET', '/api/tickets', {}, before.data.token).status, 401);
+  assert.equal(context.crmqcApi('POST', '/api/auth/login', { name: 'مدیر', password: 'new-strong-password-456' }).status, 200);
+  assert.throws(() => context.resetAdmin_('مدیر', 'short'));
+  const users = spreadsheet.getSheetByName('QC_Users');
+  assert.ok(users.data[1].some(value => String(value).startsWith('sha256$')));
+  users.data[1][users.data[0].indexOf('password')] = context.QCAccess.hashPassword('short');
+  context.crmqcOnSheetChange_();
+  assert.equal(context.crmqcApi('POST', '/api/auth/login', { name: 'مدیر', password: 'short' }).status, 401, 'legacy short password cannot be used');
+  context.resetAdmin_('مدیر', 'restored-strong-password-123');
+  assert.equal(context.crmqcApi('POST', '/api/auth/login', { name: 'مدیر', password: 'restored-strong-password-123' }).status, 200);
+});
+
+test('default generated pages bundle their scripts and set Apps Script mode before route code', () => {
+  const { JSDOM } = require('jsdom');
+  for (const file of ['Index.html', 'CallReport.html']) {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'apps-script-full', file), 'utf8');
+    const dom = new JSDOM(html);
+    const remote = [...dom.window.document.querySelectorAll('script[src],link[href]')]
+      .map(node => node.getAttribute('src') || node.getAttribute('href'))
+      .filter(url => /^https?:\/\//i.test(url));
+    assert.deepEqual(remote, [], file + ' must not load external executable code or styles');
+    assert.ok(!html.includes('__CF$cv$params'), file + ' must not contain legacy challenge scripts');
+    dom.window.close();
+    if (file === 'Index.html') {
+      assert.ok(html.indexOf('window.APP_SCRIPT_MODE = true') < html.indexOf('/* pages/callReport.js */'));
+    }
+  }
+});
+
+test('generated anonymous web app starts in locked Apps Script mode without a Google user', async () => {
+  const { JSDOM, VirtualConsole } = require('jsdom');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'apps-script-full', 'Index.html'), 'utf8')
+    .split('__QC_APP_SCRIPT_URL__').join('https://script.google.com/macros/s/demo/exec');
+  const seen = [];
+  const dom = new JSDOM(html, {
+    url: 'https://example.test/', runScripts: 'dangerously', pretendToBeVisual: true,
+    virtualConsole: new VirtualConsole(),
+    beforeParse(w) {
+      w.scrollTo = () => {};
+      const runner = {
+        withSuccessHandler(fn) { this.ok = fn; return this; },
+        withFailureHandler(fn) { this.fail = fn; return this; },
+        crmqcApi(method, url) {
+          seen.push([method, url]);
+          const ok = this.ok;
+          setTimeout(() => ok({ status: 200, data: { required: true, accounts: [], firstRun: false, orgName: '' } }), 0);
+        }
+      };
+      w.google = { script: { run: runner } };
+    }
+  });
+  try {
+    await new Promise(resolve => setTimeout(resolve, 150));
+    assert.equal(dom.window.APP_SCRIPT_MODE, true);
+    assert.equal(dom.window.QCAuth.required, true);
+    assert.equal(dom.window.document.querySelector('#authGate').hidden, false);
+    assert.ok(seen.some(call => call[1] === '/api/auth/accounts'));
+    assert.ok(!seen.some(call => call[1] === '/api/bootstrap'));
+  } finally { dom.window.close(); }
 });

@@ -81,6 +81,7 @@ function draw(root) {
           ${[['auto', 'خودکار', 'به محض تعریف اولین کاربر فعال، ورود با رمز اجباری می‌شود'],
              ['on', 'همیشه روشن', 'حتی اگر کاربری تعریف نشده باشد (احتیاط: ممکن است کسی نتواند وارد شود)'],
              ['off', 'خاموش', 'ورود بدون رمز؛ دسترسی‌ها اعمال نمی‌شوند']]
+            .filter(([value]) => !window.APP_SCRIPT_MODE || value === 'on')
             .map(([value, label, hint]) => `
             <label class="qc-mode-option${state.mode === value ? ' sel' : ''}">
               <input type="radio" name="authMode" value="${value}" ${state.mode === value ? 'checked' : ''}>
@@ -88,7 +89,7 @@ function draw(root) {
             </label>`).join('')}
         </div>
         <div class="note"><i class="fa-solid fa-circle-info"></i>
-          رمزها به‌صورت اثر انگشت (hash) ذخیره می‌شوند. اگر رمزی را مستقیم روی تب <code>QC_Users</code> به‌صورت متن ساده بنویسید هم پذیرفته می‌شود تا مدیریت از داخل شیت ممکن بماند.</div>
+          رمزها به‌صورت اثر انگشت (hash) ذخیره می‌شوند. ${window.APP_SCRIPT_MODE ? 'در این نسخه ورود اجباری و رمز حداقل ۱۲ نویسه است؛ رمز را مستقیم روی شیت ننویسید.' : 'مدیر رمز و سطح دسترسی هر کاربر را تنظیم می‌کند.'}</div>
       </div>
     </div>
 
@@ -175,7 +176,7 @@ function exportUsers() {
 function passwordDialog(user) {
   const m = modal(`${modalHead('تغییر رمز — ' + user.name, 'fa-key')}
     <div class="modal-body">
-      <div class="field"><label>رمز جدید (حداقل ۴ نویسه)</label>
+      <div class="field"><label>رمز جدید (حداقل ${window.APP_SCRIPT_MODE ? '۱۲' : '۴'} نویسه)</label>
         <div class="auth-pass"><input class="input" id="npPass" type="password" autocomplete="new-password">
           <button type="button" class="btn ghost sm" id="npShow"><i class="fa-regular fa-eye"></i></button></div>
         <div class="note" style="margin-top:8px"><i class="fa-solid fa-shield-halved"></i> رمز به‌صورت hash ذخیره می‌شود و در شیت قابل خواندن نیست.</div>
@@ -189,7 +190,7 @@ function passwordDialog(user) {
   });
   $('#npSave', m).addEventListener('click', async () => {
     const pass = $('#npPass', m).value;
-    if (pass.length < 4) { toast.error('رمز باید حداقل ۴ نویسه باشد'); return; }
+    if (pass.length < (window.APP_SCRIPT_MODE ? 12 : 4)) { toast.error(window.APP_SCRIPT_MODE ? 'رمز باید حداقل ۱۲ نویسه باشد' : 'رمز باید حداقل ۴ نویسه باشد'); return; }
     try {
       await api.put('/api/qc-users', { id: user.id, name: user.name, role: user.role, active: user.active,
         exts: (user.exts || []).join(','), agents: (user.agents || []).join(','), teams: (user.teams || []).join(','),
@@ -564,7 +565,7 @@ function editor(user) {
     const pass = $('#quPass', m).value;
     if (!name) { toast.error('نام کارشناس QC الزامی است'); return; }
     if (!editing && !pass) { toast.error('رمز اولیه الزامی است'); return; }
-    if (pass && pass.length < 4) { toast.error('رمز باید حداقل ۴ نویسه باشد'); return; }
+    if (pass && pass.length < (window.APP_SCRIPT_MODE ? 12 : 4)) { toast.error(window.APP_SCRIPT_MODE ? 'رمز باید حداقل ۱۲ نویسه باشد' : 'رمز باید حداقل ۴ نویسه باشد'); return; }
     const sel = collect();
     const role = roleSel.value;
     const off = role === 'admin' || unlimitedBox.checked;

@@ -143,7 +143,7 @@ const api = {
         return data;
       } catch (e) {
         /* خطاهای واقعی (۴xx/۵xx) سرور جزو فallback نیستند؛ فقط شبکه‌ی قطع */
-        if (!(e instanceof TypeError) || !window.LocalApi) throw e;
+        if (!(e instanceof TypeError) || !window.LocalApi || window.APP_SCRIPT_MODE) throw e;
         api.offline = true; api._lastProbe = Date.now(); api._showOfflineTag();
         toast.error('اتصال به سرور قطع شد — حالت آفلاین فعال است (داده در مرورگر ذخیره می‌شود)');
       }

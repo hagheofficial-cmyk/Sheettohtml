@@ -19,9 +19,12 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (m) => ({ '&':
 
 const TOKEN_KEY = 'crmqc.auth.v1';
 
-function safeGet(key) { try { return window.localStorage.getItem(key); } catch (e) { return null; } }
-function safeSet(key, value) { try { window.localStorage.setItem(key, value); } catch (e) { /* سندباکس بدون storage */ } }
-function safeRemove(key) { try { window.localStorage.removeItem(key); } catch (e) {} }
+// Apps Script sessions end with the browser tab; do not persist bearer tokens in localStorage.
+function tokenStorage() { return window.APP_SCRIPT_MODE ? window.sessionStorage : window.localStorage; }
+function safeGet(key) { try { return tokenStorage().getItem(key); } catch (e) { return null; } }
+function safeSet(key, value) { try { tokenStorage().setItem(key, value); } catch (e) { /* سندباکس بدون storage */ } }
+function safeRemove(key) { try { tokenStorage().removeItem(key); } catch (e) {} }
+if (window.APP_SCRIPT_MODE) { try { window.localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
 
 const QCAuth = {
   user: null,
@@ -44,6 +47,7 @@ const QCAuth = {
     safeSet(TOKEN_KEY, JSON.stringify({ token: this.token, user: this.user, at: Date.now() }));
   },
   restore() {
+    if (window.APP_SCRIPT_MODE) { try { window.localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
     const raw = safeGet(TOKEN_KEY);
     if (!raw) return null;
     try {
@@ -55,7 +59,7 @@ const QCAuth = {
   },
   clear() {
     if (window.UI && window.UI.api.clearCache) window.UI.api.clearCache(true);
-    this.user = null; this.token = ''; safeRemove(TOKEN_KEY);
+    this.user = null; this.token = ''; this._bootstrap = null; safeRemove(TOKEN_KEY);
   },
 
   /* صفحه‌هایی که این کاربر اجازه‌ی دیدنشان را دارد */
@@ -102,7 +106,7 @@ const QCAuth = {
     }
     let info = null;
     try { info = await api.get('/api/auth/accounts'); }
-    catch (e) { info = { required: false, accounts: [], firstRun: false, orgName: '' }; }
+    catch (e) { info = { required: !!window.APP_SCRIPT_MODE, accounts: [], firstRun: false, orgName: '' }; }
     this.required = !!info.required;
     this.firstRun = !!info.firstRun;
     this.accounts = info.accounts || [];
@@ -181,7 +185,7 @@ const QCAuth = {
             ${this.firstRun ? 'ساخت حساب مدیر و ورود' : 'ورود'}</button>
         </form>
         <div class="auth-note"><i class="fa-solid fa-circle-info"></i>
-          رمزها و دسترسی‌ها در تب <code>QC_Users</code> گوگل‌شیت نگهداری می‌شوند و مدیر می‌تواند آن‌ها را از صفحه‌ی «مدیریت QC» یا مستقیم روی شیت تغییر دهد.</div>
+          ${window.APP_SCRIPT_MODE ? 'مدیر حساب شما را ایجاد می‌کند. اگر هنوز مدیری وجود ندارد، مالک شیت از منوی «سامانه QC مستقل» اولین مدیر را بسازد.' : 'رمزها و دسترسی‌ها از صفحهٔ مدیریت QC تنظیم می‌شوند.'}</div>
       </div>`;
     const nameEl = $('#authName', gate), passEl = $('#authPass', gate);
     $('#authShow', gate).addEventListener('click', () => {

@@ -406,7 +406,7 @@ function scopeDb(db, user) {
 function writeGuard(db, user, method, pathname, body) {
   if (!authRequired(db)) return { ok: true };
   if (!user) return { ok: false, status: 401, error: 'برای این کار باید وارد سامانه شوید' };
-  if (user.role === 'admin' || user.unrestricted) return { ok: true };
+  if (user.role === 'admin') return { ok: true };
   const path = String(pathname || '');
   if (method === 'GET') return { ok: true };
   if (ADMIN_API.some((p) => path === p || path.indexOf(p + '/') === 0)) {
@@ -434,7 +434,7 @@ function writeGuard(db, user, method, pathname, body) {
 }
 
 /* ------------------------------------------------------------ دسترسی UI */
-function isAdmin(user) { return !!user && (user.role === 'admin' || !!user.unrestricted); }
+function isAdmin(user) { return !!user && user.role === 'admin'; }
 
 function canAccessRoute(user, route, authOn) {
   if (!authOn) return true; // وقتی هیچ کاربری تعریف نشده، همه‌چیز باز است

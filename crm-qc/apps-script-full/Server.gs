@@ -86,7 +86,7 @@ var QC_GAS_CACHE_MAX_CHARS = 4000000;
 var QC_GAS_TAB_MAX_CHARS = 6000000;
 var QC_GAS_CACHE_BATCH = 48;
 /* تب خلاصهٔ ماهانه در نوشتن‌های پی‌درپی حداکثر هر چند دقیقه یک‌بار بازسازی می‌شود
- * (دستور منوی rebuildMonthlySummary همیشه فوری بازسازی می‌کند). */
+ * (دستور منوی rebuildMonthlySummary_ همیشه فوری بازسازی می‌کند). */
 var QC_GAS_SUMMARY_EVERY_MS = 5 * 60 * 1000;
 var QC_GAS_SUMMARY_AT_KEY = 'QC_GAS_SUMMARY_AT';
 var QC_GAS_TAB_REV_KEY = 'QC_GAS_TAB_REV';
@@ -98,7 +98,7 @@ var QC_GAS_SMALL_TABS = ['meta', 'settings', 'lists', 'criteria', 'callMeta', 'a
   'actionTypes', 'fiscalMonths', 'qcUsers', 'elements'];
 var QC_GAS_CHANGE_HANDLER = 'crmqcOnSheetChange';
 /* کش نتیجه‌ی تحلیل‌ها: کلید = نسخه‌ی داده + کاربر + مسیر؛ با هر نوشتن باطل می‌شود. */
-var QC_GAS_ANALYSIS_PREFIX = 'qcan@';
+var QC_GAS_ANALYSIS_PREFIX = 'qcan-sec2@';
 var QC_GAS_ANALYSIS_TTL_SEC = 21600;
 var QC_GAS_ANALYSIS_MAX_CHARS = 900000;
 var QC_GAS_TOKEN_PREFIX = 'qctok@';
@@ -114,6 +114,8 @@ function onOpen() {
     SpreadsheetApp.getUi()
       .createMenu('سامانه QC مستقل')
       .addItem('راه‌اندازی / بررسی تب‌های سامانه', 'setupStandaloneApp')
+      .addItem('ساخت اولین مدیر امن', 'createFirstAdminFromSheet')
+      .addItem('تغییر رمز مدیر از شیت', 'resetAdminFromSheet')
       .addSeparator()
       .addItem('خواندن تازه از شیت (پاک‌کردن کش)', 'refreshFromSheet')
       .addItem('بازسازی تب خلاصه ماهانه', 'rebuildMonthlySummary')
@@ -125,12 +127,30 @@ function onOpen() {
   }
 }
 
+/* These public menu/editor callbacks are not web entry points. Google does not
+ * provide an active container/UI in a web-app execution. Verify it before any
+ * privileged work and never accept an ID or command supplied by the caller. */
+function requireSheetContext_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error('این فرمان فقط از داخل شیت قابل اجرا است.');
+  var id = PropertiesService.getScriptProperties().getProperty(QC_GAS_ID_KEY);
+  if (id && ss.getId() !== id) throw new Error('شیت فعال معتبر نیست.');
+  return ss;
+}
+function setupStandaloneApp() { requireSheetContext_(); return setupStandaloneApp_(); }
+function createFirstAdminFromSheet() { requireSheetContext_(); return createFirstAdminFromSheet_(); }
+function resetAdminFromSheet() { requireSheetContext_(); return resetAdminFromSheet_(); }
+function refreshFromSheet() { requireSheetContext_(); return refreshFromSheet_(); }
+function rebuildMonthlySummary() { requireSheetContext_(); return rebuildMonthlySummary_(); }
+function clearSessions() { requireSheetContext_(); return clearSessions_(); }
+function crmqcOnSheetChange() { requireSheetContext_(); return crmqcOnSheetChange_(); }
+
 /**
  * Run once from the bound spreadsheet's Apps Script editor.
  * Creates separate database tabs, seeds only a genuinely empty workbook and
  * installs the onChange trigger that keeps cached reads honest.
  */
-function setupStandaloneApp() {
+function setupStandaloneApp_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) throw new Error('این اسکریپت را از داخل Google Sheet مقصد اجرا کنید.');
 
@@ -180,7 +200,7 @@ function setupStandaloneApp() {
 }
 
 /** Menu item: drop the cached snapshot so the next read comes straight from the tabs. */
-function refreshFromSheet() {
+function refreshFromSheet_() {
   var ss = getDatabaseSpreadsheet_();
   invalidateTabCache_(); // کش هر ۱۶ تب دور ریخته می‌شود؛ خواندن بعدی از خود شیت است
   var db = normalizeDatabase_(readDatabase_(ss));
@@ -194,10 +214,8 @@ function refreshFromSheet() {
  * made by crmqcApi mark themselves and are skipped: they publish their own
  * revision together with the fresh snapshot.
  */
-function crmqcOnSheetChange() {
+function crmqcOnSheetChange_() {
   try {
-    var cache = CacheService.getScriptCache();
-    if (cache.get(QC_GAS_SELF_WRITE_KEY)) return;
     /* ویرایش مستقیم روی شیت (بیرون از اپ): کش هر تب باید دور ریخته شود */
     invalidateTabCache_();
     bumpRevision_();
@@ -212,7 +230,7 @@ function doGet(e) {
   if (!id) {
     return HtmlService.createHtmlOutput(
       '<meta charset="utf-8"><div dir="rtl" style="font:16px sans-serif;padding:32px">' +
-      '<h2>سامانه هنوز راه‌اندازی نشده است</h2><p>در Apps Script تابع <code>setupStandaloneApp</code> را از شیت مقصد اجرا و سپس Deploy کنید.</p></div>'
+      '<h2>سامانه هنوز راه‌اندازی نشده است</h2><p>در Apps Script تابع <code>setupStandaloneApp_</code> را از شیت مقصد اجرا و سپس Deploy کنید.</p></div>'
     ).setTitle('راه‌اندازی سامانه QC');
   }
 
@@ -220,14 +238,11 @@ function doGet(e) {
   // vendor libraries intact: `<?` inside their source would otherwise be
   // parsed as an Apps Script scriptlet.
   var page = e && e.parameter && e.parameter.page;
-  if (page === 'call-report') {
-    return withFavicon_(HtmlService.createHtmlOutput(callReportHtml_())
-      .setTitle('گزارش تماس روزانه')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1'));
-  }
+  // Never deliver report settings on an unauthenticated URL.
+
 
   var indexHtml = HtmlService.createHtmlOutputFromFile('Index').getContent()
-    .replace('__QC_APP_SCRIPT_URL__', ScriptApp.getService().getUrl());
+    .split('__QC_APP_SCRIPT_URL__').join(ScriptApp.getService().getUrl());
   return withFavicon_(HtmlService.createHtmlOutput(indexHtml)
     .setTitle('سامانه یکپارچه کنترل کیفیت CRM')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1'));
@@ -250,7 +265,8 @@ function callReportHtml_() {
 }
 
 /** فراخوانی از خود سامانه (google.script.run) */
-function getCallReportHtml() {
+function getCallReportHtml(token) {
+  requireReportAdmin_(token);
   return callReportHtml_();
 }
 
@@ -260,12 +276,13 @@ function faviconUrl_() {
     var custom = PropertiesService.getScriptProperties().getProperty(QC_GAS_FAVICON_KEY);
     if (custom) return custom;
   } catch (err) {}
-  return QC_GAS_FAVICON_FALLBACK;
+  return '';
 }
 
 function withFavicon_(output) {
   try {
-    if (output && typeof output.setFaviconUrl === 'function') output.setFaviconUrl(faviconUrl_());
+    var icon = faviconUrl_();
+    if (icon && output && typeof output.setFaviconUrl === 'function') output.setFaviconUrl(icon);
   } catch (err) {}
   return output;
 }
@@ -285,6 +302,22 @@ function crmqcApi(method, requestUrl, body, token) {
   var pathOnly = requestUrl.split('?')[0];
   var isRead = method === 'GET';
   var authPath = pathOnly.indexOf('/api/auth/') === 0;
+  // Anonymous deployments always fail closed, even if the sheet says authMode=off.
+  // The first admin must be created from the spreadsheet, never over the web.
+  if (pathOnly === '/api/auth/setup' || pathOnly === '/api/session-snapshot' ||
+      pathOnly.indexOf('/api/session-snapshot/') === 0) {
+    return { status: 403, data: { error: 'این مسیر از وب در دسترس نیست.' } };
+  }
+  if (authPath && ['/api/auth/accounts', '/api/auth/login', '/api/auth/logout', '/api/auth/me'].indexOf(pathOnly) < 0) {
+    return { status: 404, data: { error: 'مسیر نامعتبر است.' } };
+  }
+  if ((pathOnly === '/api/settings' || pathOnly.indexOf('/api/settings/') === 0) && method !== 'GET' && body.authMode && body.authMode !== 'on') {
+    return { status: 403, data: { error: 'ورود اجباری است و نمی‌توان آن را خاموش کرد.' } };
+  }
+  if (pathOnly.indexOf('/api/qc-users') === 0 && method !== 'GET' && body.password && String(body.password).trim().length < 12) {
+    return { status: 400, data: { error: 'رمز جدید باید حداقل ۱۲ نویسه باشد.' } };
+  }
+
 
   /* سریع‌ترین پاسخ ممکن: فقط شماره‌ی نسخه‌ی داده تا کاربران همزمان بفهمند
    * چیز جدیدی روی شیت آمده است (بند ۱۰). هیچ خواندنی از تب‌ها انجام نمی‌شود. */
@@ -313,13 +346,17 @@ function crmqcApi(method, requestUrl, body, token) {
        * خودش را بارگذاری می‌کند، پس ثبت یک ریت دیگر کل شیت را نمی‌خواند. */
       var wanted = attempt > 0 ? null : wantedTabsFor_(method, pathOnly, body);
       var before = normalizeDatabase_(readDatabase_(ss, wanted, readInfo));
+      before.settings.authMode = 'on';
 
       /* نشست: توکن از کش، نقش و دسترسی‌ها همیشه از داده‌ی تازه‌ی شیت */
       var session = refreshSession_(resolveSession_(token), before);
+      if (!session && !authPath && pathOnly !== '/api/bootstrap') {
+        return { status: 401, data: { error: 'برای این کار باید وارد سامانه شوید.' } };
+      }
 
       /* کش نتیجه‌ی تحلیل‌ها (بند ۸): کلید = نسخه‌ی داده + کاربر + درخواست.
        * با هر نوشتن نسخه عوض می‌شود، پس پاسخ کهنه هرگز خوانده نمی‌شود. */
-      var analysisKey = isRead && !authPath && cacheableRead_(pathOnly)
+      var analysisKey = isRead && !!session && !authPath && cacheableRead_(pathOnly)
         ? analysisCacheKey_(revision, requestUrl, session) : null;
       if (analysisKey) {
         var cached = readAnalysisCache_(analysisKey);
@@ -334,7 +371,21 @@ function crmqcApi(method, requestUrl, body, token) {
       window.LocalApi.setSession(session);
       window.__GAS_DB_DIRTY__ = false;
 
-      var result = window.LocalApi.run(method, requestUrl, body);
+      var result;
+      if (pathOnly === '/api/auth/login' && method === 'POST') {
+        checkLoginLimit_(body.name);
+        try {
+          if (String(body.password || '').trim().length < 12) throw securityError_('رمز کوتاه است.', 401);
+          result = window.LocalApi.run(method, requestUrl, body);
+        }
+        catch (loginError) { recordLoginFailure_(body.name); throw securityError_('نام کاربری یا رمز نادرست است.', 401); }
+        clearLoginFailures_(body.name);
+      } else {
+        result = window.LocalApi.run(method, requestUrl, body);
+      }
+      if (pathOnly === '/api/auth/accounts' && result) { result.accounts = []; result.firstRun = false; }
+      if (pathOnly === '/api/auth/me' && result) result.accounts = [];
+      if (pathOnly === '/api/bootstrap' && result && result.auth && !session) { result.auth.accounts = []; result.lists = {}; }
 
       if (isRead) {
         // Reads must not persist: a GET only re-derives in-memory defaults, and
@@ -347,7 +398,7 @@ function crmqcApi(method, requestUrl, body, token) {
           if (!fullCounts) {
             /* شمارش کل شیت فقط برای کاربر نامحدود؛ برای کارشناس محدود، کلاینت
              * خودش شمارش داده‌ی مجاز را از /api/data/status می‌گیرد. */
-            var unrestricted = !session || session.role === 'admin' || session.unrestricted;
+            var unrestricted = !!session && (session.role === 'admin' || session.unrestricted);
             payload.counts = unrestricted
               ? Object.assign({}, payload.counts, fastCounts_(ss), { partial: false })
               : Object.assign({}, payload.counts, { partial: true });
@@ -359,8 +410,8 @@ function crmqcApi(method, requestUrl, body, token) {
 
       if (authPath && pathOnly === '/api/auth/logout') dropToken_(token);
       if (authPath && result && result.user && (pathOnly === '/api/auth/login' || pathOnly === '/api/auth/setup')) {
-        result.token = issueToken_(result.user);
         session = refreshSession_(result.user, before);
+        result.token = issueToken_(session);
         /* داده‌ی اولیه همراه پاسخ ورود: کلاینت بلافاصله بعد از رمز، یک درخواست
          * کامل دیگر نمی‌گیرد (صفحه‌ی ورود سریع باز می‌شود). */
         result.bootstrap = bootstrapFor_(session, ss);
@@ -413,7 +464,7 @@ function bootstrapFor_(session, ss) {
     window.LocalApi.setSession(session);
     var payload = jsonSafe_(window.LocalApi.run('GET', '/api/bootstrap'));
     if (payload && payload.counts) {
-      var unrestricted = !session || session.role === 'admin' || session.unrestricted;
+      var unrestricted = !!session && (session.role === 'admin' || session.unrestricted);
       payload.counts = unrestricted
         ? Object.assign({}, payload.counts, fastCounts_(ss), { partial: false })
         : Object.assign({}, payload.counts, { partial: true });
@@ -453,8 +504,8 @@ function resolveSession_(token) {
     if (Number(hit.exp || 0) < Date.now()) return null;
     /* انقضای لغزان: تا وقتی کاربر کار می‌کند نشست بسته نمی‌شود */
     CacheService.getScriptCache().put(cacheKey,
-      JSON.stringify({ name: hit.name, exp: Date.now() + QC_GAS_TOKEN_TTL_SEC * 1000 }), QC_GAS_TOKEN_TTL_SEC);
-    return { name: hit.name };
+      JSON.stringify({ name: hit.name, credential: hit.credential, exp: Date.now() + QC_GAS_TOKEN_TTL_SEC * 1000 }), QC_GAS_TOKEN_TTL_SEC);
+    return { name: hit.name, credential: hit.credential || '' };
   } catch (err) {
     return null;
   }
@@ -464,14 +515,16 @@ function refreshSession_(session, db) {
   if (!session || !session.name) return null;
   var fresh = window.QCAccess.findUser(window.QCAccess.normalizeUsers(db), session.name);
   if (!fresh || !fresh.active) return null;
+  if (session.credential !== undefined && (!session.credential || session.credential !== credentialFingerprint_(fresh))) return null;
   return fresh;
 }
 
 function issueToken_(user) {
-  var token = window.QCAccess.randomToken(24);
+  if (!user || !user.password) throw new Error('کاربر معتبر نیست.');
+  var token = String(Utilities.getUuid()).replace(/-/g, '') + String(Utilities.getUuid()).replace(/-/g, '');
   try {
     CacheService.getScriptCache().put(tokenKey_(token),
-      JSON.stringify({ name: user.name, exp: Date.now() + QC_GAS_TOKEN_TTL_SEC * 1000 }), QC_GAS_TOKEN_TTL_SEC);
+      JSON.stringify({ name: user.name, credential: credentialFingerprint_(user), exp: Date.now() + QC_GAS_TOKEN_TTL_SEC * 1000 }), QC_GAS_TOKEN_TTL_SEC);
   } catch (err) {
     throw new Error('ذخیره‌ی نشست ممکن نشد؛ دوباره تلاش کنید');
   }
@@ -485,11 +538,87 @@ function dropToken_(token) {
 }
 
 /** Menu item: با یک پله جلو بردن «دوره‌ی نشست» همه‌ی توکن‌های فعال بی‌اثر می‌شوند. */
-function clearSessions() {
+function clearSessions_() {
   var props = PropertiesService.getScriptProperties();
   var epoch = Number(props.getProperty(QC_GAS_TOKEN_EPOCH_KEY) || 1) + 1;
   props.setProperty(QC_GAS_TOKEN_EPOCH_KEY, String(epoch));
   return { ok: true, epoch: epoch };
+}
+
+function securityError_(message, status) { var e = new Error(message); e.status = status; return e; }
+function digestHex_(value) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(value), Utilities.Charset.UTF_8)
+    .map(function (n) { return ('0' + (n < 0 ? n + 256 : n).toString(16)).slice(-2); }).join('');
+}
+function credentialFingerprint_(user) { return digestHex_(user.password); }
+function loginLimitKey_(name) { return 'qclogin@' + digestHex_(String(name || '').trim().toLowerCase()); }
+function checkLoginLimit_(name) {
+  var raw = CacheService.getScriptCache().get(loginLimitKey_(name));
+  if (Number(raw || 0) >= 5) throw securityError_('تلاش‌های ناموفق زیاد است؛ ۱۵ دقیقه دیگر دوباره تلاش کنید.', 429);
+}
+function recordLoginFailure_(name) {
+  var cache = CacheService.getScriptCache(), key = loginLimitKey_(name);
+  cache.put(key, String(Number(cache.get(key) || 0) + 1), 900);
+}
+function clearLoginFailures_(name) { CacheService.getScriptCache().remove(loginLimitKey_(name)); }
+function requireReportAdmin_(token) {
+  var ss = getDatabaseSpreadsheet_();
+  var db = normalizeDatabase_(readDatabase_(ss, ['settings', 'qcUsers']));
+  var session = refreshSession_(resolveSession_(token), db);
+  if (!session || session.role !== 'admin') throw securityError_('این گزارش فقط برای مدیر واردشده در دسترس است.', 403);
+  return session;
+}
+
+/* Accessible only from the spreadsheet UI, not google.script.run. */
+function createFirstAdminFromSheet_() {
+  var ui = SpreadsheetApp.getUi();
+  var name = ui.prompt('ساخت اولین مدیر', 'نام مدیر را وارد کنید:', ui.ButtonSet.OK_CANCEL);
+  if (name.getSelectedButton() !== ui.Button.OK) return;
+  var pass = ui.prompt('ساخت اولین مدیر', 'رمز قوی حداقل ۱۲ نویسه وارد کنید (متن در این پنجره نمایان است):', ui.ButtonSet.OK_CANCEL);
+  if (pass.getSelectedButton() !== ui.Button.OK) return;
+  createFirstAdmin_(name.getResponseText(), pass.getResponseText());
+  ui.alert('مدیر ساخته شد. اکنون از لینک Web App وارد شوید.');
+}
+function resetAdminFromSheet_() {
+  var ui = SpreadsheetApp.getUi();
+  var name = ui.prompt('تغییر رمز مدیر', 'نام مدیر موجود را وارد کنید:', ui.ButtonSet.OK_CANCEL);
+  if (name.getSelectedButton() !== ui.Button.OK) return;
+  var pass = ui.prompt('تغییر رمز مدیر', 'رمز قوی جدید حداقل ۱۲ نویسه وارد کنید (متن در این پنجره نمایان است):', ui.ButtonSet.OK_CANCEL);
+  if (pass.getSelectedButton() !== ui.Button.OK) return;
+  resetAdmin_(name.getResponseText(), pass.getResponseText());
+  ui.alert('رمز مدیر تغییر کرد و همهٔ نشست‌ها بسته شدند.');
+}
+function resetAdmin_(name, password) {
+  if (!String(name || '').trim() || String(password || '').trim().length < 12) throw new Error('نام و رمز حداقل ۱۲ نویسه الزامی است.');
+  var lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    var ss = getDatabaseSpreadsheet_(); invalidateTabCache_();
+    var db = normalizeDatabase_(readDatabase_(ss));
+    var user = window.QCAccess.findUser(window.QCAccess.normalizeUsers(db), name);
+    if (!user || user.role !== 'admin') throw new Error('مدیر یافت نشد.');
+    var existing = db.qcUsers.find(function (row) { return String(row.id) === String(user.id); });
+    if (!existing) throw new Error('مدیر یافت نشد.');
+    var previous = JSON.parse(JSON.stringify(db));
+    window.QCAccess.saveUser(db, { name: user.name, password: password, role: 'admin', active: true, note: user.note }, existing);
+    writeDatabaseDiff_(ss, previous, db, false);
+    clearSessions_(); publishRevision_(bumpRevision_(), db);
+    return { ok: true };
+  } finally { lock.releaseLock(); }
+}
+function createFirstAdmin_(name, password) {
+  if (!String(name || '').trim() || String(password || '').trim().length < 12) throw new Error('نام و رمز حداقل ۱۲ نویسه الزامی است.');
+  var lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    var ss = getDatabaseSpreadsheet_();
+    invalidateTabCache_();
+    var db = normalizeDatabase_(readDatabase_(ss));
+    if (window.QCAccess.normalizeUsers(db).length) throw new Error('کاربر از قبل وجود دارد؛ از مدیریت QC استفاده کنید.');
+    var previous = JSON.parse(JSON.stringify(db));
+    window.QCAccess.saveUser(db, { name: name, password: password, role: 'admin', active: true, exts: '*' });
+    writeDatabaseDiff_(ss, previous, db, false);
+    publishRevision_(bumpRevision_(), db);
+    return { ok: true };
+  } finally { lock.releaseLock(); }
 }
 
 /* ------------------------------------------------- کش نتیجه‌ی تحلیل‌ها */
@@ -507,7 +636,7 @@ function cacheableRead_(path) {
 }
 
 function analysisCacheKey_(revision, requestUrl, session) {
-  var who = session && session.name ? window.QCAccess.normalizeUser({ name: session.name }).key : 'guest';
+  var who = session && session.name ? JSON.stringify(window.QCAccess.publicUser(session)) : 'guest';
   var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, who + '\u0001' + requestUrl, Utilities.Charset.UTF_8);
   var hex = '';
   for (var i = 0; i < digest.length; i++) hex += ('0' + (digest[i] < 0 ? digest[i] + 256 : digest[i]).toString(16)).slice(-2);
@@ -550,7 +679,7 @@ function writeAnalysisCache_(key, payload) {
 }
 
 /** Menu item: بازسازی تب خلاصه‌ی ماهانه از داده‌ی فعلی شیت (بند ۸). */
-function rebuildMonthlySummary() {
+function rebuildMonthlySummary_() {
   var ss = getDatabaseSpreadsheet_();
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -568,12 +697,14 @@ function rebuildMonthlySummary() {
 }
 
 /** Read a saved setting used by the separate daily call report page. */
-function getCallReportSettings() {
+function getCallReportSettings(token) {
+  requireReportAdmin_(token);
   return readCallReportSettings_();
 }
 
 /** Persist the two legacy call-report configuration lists in their own tabs. */
-function saveCallReportSetting(key, jsonValue) {
+function saveCallReportSetting(key, jsonValue, token) {
+  requireReportAdmin_(token);
   var sheetName = QC_GAS_CALL_REPORT_KEYS[String(key || '')];
   if (!sheetName) throw new Error('کلید تنظیمات گزارش تماس مجاز نیست.');
   var lock = LockService.getScriptLock();
@@ -600,7 +731,7 @@ function saveCallReportSetting(key, jsonValue) {
 
 function getDatabaseSpreadsheet_() {
   var id = PropertiesService.getScriptProperties().getProperty(QC_GAS_ID_KEY);
-  if (!id) throw new Error('ابتدا تابع setupStandaloneApp را از شیت مقصد اجرا کنید.');
+  if (!id) throw new Error('ابتدا تابع setupStandaloneApp_ را از شیت مقصد اجرا کنید.');
   return SpreadsheetApp.openById(id);
 }
 
@@ -608,9 +739,10 @@ function installChangeTrigger_(ss) {
   try {
     var triggers = ScriptApp.getProjectTriggers();
     for (var i = 0; i < triggers.length; i++) {
-      if (triggers[i].getHandlerFunction() === QC_GAS_CHANGE_HANDLER) ScriptApp.deleteTrigger(triggers[i]);
+      if ([QC_GAS_CHANGE_HANDLER, 'crmqcOnSheetChange_'].indexOf(triggers[i].getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(triggers[i]);
     }
     ScriptApp.newTrigger(QC_GAS_CHANGE_HANDLER).forSpreadsheet(ss).onChange().create();
+    ScriptApp.newTrigger(QC_GAS_CHANGE_HANDLER).forSpreadsheet(ss).onEdit().create();
   } catch (err) {
     // Without the trigger, cached reads still expire through their TTL.
   }

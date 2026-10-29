@@ -9,13 +9,11 @@ const PUBLIC = path.join(CRM, 'public');
 const SHARED = path.join(CRM, 'shared');
 const MODULES = path.join(CRM, 'node_modules');
 
-/* Two deployment flavours:
- *   cdn     (default) — vendor libraries/fonts stay on jsDelivr, so the HTML files
- *                       are small enough to paste into the Apps Script editor.
- *   --offline          — everything inlined; no external request, but multi-MB files
- *                       that realistically need `clasp push`. */
-const MODE = process.argv.includes('--offline') ? 'offline' : 'cdn';
-const OUT = MODE === 'offline' ? path.join(CRM, 'apps-script-full', 'offline') : path.join(CRM, 'apps-script-full');
+/* The default build embeds vendor code/fonts locally for anonymous deployments.
+ * --offline writes the same build to a separate ignored folder; --cdn is an
+ * explicitly less-isolated legacy option for projects that accept CDN risk. */
+const MODE = process.argv.includes('--cdn') ? 'cdn' : 'offline';
+const OUT = process.argv.includes('--offline') ? path.join(CRM, 'apps-script-full', 'offline') : path.join(CRM, 'apps-script-full');
 const SERVER_SOURCE = path.join(CRM, 'apps-script-full', 'Server.gs');
 
 /* public/vendor/* → npm package + published file. Versions come from the
@@ -105,7 +103,11 @@ function vendorScriptTag(cleanPath) {
   }
   const file = mapping ? path.join(MODULES, ...mapping[0].split('/'), mapping[1]) : path.join(PUBLIC, cleanPath);
   if (!fs.existsSync(file)) throw new Error(`Cannot bundle vendor script ${cleanPath}`);
-  return scriptTag(read(file), cleanPath);
+  let source = read(file);
+  if (cleanPath === 'vendor/jspdf.umd.min.js') {
+    source = source.replace(/\/\*\*\s*\* @license\s*Copyright \(c\) 2008, Adobe Systems Incorporated[\s\S]*?\*\//g, block => block.replace(/[ \t]+$/gm, ''));
+  }
+  return scriptTag(source, cleanPath);
 }
 
 function buildCode() {
@@ -151,6 +153,8 @@ URLSearchParams.prototype.forEach = function (callback, context) {
 function makeIndex() {
   let html = read(path.join(PUBLIC, 'index.html'));
   const vazir = vazirCss();
+  // Route modules and auth must see the hosting mode before they are evaluated.
+  html = html.replace('<head>', '<head><script>window.APP_SCRIPT_MODE = true; window.APP_SCRIPT_URL = \"__QC_APP_SCRIPT_URL__\";</script>');
 
   // The full Sheets app is already connected directly to the workbook, so hide
   // the optional Node-to-Sheets connector from this standalone build.
@@ -249,7 +253,7 @@ function makeCallReport() {
   const logo = dataUri(path.join(PUBLIC, 'icon-192.png'));
 
   // Remove incidental challenge-platform snippets copied into this legacy page.
-  html = html.replace(/<script\b[^>]*>[\s\S]*?__CF\$cv\.params[\s\S]*?<\/script>/gi, '');
+  html = html.replace(/<script\b[^>]*>(?:(?!<\/script>)[\s\S])*?__CF\$cv(?:\.params|\$params)(?:(?!<\/script>)[\s\S])*?<\/script>/gi, '');
   html = html.replace(/<link\b[^>]*href=["'][^"']*(?:favicon|apple-touch-icon)[^"']*["'][^>]*>/gi, '');
   html = html.replace('</head>', `<link rel="icon" type="image/png" href="${logo}">\n</head>`);
   html = html.replace(/src=(["'])logo\.png(?:\?[^"']*)?\1/g, 'data-app-logo src=""');
@@ -317,11 +321,7 @@ window.APP_SCRIPT_MODE = true;
     function persist(key, value) {
       if (!Object.prototype.hasOwnProperty.call(keys, key)) return;
       keys[key] = String(value);
-      if (window.google && google.script && google.script.run) {
-        google.script.run
-          .withFailureHandler(function (error) { console.error('ذخیره تنظیمات گزارش تماس در شیت ناموفق بود', error); })
-          .saveCallReportSetting(key, String(value));
-      }
+      if (window.parent !== window) window.parent.postMessage({ type: 'qc:callreport-save', key: key, value: String(value) }, '*');
     }
     var shim = {
       getItem: function (key) {

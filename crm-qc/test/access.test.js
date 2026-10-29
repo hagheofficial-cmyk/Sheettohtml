@@ -1157,11 +1157,11 @@ for (const build of ['public', 'offline']) {
       assert.ok(frame, 'فریم محلی ساخته می‌شود');
       assert.ok(String(frame.getAttribute('srcdoc')).includes('گزارش تماس'), 'srcdoc از همان HTML ابزار پر می‌شود');
       assert.ok(txt('#content').includes('بازه‌ی فعلی'), 'بازه‌ی فعال سامانه نشان داده می‌شود');
-      assert.ok($('#crNewTab').getAttribute('href').includes('page=call-report'));
+      assert.ok($('#crNewTab').getAttribute('href').includes('#/callreport'));
 
       await w.App.setDateRange({ from: fx.current.from, to: fx.current.to, preset: 'fm:cur' });
       await settle();
-      assert.ok($('#crNewTab').getAttribute('href').includes('qcFrom='), 'بازه‌ی تاریخ هم به ابزار منتقل می‌شود');
+      assert.ok($('#crNewTab').getAttribute('href').includes('#/callreport'), 'تب جدید از دروازهٔ سامانه باز می‌شود');
       assert.equal(doc.querySelectorAll('#content iframe').length, 1, 'فریم تازه‌سازی/تکرار نمی‌شود');
       delete w.APP_SCRIPT_MODE; delete w.APP_SCRIPT_URL; delete w.google;
     });

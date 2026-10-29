@@ -10,9 +10,10 @@
 const { $, esc } = UI;
 
 const STANDALONE = !!(window.APP_SCRIPT_MODE && window.APP_SCRIPT_URL);
-const SRC = STANDALONE ? window.APP_SCRIPT_URL + '?page=call-report' : 'call-admin-report.html';
+const SRC = STANDALONE ? window.APP_SCRIPT_URL + '#/callreport' : 'call-admin-report.html';
 
 function rangeSource() {
+  if (STANDALONE) return SRC; // New tab enters the authenticated SPA, never a public report URL.
   const params = new URLSearchParams();
   if (App.dateRange.from) params.set('qcFrom', App.dateRange.from);
   if (App.dateRange.to) params.set('qcTo', App.dateRange.to);
@@ -61,9 +62,15 @@ function render(root) {
  * ------------------------------------------------------------------------- */
 let reportHtmlCache = null;   // HTML ابزار (یک‌بار در هر بارگذاری صفحه)
 let reportHtmlPending = false;
+let reportCacheToken = null;
 let reportTarget = null;      // آخرین #crWrap زنده؛ رندر مجدد مسیر آن را عوض می‌کند
 
 function renderStandalone(root) {
+  const token = (window.QCAuth && window.QCAuth.token) || '';
+  if (reportCacheToken !== token) { reportHtmlCache = null; reportHtmlPending = false; reportCacheToken = token; }
+  if (!window.QCAuth || !window.QCAuth.user || window.QCAuth.user.role !== 'admin') {
+    root.innerHTML = '<div class="note">گزارش تماس قدیمی فقط برای مدیر در دسترس است.</div>'; return;
+  }
   const params = new URLSearchParams();
   if (App.dateRange.from) params.set('qcFrom', App.dateRange.from);
   if (App.dateRange.to) params.set('qcTo', App.dateRange.to);
@@ -137,7 +144,7 @@ function renderStandalone(root) {
     frame = document.createElement('iframe');
     frame.className = 'cr-embed-frame';
     frame.title = 'گزارش تماس روزانه تیم‌ها';
-    frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-downloads');
+    frame.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-downloads');
     frame.addEventListener('load', () => {
       setState('<i class="fa-solid fa-circle-check"></i> ابزار آماده است', 'ok');
       try {
@@ -175,13 +182,14 @@ function renderStandalone(root) {
     setState('<i class="fa-solid fa-circle-notch spin"></i> در حال آماده‌سازی ابزار…');
     google.script.run
       .withSuccessHandler((html) => {
+        if (reportCacheToken !== token || !window.QCAuth || window.QCAuth.token !== token) return;
         reportHtmlPending = false;
         if (!html) { fallback('نسخه‌ی مستقر، تابع گزارش تماس را ندارد؛ Code.gs جدید را جای‌گذاری کنید'); return; }
         reportHtmlCache = html;
         try { paint(html); } catch (e) { fallback(e.message); }
       })
       .withFailureHandler((error) => { reportHtmlPending = false; fallback(error && error.message); })
-      .getCallReportHtml();
+      .getCallReportHtml(token);
   }
 
   /* ذخیره‌ی تنظیمات ابزار (کارشناسان/دسترسی‌ها) از داخل iframe به شیت */
@@ -189,11 +197,11 @@ function renderStandalone(root) {
     /* صفحه که عوض شود، گوش‌دهنده خودش بازنشسته می‌شود */
     if (!root.isConnected) { window.removeEventListener('message', onMessage); return; }
     const data = event.data || {};
-    if (data.type !== 'qc:callreport-save') return;
+    if (data.type !== 'qc:callreport-save' || !frame || event.source !== frame.contentWindow) return;
     if (!(window.google && google.script && google.script.run)) return;
     google.script.run
       .withFailureHandler(() => UI.toast('ذخیره تنظیمات گزارش تماس در شیت ناموفق بود', 'error'))
-      .saveCallReportSetting(data.key, data.value);
+      .saveCallReportSetting(data.key, data.value, token);
   };
 
   const refresh = () => {
