@@ -198,14 +198,6 @@ document.addEventListener('DOMContentLoaded', function () {
       text: function () { return Promise.resolve(JSON.stringify(payload)); } };
   }
 
-  /* Every google.script.run round trip costs a few hundred milliseconds, so
-   * identical GETs are deduplicated while in flight and their answers are
-   * reused for a moment. Any write drops the cache immediately. */
-  var GET_TTL_MS = 4000;
-  var answered = {};
-  var pending = {};
-  function dropGetCache() { answered = {}; }
-
   function send(method, requestUrl, body) {
     return new Promise(function (resolve) {
       if (!window.google || !google.script || !google.script.run) {
@@ -232,25 +224,7 @@ document.addEventListener('DOMContentLoaded', function () {
       catch (error) { return Promise.resolve(response({status:400,data:{error:'JSON درخواست نامعتبر است.'}})); }
     }
 
-    if (method !== 'GET') {
-      dropGetCache();
-      return send(method, requestUrl, body).then(function (packet) {
-        dropGetCache();
-        return response(packet);
-      });
-    }
-
-    var hit = answered[requestUrl];
-    if (hit && Date.now() - hit.at < GET_TTL_MS) return Promise.resolve(response(hit.packet));
-    if (pending[requestUrl]) return pending[requestUrl];
-
-    var request = send(method, requestUrl, body).then(function (packet) {
-      delete pending[requestUrl];
-      if (packet && Number(packet.status) === 200) answered[requestUrl] = { at: Date.now(), packet: packet };
-      return response(packet);
-    });
-    pending[requestUrl] = request;
-    return request;
+    return send(method, requestUrl, body).then(response);
   };
 })();
 </script>`;

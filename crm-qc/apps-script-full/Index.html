@@ -5883,6 +5883,66 @@ function fa(x, def) { if (x == null || x === '') return def != null ? def : '—
 function el(html) { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; }
 function debounce(fn, ms) { let t; return function (...a) { clearTimeout(t); t = setTimeout(() => fn.apply(this, a), ms); }; }
 
+/* Cache only read-only data, per authenticated token and browser tab. Never
+ * cache auth/revision/config endpoints. Session storage survives reloads but
+ * is not shared between tabs; every restored session is validated by /auth/me. */
+const readCache = {
+  ttl: 120000,
+  key: 'crmqc.readCache.v1',
+  signal: 'crmqc.readCache.invalidate.v1',
+  entries: {}, pending: {}, token: '', epoch: 0,
+  allowed(url) {
+    const path = url.split('?')[0];
+    return /^\/api\/(bootstrap|dashboard|reports|portfolio(?:\/.*)?|tickets(?:\/.*)?|socials(?:\/.*)?|agents(?:\/.*)?|data\/status|calls\/analysis|expert-ref(?:\/.*)?|criteria|elements|fiscal-months(?:\/.*)?|monthly-summary|action-types|actions(?:\/.*)?|reminders(?:\/.*)?)$/.test(path);
+  },
+  scope(token) {
+    if (this.token === token) return;
+    this.epoch++; this.entries = {}; this.pending = {}; this.token = token;
+    if (!token) return;
+    try {
+      const data = JSON.parse(sessionStorage.getItem(this.key) || 'null');
+      if (data && data.token === token && data.entries && typeof data.entries === 'object') this.entries = data.entries;
+    } catch (e) { /* storage may be unavailable */ }
+  },
+  save() {
+    try {
+      const now = Date.now();
+      const keys = Object.keys(this.entries).filter(k => now - this.entries[k].at < this.ttl).sort((a, b) => this.entries[b].at - this.entries[a].at);
+      const limited = {};
+      keys.slice(0, 60).forEach(k => { limited[k] = this.entries[k]; });
+      this.entries = limited;
+      const json = JSON.stringify({ token: this.token, entries: limited });
+      if (json.length <= 2000000) sessionStorage.setItem(this.key, json);
+      else sessionStorage.removeItem(this.key);
+    } catch (e) { try { sessionStorage.removeItem(this.key); } catch (_) {} }
+  },
+  clear(broadcast) {
+    this.epoch++; this.entries = {}; this.pending = {};
+    try { sessionStorage.removeItem(this.key); } catch (e) {}
+    if (broadcast) try { localStorage.setItem(this.signal, Date.now() + ':' + Math.random()); } catch (e) {}
+  },
+  async get(url, load) {
+    const token = window.QCAuth && window.QCAuth.token || '';
+    this.scope(token);
+    if (!token || api.offline || !this.allowed(url) || api._writes.size) return load();
+    const hit = this.entries[url];
+    if (hit && Date.now() >= hit.at && Date.now() - hit.at < this.ttl) return JSON.parse(JSON.stringify(hit.data));
+    if (this.pending[url]) return JSON.parse(JSON.stringify(await this.pending[url]));
+    const epoch = this.epoch;
+    const request = load().then(data => {
+      if (epoch === this.epoch && this.token === token && !api.offline && !api._writes.size && data != null) {
+        this.entries[url] = { at: Date.now(), data: JSON.parse(JSON.stringify(data)) };
+        this.save();
+      }
+      return data;
+    });
+    this.pending[url] = request;
+    try { return JSON.parse(JSON.stringify(await request)); }
+    finally { if (this.pending[url] === request) delete this.pending[url]; }
+  }
+};
+window.addEventListener('storage', e => { if (e.key === readCache.signal) readCache.clear(false); });
+
 /* ------------------------------------------------------------------- API */
 const api = {
   /* اگر سرور در دسترس نباشد (محیط پیش‌نمایش بیرون از نوبت کاری خاموش می‌شود)،
@@ -5903,14 +5963,21 @@ const api = {
     return Object.keys(h).length ? h : undefined;
   },
   async req(method,url,body){
-    if(method!=='GET')api._revNoted=false;
-    const work=this._request(method,url,body);if(method!=='GET')this._writes.add(work);
-    try{
-      const result=await work;
-      if(method!=='GET'&&window.App&&!api._revNoted)window.App.syncAfterWrite();
+    url = App.withDateRange(url, method);
+    const write = method !== 'GET';
+    const token = window.QCAuth && window.QCAuth.token;
+    if (!write && token && !api.offline && readCache.allowed(url) && !this._writes.size)
+      return readCache.get(url, () => this._request(method, url, body));
+    if (write) { api._revNoted = false; readCache.clear(true); }
+    const work = this._request(method, url, body);
+    if (write) this._writes.add(work);
+    try {
+      const result = await work;
+      if (write && window.App && !api._revNoted) window.App.syncAfterWrite();
       return result;
+    } finally {
+      if (write) { this._writes.delete(work); readCache.clear(true); }
     }
-    finally{this._writes.delete(work);}
   },
   unauthorized(message) {
     if (api._unauthorized || !window.QCAuth || !window.QCAuth.required) return;
@@ -5931,7 +5998,7 @@ const api = {
          * رفت‌وبرگشت کامل به /api/revision را بعد از هر ثبت حذف می‌کند. */
         try {
           const rev = (res.headers && typeof res.headers.get === 'function' ? res.headers.get('x-qc-revision') : '') || res.revision || '';
-          if (rev && window.App) { window.App.noteRevision(rev); api._revNoted = true; }
+          if (rev && method !== 'GET' && window.App) { window.App.noteRevision(rev); api._revNoted = true; }
         } catch (e) {}
         let data = null;
         try { data = await res.json(); } catch (e) { /* پاسخ خالی */ }
@@ -5971,6 +6038,7 @@ const api = {
       throw e2;
     }
   },
+  clearCache: (broadcast) => readCache.clear(!!broadcast),
   get: (url) => api.req('GET', url),
   post: (url, b) => api.req('POST', url, b || {}),
   put: (url, b) => api.req('PUT', url, b || {}),
@@ -6846,6 +6914,7 @@ const App = {
     }, 45000);
   },
   markStale(rev) {
+    readCache.clear(false);
     this._pendingRevision = rev;
     const chip = $('#syncChip');
     if (chip) { chip.hidden = false; chip.classList.add('pulse'); }
@@ -6883,6 +6952,7 @@ const App = {
     if (chip) { chip.disabled = true; }
     try {
       this._rangeReady = false;
+      readCache.clear(false);
       await this.boot();
       await this.route();
       this._pendingRevision = 0;
@@ -7105,7 +7175,10 @@ const QCAuth = {
       return saved.user;
     } catch (e) { return null; }
   },
-  clear() { this.user = null; this.token = ''; safeRemove(TOKEN_KEY); },
+  clear() {
+    if (window.UI && window.UI.api.clearCache) window.UI.api.clearCache(true);
+    this.user = null; this.token = ''; safeRemove(TOKEN_KEY);
+  },
 
   /* صفحه‌هایی که این کاربر اجازه‌ی دیدنشان را دارد */
   can(route) {
@@ -7139,8 +7212,11 @@ const QCAuth = {
       try {
         const me = await api.get('/api/auth/me');
         if (me && me.required && me.user) {
+          /* Permissions may have changed while the tab was closed. Never reuse
+           * data cached under the previous identity/scope for the same token. */
+          if (JSON.stringify(saved) !== JSON.stringify(me.user) && api.clearCache) api.clearCache(true);
           this.required = true; this.accounts = me.accounts || []; this.user = me.user;
-          this.mode = 'auto'; this.syncLocalSession(); return true;
+          this.mode = 'auto'; this.persist(); this.syncLocalSession(); return true;
         }
         if (me && !me.required) { this.required = false; this.clear(); return true; }
       } catch (e) { /* نشست منقضی شده */ }
@@ -13465,14 +13541,6 @@ document.addEventListener('DOMContentLoaded', function () {
       text: function () { return Promise.resolve(JSON.stringify(payload)); } };
   }
 
-  /* Every google.script.run round trip costs a few hundred milliseconds, so
-   * identical GETs are deduplicated while in flight and their answers are
-   * reused for a moment. Any write drops the cache immediately. */
-  var GET_TTL_MS = 4000;
-  var answered = {};
-  var pending = {};
-  function dropGetCache() { answered = {}; }
-
   function send(method, requestUrl, body) {
     return new Promise(function (resolve) {
       if (!window.google || !google.script || !google.script.run) {
@@ -13499,25 +13567,7 @@ document.addEventListener('DOMContentLoaded', function () {
       catch (error) { return Promise.resolve(response({status:400,data:{error:'JSON درخواست نامعتبر است.'}})); }
     }
 
-    if (method !== 'GET') {
-      dropGetCache();
-      return send(method, requestUrl, body).then(function (packet) {
-        dropGetCache();
-        return response(packet);
-      });
-    }
-
-    var hit = answered[requestUrl];
-    if (hit && Date.now() - hit.at < GET_TTL_MS) return Promise.resolve(response(hit.packet));
-    if (pending[requestUrl]) return pending[requestUrl];
-
-    var request = send(method, requestUrl, body).then(function (packet) {
-      delete pending[requestUrl];
-      if (packet && Number(packet.status) === 200) answered[requestUrl] = { at: Date.now(), packet: packet };
-      return response(packet);
-    });
-    pending[requestUrl] = request;
-    return request;
+    return send(method, requestUrl, body).then(response);
   };
 })();
 </script>

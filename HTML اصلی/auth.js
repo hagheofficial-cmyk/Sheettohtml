@@ -53,7 +53,10 @@ const QCAuth = {
       return saved.user;
     } catch (e) { return null; }
   },
-  clear() { this.user = null; this.token = ''; safeRemove(TOKEN_KEY); },
+  clear() {
+    if (window.UI && window.UI.api.clearCache) window.UI.api.clearCache(true);
+    this.user = null; this.token = ''; safeRemove(TOKEN_KEY);
+  },
 
   /* صفحه‌هایی که این کاربر اجازه‌ی دیدنشان را دارد */
   can(route) {
@@ -87,8 +90,11 @@ const QCAuth = {
       try {
         const me = await api.get('/api/auth/me');
         if (me && me.required && me.user) {
+          /* Permissions may have changed while the tab was closed. Never reuse
+           * data cached under the previous identity/scope for the same token. */
+          if (JSON.stringify(saved) !== JSON.stringify(me.user) && api.clearCache) api.clearCache(true);
           this.required = true; this.accounts = me.accounts || []; this.user = me.user;
-          this.mode = 'auto'; this.syncLocalSession(); return true;
+          this.mode = 'auto'; this.persist(); this.syncLocalSession(); return true;
         }
         if (me && !me.required) { this.required = false; this.clear(); return true; }
       } catch (e) { /* نشست منقضی شده */ }
